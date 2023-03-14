@@ -12,5 +12,12 @@
   },
   "keywords": [],
   "author": "Ivan Gornovskiy",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.3.4",
+    "cli": "^1.0.1",
+    "lowdb": "^5.1.0",
+    "p-queue": "^7.3.4",
+    "yargs": "^17.7.1"
+  }
 }
