@@ -2,7 +2,9 @@ import PQueue from "p-queue";
 
 import options from "./src/options.js";
 
-import getItemsByQuery from "./src/adapters/wildberries.js";
+// import { getItemsByQuery as getItemsByQueryFromWildberries } from "./src/adapters/wildberries.js";
+// import { getItemsByQuery as getItemsByQueryFromAliexpress } from "./src/adapters/aliexpress.js";
+import { getItemsByQuery as getItemsByQueryFromEbay } from "./src/adapters/ebay.js";
 
 (async () => {
     if (!options.query) {
@@ -24,25 +26,27 @@ import getItemsByQuery from "./src/adapters/wildberries.js";
     //   // console.log(result);
     // });
 
-    //   queue.on("idle", () => {
+    // queue.on("idle", () => {
     //     console.log(
-    //       `Queue is idle.  Size: ${queue.size}  Pending: ${queue.pending}`
+    //         `Queue is idle.  Size: ${queue.size}  Pending: ${queue.pending}`
     //     );
-    //   });
+    // });
 
-    //   queue.on("add", () => {
+    // queue.on("add", () => {
     //     console.log(
-    //       `Task is added.  Size: ${queue.size}  Pending: ${queue.pending}`
+    //         `Task is added.  Size: ${queue.size}  Pending: ${queue.pending}`
     //     );
-    //   });
+    // });
 
-    //   queue.on("next", () => {
+    // queue.on("next", () => {
     //     console.log(
-    //       `Task is completed.  Size: ${queue.size}  Pending: ${queue.pending}`
+    //         `Task is completed.  Size: ${queue.size}  Pending: ${queue.pending}`
     //     );
-    //   });
+    // });
 
-    getItemsByQuery(options.query, queue);
+    // getItemsByQueryFromWildberries(options.query, queue);
+    // getItemsByQueryFromAliexpress(options.query, queue);
+    getItemsByQueryFromEbay(options.query, queue);
 
     return true;
 })();

@@ -15,7 +15,9 @@ if (!fs.existsSync(dbPath)) {
     fs.mkdirSync(dbPath);
 }
 
-const wildberriesAdapter = new JSONFileSync(path.resolve(dbPath, "users.json"));
+const wildberriesAdapter = new JSONFileSync(
+    path.resolve(dbPath, "wildberries.json")
+);
 const wildberriesDb = new LowSync(wildberriesAdapter);
 
 wildberriesDb.read();
@@ -39,16 +41,13 @@ export async function getFeedback(id, feedback, query, queue) {
         `[Wildberries] ${query}: ${id} - Try to download ${photos.length} photos`
     );
 
-    const saveDirPath = path.resolve(options.directory, "./download");
-
-    if (!fs.existsSync(saveDirPath)) {
-        fs.mkdirSync(saveDirPath);
-    }
-
-    const itemFolderPath = path.resolve(saveDirPath, id.toString());
+    const itemFolderPath = path.resolve(
+        path.resolve(options.directory, "./download", "wildberries"),
+        id.toString()
+    );
 
     if (!fs.existsSync(itemFolderPath)) {
-        fs.mkdirSync(itemFolderPath);
+        fs.mkdirSync(itemFolderPath, { recursive: true });
     }
 
     for (const photo of photos) {
