@@ -1,3 +1,5 @@
+import sleep from "./sleep.js";
+
 /**
  * Autoscroll puppeteer page
  *
@@ -24,6 +26,26 @@ export async function autoScroll(page) {
             }, 100);
         });
     });
+}
+
+/**
+ * Scroll ticj for page
+ *
+ * @param   {Object}  page  Puppeteer page
+ *
+ * @return  {Boolean}       Result
+ */
+export async function scrollTick(page) {
+    await page.evaluate(async () => {
+        let distance = Math.floor(document.body.offsetHeight / 2);
+
+        // let scrollHeight = document.body.scrollHeight;
+        window.scrollBy(0, distance);
+
+        return true;
+    });
+
+    await sleep(50);
 }
 
 export default autoScroll;

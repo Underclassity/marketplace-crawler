@@ -1,3 +1,5 @@
+import options from "../options.js";
+
 /**
  * Page goto settings
  *
@@ -5,7 +7,7 @@
  */
 export const goSettings = {
     waitUntil: "load",
-    timeout: 0,
+    timeout: options.timeout || 0,
 };
 
 export default goSettings;
