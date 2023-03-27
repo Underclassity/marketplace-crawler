@@ -11,10 +11,10 @@ export async function autoScroll(page) {
     await page.evaluate(async () => {
         await new Promise((resolve) => {
             let totalHeight = 0;
-            let distance = Math.floor(document.body.offsetHeight / 2);
+            const distance = Math.floor(document.body.offsetHeight / 2);
 
-            let timer = setInterval(() => {
-                let scrollHeight = document.body.scrollHeight;
+            const timer = setInterval(() => {
+                const scrollHeight = document.body.scrollHeight;
 
                 window.scrollBy(0, distance);
                 totalHeight += distance;
@@ -37,7 +37,7 @@ export async function autoScroll(page) {
  */
 export async function scrollTick(page) {
     await page.evaluate(async () => {
-        let distance = Math.floor(document.body.offsetHeight / 2);
+        const distance = Math.floor(document.body.offsetHeight / 2);
 
         // let scrollHeight = document.body.scrollHeight;
         window.scrollBy(0, distance);

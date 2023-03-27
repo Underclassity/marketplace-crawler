@@ -28,6 +28,11 @@ export const options = yargs(hideBin(process.argv))
         default: 100500,
         type: "number",
     })
+    .option("start", {
+        describe: "Start page",
+        default: 1,
+        type: "number",
+    })
     .option("timeout", {
         describe: "XHR timeout",
         default: 30000,
@@ -52,6 +57,11 @@ export const options = yargs(hideBin(process.argv))
         describe: "Logs flag",
         default: false,
         type: "boolean",
+    })
+    .option("id", {
+        describe: "ID to get",
+        default: false,
+        type: "number",
     }).argv;
 
 console.log("Options:");
