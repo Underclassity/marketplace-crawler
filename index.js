@@ -7,12 +7,12 @@ import AdblockerPlugin from "puppeteer-extra-plugin-adblocker";
 import options from "./src/options.js";
 
 // import { getItemsByQuery as getItemsByQueryFromWildberries } from "./src/adapters/wildberries.js";
-// import { getItemsByQuery as getItemsByQueryFromAliexpress } from "./src/adapters/aliexpress.js";
+import { getItemsByQuery as getItemsByQueryFromAliexpress } from "./src/adapters/aliexpress.js";
 // import { getItemsByQuery as getItemsByQueryFromEbay } from "./src/adapters/ebay.js";
-import {
-    getItemsByQuery as getItemsByQueryFromOzon,
-    getOzonItem,
-} from "./src/adapters/ozon.js";
+// import {
+//     getItemsByQuery as getItemsByQueryFromOzon,
+//     getOzonItem,
+// } from "./src/adapters/ozon.js";
 
 // Configure puppeteer
 puppeteer.use(
@@ -31,30 +31,30 @@ puppeteer.use(StealthPlugin());
         carryoverConcurrencyCount: true,
     });
 
-    if (options.id) {
-        const browser = await puppeteer.launch({
-            headless: options.headless,
-            devtools: options.headless ? false : true,
-        });
+    // if (options.id) {
+    //     const browser = await puppeteer.launch({
+    //         headless: options.headless,
+    //         devtools: options.headless ? false : true,
+    //     });
 
-        console.log(`Update item ${options.id}`);
+    //     console.log(`Update item ${options.id}`);
 
-        queue.add(
-            () =>
-                getOzonItem(
-                    null,
-                    options.id,
-                    options.query || "ID",
-                    queue,
-                    browser
-                ),
-            {
-                priority: 9,
-            }
-        );
+    //     queue.add(
+    //         () =>
+    //             getOzonItem(
+    //                 null,
+    //                 options.id,
+    //                 options.query || "ID",
+    //                 queue,
+    //                 browser
+    //             ),
+    //         {
+    //             priority: 9,
+    //         }
+    //     );
 
-        return true;
-    }
+    //     return true;
+    // }
 
     if (!options.query) {
         console.log("Query not defined!");
@@ -87,9 +87,9 @@ puppeteer.use(StealthPlugin());
     // });
 
     // getItemsByQueryFromWildberries(options.query, queue);
-    // getItemsByQueryFromAliexpress(options.query, queue);
+    getItemsByQueryFromAliexpress(options.query, queue);
     // getItemsByQueryFromEbay(options.query, queue);
-    getItemsByQueryFromOzon(options.query, queue);
+    // getItemsByQueryFromOzon(options.query, queue);
 
     return true;
 })();

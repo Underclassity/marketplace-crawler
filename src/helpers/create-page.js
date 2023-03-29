@@ -30,19 +30,14 @@ export async function createPage(
         await page.setDefaultNavigationTimeout(0);
 
         page.on("request", (req) => {
-            if (
-                // ["image", "other", "script", "font", "stylesheet"].indexOf(req.resourceType()) != -1
-                types.indexOf(req.resourceType()) != -1
-            ) {
-                // if (types.indexOf(req.resourceType()) != -1) {
-                return Promise.resolve()
-                    .then(() => req.abort())
-                    .catch((e) => {});
-            } else {
-                return Promise.resolve()
-                    .then(() => req.continue())
-                    .catch((e) => {});
-            }
+            // ["image", "other", "script", "font", "stylesheet"].indexOf(req.resourceType()) != -1
+            return !types.includes(req.resourceType())
+                ? Promise.resolve()
+                      .then(() => req.continue())
+                      .catch((e) => {})
+                : Promise.resolve()
+                      .then(() => req.abort())
+                      .catch((e) => {});
         });
     }
 

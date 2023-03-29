@@ -8,8 +8,8 @@ import { exec } from "node:child_process";
  * @return  {Object}           Promise
  */
 export async function commandCall(command) {
-    return new Promise(function (resolve, reject) {
-        return exec(command, function (error, stdout, stderr) {
+    return new Promise((resolve, reject) =>
+        exec(command, (error, stdout, stderr) => {
             if (error) {
                 console.log(error);
                 console.log(stdout);
@@ -23,8 +23,8 @@ export async function commandCall(command) {
             // }
 
             return resolve(stdout || true);
-        });
-    });
+        })
+    );
 }
 
 export default commandCall;

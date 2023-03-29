@@ -62,6 +62,16 @@ export const options = yargs(hideBin(process.argv))
         describe: "ID to get",
         default: false,
         type: "number",
+    })
+    .option("time", {
+        describe: "Time to update in hours",
+        default: 12,
+        type: "number",
+    })
+    .option("pageSize", {
+        type: "number",
+        describe: "Scrape item page size",
+        default: 100,
     }).argv;
 
 console.log("Options:");

@@ -61,9 +61,8 @@ export class PreloadQueue {
      */
     get eta() {
         const averageTime =
-            this.downloadWindow.reduce(function (a, b) {
-                return a + b;
-            }, 0) / this.downloadWindow.length;
+            this.downloadWindow.reduce((a, b) => a + b, 0) /
+            this.downloadWindow.length;
 
         return (this.length - this.downloaded) * averageTime;
     }
@@ -105,7 +104,7 @@ export class PreloadQueue {
         this.queue[priority].push(func);
 
         // increment length
-        this._length += 1;
+        this._length++;
 
         return this;
     }
@@ -136,7 +135,7 @@ export class PreloadQueue {
             return this;
         }
 
-        this._count += 1;
+        this._count++;
 
         // init time in download storage
         this.downloadTime[task.id] = {
@@ -145,7 +144,7 @@ export class PreloadQueue {
         };
 
         Object.defineProperty(this.downloadTime[task.id], "value", {
-            get: function () {
+            get() {
                 return this.end - this.start;
             },
         });
@@ -160,10 +159,10 @@ export class PreloadQueue {
                 }
             }
 
-            this._count -= 1;
+            this._count--;
 
             // increment downloaded
-            this._downloaded += 1;
+            this._downloaded++;
 
             if (this.queue[task.priority].length) {
                 this.queue[task.priority].shift();

@@ -23,9 +23,7 @@ export async function getProxyList() {
 
         const fileData = await fileRequest.text();
 
-        proxies = fileData.split("\n").filter(function (item) {
-            return item.length;
-        });
+        proxies = fileData.split("\n").filter((item) => item.length);
 
         proxies = proxies.slice(proxies.length - 100);
     } catch (error) {
@@ -63,16 +61,14 @@ export async function filterProxyList(data = getProxyList(), delay = 500) {
         if (proxyCache[item]) {
             resultData.push(item);
 
-            if (data.indexOf(item) != -1) {
+            if (data.includes(item)) {
                 data[data.indexOf(item)] = null;
             }
         }
     }
 
     // filter data before process
-    data = data.filter(function (item) {
-        return item;
-    });
+    data = data.filter((item) => item);
 
     log(`Found ${data.length} proxies for test`);
 
@@ -82,12 +78,12 @@ export async function filterProxyList(data = getProxyList(), delay = 500) {
         actions.push(async () => {
             log(`Test proxy ${ip}:${port}`);
 
-            const result = await new Promise(function (resolve) {
+            const result = await new Promise((resolve) => {
                 const sock = new net.Socket();
 
                 sock.setTimeout(delay);
 
-                sock.on("connect", function () {
+                sock.on("connect", () => {
                     log(`Proxy ${ip}:${port} connected`);
 
                     sock.destroy();
@@ -100,7 +96,7 @@ export async function filterProxyList(data = getProxyList(), delay = 500) {
 
                     resolve(item);
                 })
-                    .on("error", function (e) {
+                    .on("error", (e) => {
                         log(`Proxy ${ip}:${port} error: ${e.message}`);
 
                         proxyCache[item] = false;
@@ -111,7 +107,7 @@ export async function filterProxyList(data = getProxyList(), delay = 500) {
 
                         resolve(null);
                     })
-                    .on("timeout", function () {
+                    .on("timeout", () => {
                         log(`Proxy ${ip}:${port} timeout`);
 
                         proxyCache[item] = false;

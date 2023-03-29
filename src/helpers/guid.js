@@ -20,11 +20,7 @@ export function guid(num) {
         let resId = "";
 
         for (let i = 0; i < num; i++) {
-            if (i) {
-                resId = resId + "-" + s4();
-            } else {
-                resId = resId + s4();
-            }
+            resId = i ? `${resId}-${s4()}` : resId + s4();
         }
 
         return resId;

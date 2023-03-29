@@ -8,12 +8,12 @@ import options from "../options.js";
  * @return  {Boolean}       Result
  */
 export function log(msg) {
-  if (options.logs) {
-    console.log(msg);
-    return true;
-  }
+    if (options.logs) {
+        console.log(msg);
+        return true;
+    }
 
-  return false;
+    return false;
 }
 
 export default log;

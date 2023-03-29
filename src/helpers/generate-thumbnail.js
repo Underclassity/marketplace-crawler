@@ -27,7 +27,7 @@ export async function generateThumbail(dir, force = false) {
         .filter((filepath) =>
             fs.statSync(path.resolve(itemFolder, filepath)).isFile()
         )
-        .filter((filepath) => filepath.indexOf(".json") === -1);
+        .filter((filepath) => !filepath.includes(".json"));
 
     const isExist = fs.existsSync(itemThumbnailPath);
 
@@ -48,9 +48,7 @@ export async function generateThumbail(dir, force = false) {
     console.log(`${dir}: Process (${options.force}, ${force})`);
 
     // take random elements
-    itemImages = itemImages.sort(function (item) {
-        return Math.random() - Math.random();
-    });
+    itemImages = itemImages.sort((item) => Math.random() - Math.random());
 
     // itemImages = itemImages.sort(function (a, b) {
     //   const aBirthtime = fs.statSync(path.resolve(itemFolder, a)).birthtimeMs
@@ -59,9 +57,9 @@ export async function generateThumbail(dir, force = false) {
     //   return bBirthtime - aBirthtime
     // })
 
-    let images = itemImages.slice(0, 16).map(function (filename) {
-        return path.resolve(itemFolder, filename);
-    });
+    let images = itemImages
+        .slice(0, 16)
+        .map((filename) => path.resolve(itemFolder, filename));
 
     const length = images.length;
 
@@ -102,7 +100,7 @@ export async function generateThumbail(dir, force = false) {
         );
 
         if (fs.existsSync(imageCropedPath)) {
-            counter += 1;
+            counter++;
             cropedImages.push(imageCropedPath);
             continue;
         }
@@ -117,7 +115,7 @@ export async function generateThumbail(dir, force = false) {
             } convert ${image} -gravity Center -crop ${cropFactor}x${cropFactor}+0+0 ${imageCropedPath}`;
 
             await commandCall(command);
-            counter += 1;
+            counter++;
 
             cropedImages.push(imageCropedPath);
         } catch (error) {
