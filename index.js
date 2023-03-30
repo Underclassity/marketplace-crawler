@@ -7,8 +7,9 @@ import AdblockerPlugin from "puppeteer-extra-plugin-adblocker";
 import options from "./src/options.js";
 
 // import { getItemsByQuery as getItemsByQueryFromWildberries } from "./src/adapters/wildberries.js";
-import { getItemsByQuery as getItemsByQueryFromAliexpress } from "./src/adapters/aliexpress.js";
+// import { getItemsByQuery as getItemsByQueryFromAliexpress } from "./src/adapters/aliexpress.js";
 // import { getItemsByQuery as getItemsByQueryFromEbay } from "./src/adapters/ebay.js";
+import { getItemsByQuery as getItemsByQueryFromAmazon } from "./src/adapters/amazon.js";
 // import {
 //     getItemsByQuery as getItemsByQueryFromOzon,
 //     getOzonItem,
@@ -87,9 +88,10 @@ puppeteer.use(StealthPlugin());
     // });
 
     // getItemsByQueryFromWildberries(options.query, queue);
-    getItemsByQueryFromAliexpress(options.query, queue);
+    // getItemsByQueryFromAliexpress(options.query, queue);
     // getItemsByQueryFromEbay(options.query, queue);
     // getItemsByQueryFromOzon(options.query, queue);
+    getItemsByQueryFromAmazon(options.query, queue);
 
     return true;
 })();
