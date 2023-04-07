@@ -11,11 +11,14 @@ import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import AdblockerPlugin from "puppeteer-extra-plugin-adblocker";
 
+import autoScroll from "../helpers/auto-scroll.js";
 import createPage from "../helpers/create-page.js";
+import downloadItem from "../helpers/download.js";
 import goSettings from "../helpers/go-settings.js";
 import log from "../helpers/log.js";
 import options from "../options.js";
-import autoScroll from "../helpers/auto-scroll.js";
+import priorities from "../helpers/priorities.js";
+import updateTime from "../helpers/db.js";
 
 const dbPath = path.resolve(options.directory, "db");
 
@@ -42,17 +45,37 @@ puppeteer.use(
 
 puppeteer.use(StealthPlugin());
 
+function logMsg(msg, id) {
+    const query = options.query || "";
+
+    if (id) {
+        return log(`[Ebay] ${query}: ${id} - ${msg}`);
+    }
+
+    return log(`[Ebay] ${query}: ${msg}`);
+}
+
+/**
+ * Get item id from link
+ *
+ * @param   {String}  link  Item link
+ *
+ * @return  {String}        Item ID
+ */
 function getItemId(link) {
-    return link.match(/(\d+)/gim).filter((item) => item.length >= 10)[0];
+    return link.match(/(\d+)/gim).find((item) => item.length >= 10);
 }
 
-function onlyUnique(value, index, self) {
-    return self.indexOf(value) === index;
-}
-
+/**
+ * Get photos URLs for item by ID
+ *
+ * @param   {String}  itemId  Item ID
+ *
+ * @return  {Array}           Photos URLs array
+ */
 async function getPhotosURLs(itemId) {
     try {
-        let request = await axios(
+        const request = await axios(
             `http://www.isdntek.com/fetch/fetchpgsource.php?cnt=1&deweb=1&delay=50&pg1=https%3A//www.ebay.com/itm/${itemId}%3Forig_cvip%3Dtrue%26nordt%3Dtrue`,
             {
                 timeout: options.timeout,
@@ -60,37 +83,34 @@ async function getPhotosURLs(itemId) {
             }
         );
 
-        let html = request.data;
+        const html = request.data;
 
         let $ = cheerio.load(html);
 
         $ = cheerio.load($("#pagesourcecode").text());
 
-        let imageUrls = [];
+        const imageUrls = [];
 
-        $("img").each(function (index, image) {
+        $("img").each((index, image) => {
             imageUrls.push($(image).attr("src"));
         });
 
-        imageUrls = imageUrls
+        return imageUrls
             .filter((item) => item)
-            .filter(
-                (imageURL) =>
-                    imageURL.indexOf("https://i.ebayimg.com/images/g/") != -1
+            .filter((imageURL) =>
+                imageURL.includes("https://i.ebayimg.com/images/g/")
             )
-            .filter(onlyUnique)
-            .map(function (imageURL) {
-                return {
-                    id: imageURL
-                        .match(/g\/(.+)\/s/gim)[0]
-                        .replace("g/", "")
-                        .replace("/s", ""),
-                    link: imageURL,
-                    ext: imageURL.split(".").pop(),
-                };
-            });
-
-        return imageUrls;
+            .filter((item, index, array) => {
+                return array.indexOf(item) == index;
+            })
+            .map((imageURL) => ({
+                id: imageURL
+                    .match(/g\/(.+)\/s/gim)[0]
+                    .replace("g/", "")
+                    .replace("/s", ""),
+                link: imageURL,
+                ext: imageURL.split(".").pop(),
+            }));
     } catch (error) {
         console.log(error.message);
     }
@@ -98,31 +118,96 @@ async function getPhotosURLs(itemId) {
     return false;
 }
 
-async function download(id, query, photoObject, photoURL, imagePath) {
-    log(`[Ebay] ${query}: ${id} - Try to download ${photoObject.id}`);
+export function updateItems(queue) {
+    logMsg("Update items");
 
-    const dirPath = path.dirname(imagePath);
+    ebayDb.read();
 
-    if (!fs.existsSync(dirPath)) {
-        fs.mkdirSync(dirPath, { recursive: true });
-    }
+    const time = options.time * 60 * 60 * 1000;
 
-    try {
-        const res = await axios(photoURL, {
-            responseType: "stream",
-            timeout: options.timeout * 2,
+    for (const itemId in ebayDb.data) {
+        const item = ebayDb.data[itemId];
+
+        if (
+            item &&
+            item.time &&
+            Date.now() - item.time <= time &&
+            !options.force
+        ) {
+            logMsg(`Already updated by time`, item);
+            continue;
+        }
+
+        queue.add(() => getItem(itemId, queue), {
+            priority: priorities.item,
         });
-
-        res.data.pipe(fs.createWriteStream(imagePath));
-
-        log(`[Ebay] ${query}: ${id} - Downloaded ${photoObject.id}`);
-
-        return true;
-    } catch (error) {
-        console.error(error.message);
     }
 
-    return false;
+    return true;
+}
+
+export function updateReviews(queue) {
+    logMsg("Update reviews");
+
+    ebayDb.read();
+
+    for (const itemId in ebayDb.data) {
+        const item = ebayDb.data[itemId];
+
+        if (!("reviews" in item) || !Object.keys(item.reviews).length) {
+            continue;
+        }
+
+        const folderPath = path.resolve(
+            options.directory,
+            "download",
+            "ebay",
+            itemId
+        );
+
+        for (const reviewId in item.reviews) {
+            const photoObject = item.reviews[reviewId];
+
+            const photoURL = `https://i.ebayimg.com/images/g/${photoObject.id}/s-l1600.${photoObject.ext}`;
+
+            const imagePath = path.resolve(
+                folderPath,
+                `${photoObject.id}.${photoObject.ext}`
+            );
+
+            downloadItem(photoURL, imagePath, queue);
+        }
+    }
+
+    return true;
+}
+
+export async function getItem(id, queue) {
+    logMsg(`Get photos`, id);
+
+    const folderPath = path.resolve(options.directory, "download", "ebay", id);
+
+    const photos = await getPhotosURLs(id);
+
+    updateTime(ebayDb, id);
+
+    for (const photoObject of photos) {
+        if (!(photoObject.id in ebayDb.data[id].reviews)) {
+            ebayDb.data[id].reviews[photoObject.id] = photoObject;
+            ebayDb.write();
+        }
+
+        const photoURL = `https://i.ebayimg.com/images/g/${photoObject.id}/s-l1600.${photoObject.ext}`;
+
+        const imagePath = path.resolve(
+            folderPath,
+            `${photoObject.id}.${photoObject.ext}`
+        );
+
+        downloadItem(photoURL, imagePath, queue);
+    }
+
+    return true;
 }
 
 export async function getItemsByQuery(query, queue) {
@@ -131,14 +216,12 @@ export async function getItemsByQuery(query, queue) {
     });
 
     let pagesCount = options.pages;
-    let itemsPerPage = 200; // 200, 100, 50, 25
-
-    let allItemsCount = 0;
+    const itemsPerPage = 200; // 200, 100, 50, 25
 
     for (let pageId = 1; pageId <= pagesCount; pageId++) {
-        log(`[Ebay] ${query}: Get page ${pageId}`);
+        logMsg(`Get page ${pageId}`);
 
-        let page = await createPage(browser, true);
+        const page = await createPage(browser, true);
 
         await page.goto(
             `https://www.ebay.com/sch/i.html?_fsrp=1&_sop=12&_nkw=${query.replace(
@@ -150,83 +233,71 @@ export async function getItemsByQuery(query, queue) {
 
         await autoScroll(page);
 
-        let itemsCount = await page.$eval(
-            ".srp-controls__count-heading",
-            function (element) {
-                return parseInt(element.textContent.replace(",", ""), 10);
-            }
-        );
+        let itemsLinks;
 
-        pagesCount = Math.floor(itemsCount / itemsPerPage) + 2;
+        try {
+            const itemsCount = await page.$eval(
+                ".srp-controls__count-heading",
+                (element) => parseInt(element.textContent.replace(",", ""), 10)
+            );
 
-        let itemsLinks = await page.$$eval(".s-item a", function (items) {
-            return Array.from(items).map((item) => item.href);
-        });
+            pagesCount = Math.floor(itemsCount / itemsPerPage) + 2;
+
+            itemsLinks = await page.$$eval(".s-item a", (items) =>
+                Array.from(items).map((item) => item.href)
+            );
+        } catch (error) {}
 
         await page.close();
 
-        let ids = itemsLinks
+        const ids = itemsLinks
             .map(getItemId)
             .map((item) => parseInt(item, 10))
             .filter((item) => item)
-            .filter(onlyUnique)
-            .map((item) => item.toString());
+            .filter((item, index, array) => {
+                return array.indexOf(item) == index;
+            })
+            .map((item) => item.toString())
+            .filter((item) => {
+                const time = options.time * 60 * 60 * 1000;
+
+                const dbReviewItem = ebayDb.data[item];
+
+                if (
+                    dbReviewItem &&
+                    dbReviewItem.time &&
+                    Date.now() - dbReviewItem.time <= time &&
+                    !options.force
+                ) {
+                    logMsg(`Already updated by time`, item);
+                    return false;
+                }
+
+                return true;
+            });
 
         if (!ids.length) {
-            pageId == pagesCount;
+            pageId = pagesCount;
+            logMsg(`Items not found on page ${pageId}`);
+
             continue;
         }
 
-        log(`[Ebay] ${query}: Found ${ids.length} on page ${pageId}`);
+        logMsg(`Found ${ids.length} on page ${pageId}`);
 
-        allItemsCount += ids.length;
+        for (const id of ids) {
+            if (!(id in ebayDb.data)) {
+                ebayDb.data[id] = {
+                    reviews: {},
+                };
+                ebayDb.write();
+            }
 
-        for (let id of ids) {
-            let folderPath = path.resolve(
-                options.directory,
-                "download",
-                "ebay",
-                id
-            );
-
-            queue.add(
-                async () => {
-                    log(`[Ebay] ${query}: ${id} - Get photos for ${id}`);
-
-                    let photos = await getPhotosURLs(id);
-
-                    for (let photoObject of photos) {
-                        let photoURL = `https://i.ebayimg.com/images/g/${photoObject.id}/s-l1600.${photoObject.ext}`;
-
-                        let imagePath = path.resolve(
-                            folderPath,
-                            `${photoObject.id}.${photoObject.ext}`
-                        );
-
-                        if (fs.existsSync(imagePath)) {
-                            continue;
-                        }
-
-                        queue.add(
-                            async () => {
-                                await download(
-                                    id,
-                                    query,
-                                    photoObject,
-                                    photoURL,
-                                    imagePath
-                                );
-                            },
-                            { priority: 5 }
-                        );
-                    }
-                },
-                { priority: 4 }
-            );
+            queue.add(() => getItem(id, queue), {
+                priority: priorities.item,
+            });
         }
     }
-
-    log(`Found ${allItemsCount} items`);
 
     await browser.close();
 

@@ -18,6 +18,16 @@ export const options = yargs(hideBin(process.argv))
         type: "string",
         default: false,
     })
+    .option("update", {
+        describe: "Update items flag",
+        default: false,
+        type: "boolean",
+    })
+    .option("reviews", {
+        describe: "Update reviews flag",
+        default: false,
+        type: "boolean",
+    })
     .option("throat", {
         describe: "Throat number",
         default: 1,

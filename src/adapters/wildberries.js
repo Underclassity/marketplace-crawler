@@ -8,6 +8,8 @@ import { JSONFileSync } from "lowdb/node";
 
 import options from "../options.js";
 import log from "../helpers/log.js";
+import priorities from "../helpers/priorities.js";
+import downloadItem from "../helpers/download.js";
 
 const dbPath = path.resolve(options.directory, "db");
 
@@ -27,9 +29,24 @@ if (!wildberriesDb.data) {
     wildberriesDb.write();
 }
 
+function logMsg(msg, id) {
+    const query = options.query || "";
+
+    if (id) {
+        return log(`[Wildberries] ${query}: ${id} - ${msg}`);
+    }
+
+    return log(`[Wildberries] ${query}: ${msg}`);
+}
+
 export async function getFeedback(id, feedback, query, queue) {
-    if (!(feedback.id in wildberriesDb.data)) {
-        wildberriesDb.data[feedback.id] = feedback;
+    if (!("reviews" in wildberriesDb.data[id])) {
+        wildberriesDb.data[id].reviews = {};
+        wildberriesDb.write();
+    }
+
+    if (!(feedback.id in wildberriesDb.data[id].reviews)) {
+        wildberriesDb.data[id].reviews[feedback.id] = feedback;
         wildberriesDb.write();
     }
 
@@ -37,9 +54,7 @@ export async function getFeedback(id, feedback, query, queue) {
         (item) => `https://feedbackphotos.wbstatic.net/${item.fullSizeUri}`
     );
 
-    log(
-        `[Wildberries] ${query}: ${id} - Try to download ${photos.length} photos`
-    );
+    logMsg(`Try to download ${photos.length} photos`, id);
 
     const itemFolderPath = path.resolve(
         path.resolve(options.directory, "./download", "wildberries"),
@@ -52,90 +67,16 @@ export async function getFeedback(id, feedback, query, queue) {
 
     for (const photo of photos) {
         const filename = path.parse(photo).base;
-
         const filepath = path.resolve(itemFolderPath, filename);
-        const filepathWebp = path.resolve(
-            itemFolderPath,
-            `${path.parse(photo).name}.webp`
-        );
 
-        // let isSizeEqual = true;
-
-        // if (fs.existsSync(filepath) && !fs.existsSync(filepathWebp)) {
-        //     log(
-        //         `[Wildberries] ${query}: ${id} - Try to check filesize for ${filename}`
-        //     );
-
-        //     await queue.add(
-        //         async () => {
-        //             try {
-        //                 const headRequest = await axios(photo, {
-        //                     method: "head",
-        //                     timeout: options.timeout,
-        //                 });
-        //                 const { headers } = headRequest;
-
-        //                 const contentLength = parseInt(
-        //                     headers["content-length"]
-        //                 );
-        //                 const size = fs.statSync(filepath).size;
-
-        //                 isSizeEqual = contentLength === size;
-
-        //                 log(
-        //                     `[Wildberries] ${query}: ${id} - Filesize for ${filename} equal`
-        //                 );
-
-        //                 return true;
-        //             } catch (error) {
-        //                 console.log(
-        //                     `[Wildberries] ${query}: ${id} - Filesize ${filename} check eror`
-        //                 );
-        //                 console.error(error.message);
-
-        //                 return false;
-        //             }
-        //         },
-        //         { priority: 5 }
-        //     );
-        // }
-
-        if (
-            (!fs.existsSync(filepath) && !fs.existsSync(filepathWebp)) ||
-            // !isSizeEqual ||
-            options.force
-        ) {
-            log(`[Wildberries] ${query}: ${id} - Download ${filename}`);
-
-            queue.add(
-                async () => {
-                    try {
-                        const res = await axios(photo, {
-                            responseType: "stream",
-                            timeout: options.timeout * 2,
-                        });
-
-                        res.data.pipe(fs.createWriteStream(filepath));
-
-                        log(
-                            `[Wildberries] ${query}: ${id} - Downloaded ${filename}`
-                        );
-                    } catch (error) {
-                        console.error(error.message);
-                    }
-                },
-                { priority: 5 }
-            );
-        } else {
-            log(`[Wildberries] ${query}: ${id} - File ${filename} exists`);
-        }
+        downloadItem(photo, filepath, queue);
     }
 
     return true;
 }
 
 export async function getItemInfo(id, query) {
-    log(`[Wildberries] ${query}: ${id} - Get full info`);
+    logMsg(`Get full info`, id);
 
     try {
         const request = await axios(
@@ -162,19 +103,30 @@ export async function getItemInfo(id, query) {
 export async function getFeedbacks(id, query, queue) {
     queue.add(
         async () => {
-            log(`[Wildberries] ${query}: ${id} - Feedbacks get`);
+            logMsg(`Feedbacks get`, id);
 
             const fullInfo = await getItemInfo(id, query);
 
+            if (!wildberriesDb.data[id]) {
+                wildberriesDb.data[id] = {};
+                wildberriesDb.write();
+            }
+
+            if (!("reviews" in wildberriesDb.data[id])) {
+                wildberriesDb.data[id].reviews = {};
+                wildberriesDb.write();
+            }
+
+            wildberriesDb.data[id].time = Date.now();
+            wildberriesDb.write();
+
             if (!fullInfo) {
-                log(`[Wildberries] ${query}: ${id} - No feedbacks found`);
+                logMsg(`No feedbacks found`, id);
 
                 return false;
             }
 
-            log(
-                `[Wildberries] ${query}: ${id} - Found ${fullInfo.feedbackCountWithPhoto} feedbacks`
-            );
+            logMsg(`Found ${fullInfo.feedbackCountWithPhoto} feedbacks`, id);
 
             const itterations = Math.round(
                 fullInfo.feedbackCountWithPhoto / 30
@@ -198,21 +150,21 @@ export async function getFeedbacks(id, query, queue) {
                                 async () =>
                                     await getFeedback(id, item, query, queue),
                                 {
-                                    priority: 6,
+                                    priority: priorities.review,
                                 }
                             )
                         );
                     },
-                    { priority: 7 }
+                    { priority: priorities.review }
                 );
             }
         },
-        { priority: 8 }
+        { priority: priorities.review }
     );
 }
 
 export async function feedbacksRequest(id, query, skip) {
-    log(`[Wildberries] ${query}: ${id} - Get feedbacks with skip ${skip}`);
+    logMsg(`Get feedbacks with skip ${skip}`, id);
 
     try {
         const request = await axios(
@@ -225,9 +177,6 @@ export async function feedbacksRequest(id, query, skip) {
                     take: 30,
                     skip,
                 },
-                // headers: {
-                //   'content-type': 'application/json'
-                // },
                 method: "POST",
                 timeout: options.timeout,
             }
@@ -242,7 +191,7 @@ export async function feedbacksRequest(id, query, skip) {
 }
 
 export async function itemsRequest(query, page = 1) {
-    log(`[Wildberries] ${query}: Page ${page} items get`);
+    logMsg(`Page ${page} items get`);
 
     try {
         const getItemsRequest = await axios(
@@ -262,16 +211,81 @@ export async function itemsRequest(query, page = 1) {
     return false;
 }
 
+export function updateItems(queue) {
+    logMsg("Update items");
+
+    wildberriesDb.read();
+
+    const time = options.time * 60 * 60 * 1000;
+
+    for (const itemId in wildberriesDb.data) {
+        const item = wildberriesDb.data[itemId];
+
+        if (item?.time && Date.now() - item.time <= time && !options.force) {
+            continue;
+        }
+
+        queue.add(() => getFeedbacks(itemId, false, queue), {
+            priority: priorities.item,
+        });
+    }
+
+    return true;
+}
+
+export function updateReviews(queue) {
+    logMsg("Update reviews");
+
+    wildberriesDb.read();
+
+    for (const itemId in wildberriesDb.data) {
+        const item = wildberriesDb.data[itemId];
+
+        if (!("reviews" in item) || !Object.keys(item.reviews).length) {
+            continue;
+        }
+
+        for (const reviewId in item.reviews) {
+            const feedback = item.reviews[reviewId];
+
+            const photos = feedback.photos.map(
+                (item) =>
+                    `https://feedbackphotos.wbstatic.net/${item.fullSizeUri}`
+            );
+
+            logMsg(`Try to download ${photos.length} photos`, itemId);
+
+            const itemFolderPath = path.resolve(
+                path.resolve(options.directory, "./download", "wildberries"),
+                itemId.toString()
+            );
+
+            if (!fs.existsSync(itemFolderPath)) {
+                fs.mkdirSync(itemFolderPath, { recursive: true });
+            }
+
+            for (const photo of photos) {
+                const filename = path.parse(photo).base;
+                const filepath = path.resolve(itemFolderPath, filename);
+
+                downloadItem(photo, filepath, queue);
+            }
+        }
+    }
+
+    return true;
+}
+
 export async function getItemsByQuery(query, queue) {
-    log(`[Wildberries] ${query}: Get items call`);
+    logMsg(`Get items call`);
 
     for (let page = 1; page <= options.pages; page++) {
         const getItemsData = await queue.add(() => itemsRequest(query, page), {
-            priority: 10,
+            priority: priorities.page,
         });
 
         if (!getItemsData || !getItemsData.data) {
-            log(`[Wildberries] ${query}: No items left`);
+            logMsg(`No items left`);
             page = options.pages;
             continue;
         }
@@ -281,18 +295,46 @@ export async function getItemsByQuery(query, queue) {
             continue;
         }
 
-        let results = getItemsData.data.products
+        const results = getItemsData.data.products
             .map((item) => item.root)
             .filter((item, index, array) => array.indexOf(item) === index)
-            .map((item) => (item = parseInt(item, 10)));
+            .map((item) => (item = parseInt(item, 10)))
+            .filter((item) => {
+                const dbReviewItem = wildberriesDb.data[item];
+                const time = options.time * 60 * 60 * 1000;
 
-        log(
-            `[Wildberries] ${query}: Page ${page} found ${results.length} items`
-        );
+                if (
+                    dbReviewItem?.time &&
+                    Date.now() - dbReviewItem.time <= time &&
+                    !options.force
+                ) {
+                    return false;
+                }
 
-        for (let itemId of results) {
+                return true;
+            });
+
+        logMsg(`Page ${page} found ${results.length} items`);
+
+        for (const itemId of results) {
+            if (query && query.length) {
+                const dbReviewItem = wildberriesDb.data[itemId];
+
+                if (dbReviewItem) {
+                    if (!dbReviewItem.tags.includes(query)) {
+                        dbReviewItem.tags = [query].concat(dbReviewItem.tags);
+                        wildberriesDb.write();
+                    }
+                } else {
+                    wildberriesDb.data[itemId] = {
+                        tags: [query],
+                    };
+                    wildberriesDb.write();
+                }
+            }
+
             queue.add(async () => await getFeedbacks(itemId, query, queue), {
-                priority: 9,
+                priority: priorities.item,
             });
         }
     }

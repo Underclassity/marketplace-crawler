@@ -6,14 +6,35 @@ import AdblockerPlugin from "puppeteer-extra-plugin-adblocker";
 
 import options from "./src/options.js";
 
-// import { getItemsByQuery as getItemsByQueryFromWildberries } from "./src/adapters/wildberries.js";
-// import { getItemsByQuery as getItemsByQueryFromAliexpress } from "./src/adapters/aliexpress.js";
-// import { getItemsByQuery as getItemsByQueryFromEbay } from "./src/adapters/ebay.js";
-import { getItemsByQuery as getItemsByQueryFromAmazon } from "./src/adapters/amazon.js";
-// import {
-//     getItemsByQuery as getItemsByQueryFromOzon,
-//     getOzonItem,
-// } from "./src/adapters/ozon.js";
+import {
+    getItemsByQuery as getItemsByQueryFromAliexpress,
+    updateItems as updateItemsFromAliexpress,
+    updateReviews as updateReviewsFromAliexpress,
+} from "./src/adapters/aliexpress.js";
+
+import {
+    getItemsByQuery as getItemsByQueryFromAmazon,
+    updateItems as updateItemsFromAmazon,
+    updateReviews as updateReviewsFromAmazon,
+} from "./src/adapters/amazon.js";
+
+import {
+    getItemsByQuery as getItemsByQueryFromEbay,
+    updateItems as updateItemsFromEbay,
+    updateReviews as updateReviewsFromEbay,
+} from "./src/adapters/ebay.js";
+
+import {
+    getItemsByQuery as getItemsByQueryFromOzon,
+    updateItems as updateItemsFromOzon,
+    updateReviews as updateReviewsFromOzon,
+} from "./src/adapters/ozon.js";
+
+import {
+    getItemsByQuery as getItemsByQueryFromWildberries,
+    updateItems as updateItemsFromWildberries,
+    updateReviews as updateReviewsFromWildberries,
+} from "./src/adapters/wildberries.js";
 
 // Configure puppeteer
 puppeteer.use(
@@ -57,8 +78,33 @@ puppeteer.use(StealthPlugin());
     //     return true;
     // }
 
+    if (options.reviews) {
+        console.log("Update items reviews");
+
+        // updateReviewsFromAliexpress(queue);
+        // updateReviewsFromAmazon(queue);
+        // updateReviewsFromEbay(queue);
+        updateReviewsFromOzon(queue);
+        // updateReviewsFromWildberries(queue);
+
+        return false;
+    }
+
+    if (options.update) {
+        console.log("Update items");
+
+        // updateItemsFromAliexpress(queue);
+        // updateItemsFromAmazon(queue);
+        // updateItemsFromEbay(queue);
+        updateItemsFromOzon(queue);
+        // updateItemsFromWildberries(queue);
+
+        return false;
+    }
+
     if (!options.query) {
         console.log("Query not defined!");
+
         return false;
     }
 
@@ -87,11 +133,11 @@ puppeteer.use(StealthPlugin());
     //     );
     // });
 
-    // getItemsByQueryFromWildberries(options.query, queue);
-    // getItemsByQueryFromAliexpress(options.query, queue);
-    // getItemsByQueryFromEbay(options.query, queue);
-    // getItemsByQueryFromOzon(options.query, queue);
+    getItemsByQueryFromAliexpress(options.query, queue);
     getItemsByQueryFromAmazon(options.query, queue);
+    getItemsByQueryFromEbay(options.query, queue);
+    getItemsByQueryFromOzon(options.query, queue);
+    getItemsByQueryFromWildberries(options.query, queue);
 
     return true;
 })();

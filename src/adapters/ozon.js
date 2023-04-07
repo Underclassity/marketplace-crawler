@@ -1,8 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import axios from "axios";
-
 import { LowSync } from "lowdb";
 import { JSONFileSync } from "lowdb/node";
 
@@ -10,13 +8,15 @@ import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import AdblockerPlugin from "puppeteer-extra-plugin-adblocker";
 
+import { updateTime, updateTags } from "../helpers/db.js";
 import autoScroll from "../helpers/auto-scroll.js";
 import browserClose from "../helpers/browser-close.js";
-import commandCall from "../helpers/command-call.js";
 import createPage from "../helpers/create-page.js";
+import downloadItem from "../helpers/download.js";
 import goSettings from "../helpers/go-settings.js";
 import log from "../helpers/log.js";
 import options from "../options.js";
+import priorities from "../helpers/priorities.js";
 import sleep from "../helpers/sleep.js";
 
 const dbPath = path.resolve(options.directory, "db");
@@ -45,14 +45,16 @@ puppeteer.use(
 puppeteer.use(StealthPlugin());
 
 function logMsg(msg, id) {
+    const query = options.query || "";
+
     if (id) {
-        return log(`[Ozon] ${options.query}: ${id} - ${msg}`);
+        return log(`[Ozon] ${query}: ${id} - ${msg}`);
     }
 
-    return log(`[Ozon] ${options.query}: ${msg}`);
+    return log(`[Ozon] ${query}: ${msg}`);
 }
 
-async function download(id, query, url, type = "photo", uuid) {
+async function download(id, queue, url, type = "photo", uuid) {
     if (url.includes(".m3u8")) {
         type = "video";
     }
@@ -71,65 +73,7 @@ async function download(id, query, url, type = "photo", uuid) {
     const name = `${uuid}${type == "video" ? ".mp4" : path.parse(url).ext}`;
     const itemPath = path.resolve(dirPath, name);
 
-    let isSizeEqual = true;
-
-    if (fs.existsSync(itemPath)) {
-        try {
-            const headRequest = await axios(url, { method: "head" });
-            let { headers } = headRequest;
-
-            const contentLength = parseInt(headers["content-length"]);
-            const size = fs.statSync(itemPath).size;
-
-            isSizeEqual = contentLength == size;
-
-            logMsg(`Size ${type} ${name} equal ${isSizeEqual} - ${url}`, id);
-        } catch (error) {
-            console.log(error);
-        }
-    }
-
-    if (fs.existsSync(itemPath) && isSizeEqual) {
-        logMsg(`Already downloaded ${type} ${name} - ${url}`, id);
-        return true;
-    }
-
-    logMsg(`Try to download ${type} ${name} - ${url}`, id);
-
-    if (type == "photo") {
-        try {
-            const res = await axios(url, {
-                responseType: "stream",
-                timeout: options.timeout * 2,
-            });
-
-            res.data.pipe(fs.createWriteStream(itemPath));
-
-            logMsg(`Downloaded ${type} ${name}`, id);
-
-            return true;
-        } catch (error) {
-            logMsg(`Download error ${type} ${name}`, id);
-            console.error(error.message);
-        }
-    }
-
-    if (type == "video") {
-        const isWin = process.platform === "win32";
-
-        try {
-            const ffmpegCommand = `ffmpeg${
-                isWin ? ".exe" : ""
-            } -i "${url}" "${itemPath.toString()}"`;
-
-            await commandCall(ffmpegCommand);
-
-            logMsg(`Downloaded ${type} ${name}`, id);
-        } catch (error) {
-            logMsg(`Download error ${type} ${name}`, id);
-            console.log(error.message);
-        }
-    }
+    downloadItem(url, itemPath, queue, type == "video");
 
     return false;
 }
@@ -224,32 +168,24 @@ export async function getOzonItem(link, id, query, queue, browser) {
 
             if (reviewItem.content.photos.length) {
                 for (const photoItem of reviewItem.content.photos) {
-                    queue.add(
-                        () =>
-                            download(
-                                reviewItem.itemId,
-                                query,
-                                photoItem.url,
-                                "photo",
-                                photoItem.uuid
-                            ),
-                        { priority: 10 }
+                    download(
+                        reviewItem.itemId,
+                        queue,
+                        photoItem.url,
+                        "photo",
+                        photoItem.uuid
                     );
                 }
             }
 
             if (reviewItem.content.videos.length) {
                 for (const videoItem of reviewItem.content.videos) {
-                    queue.add(
-                        () =>
-                            download(
-                                reviewItem.itemId,
-                                query,
-                                videoItem.url,
-                                "video",
-                                videoItem.uuid
-                            ),
-                        { priority: 10 }
+                    download(
+                        reviewItem.itemId,
+                        queue,
+                        videoItem.url,
+                        "video",
+                        videoItem.uuid
                     );
                 }
             }
@@ -284,7 +220,7 @@ export async function getOzonItem(link, id, query, queue, browser) {
         if (!reviews.length) {
             isReviews = true;
 
-            if (page && page.close) {
+            if (page?.close) {
                 await page.close();
                 page = undefined;
             }
@@ -361,12 +297,53 @@ export async function getOzonItem(link, id, query, queue, browser) {
         // await browserClose(browser);
     }
 
-    if (page && page.close) {
+    if (page?.close) {
         await page.close();
         page = undefined;
     }
 
     logMsg("Ended", id);
+
+    return true;
+}
+
+export async function updateItems(queue) {
+    ozonDb.read();
+
+    const browser = await puppeteer.launch({
+        headless: options.headless,
+        devtools: options.headless ? false : true,
+    });
+
+    const time = options.time * 60 * 60 * 1000;
+
+    for (const itemId in ozonDb.data) {
+        const item = ozonDb.data[itemId];
+
+        if (
+            item &&
+            item.time &&
+            Date.now() - item.time <= time &&
+            !options.force
+        ) {
+            logMsg(`Already updated by time`, item);
+            continue;
+        }
+
+        queue.add(() => getOzonItem(item.link, itemId, false, queue, browser), {
+            priority: priorities.item,
+        });
+    }
+
+    return true;
+}
+
+export async function updateReviews(queue) {
+    ozonDb.read();
+
+    for (const itemId in ozonDb.data) {
+        const item = ozonDb.data[itemId];
+    }
 
     return true;
 }
@@ -428,12 +405,33 @@ export async function getItemsByQuery(query, queue) {
                     }
 
                     return link.slice(0, ind);
-                })
-                .filter((item) => item && item.length);
+                });
+
+            const beforeFilterCount = items.length;
+
+            items = items.filter((item) => {
+                const id = parseInt(item.slice(item.lastIndexOf("-") + 1), 10);
+
+                const time = options.time * 60 * 60 * 1000;
+
+                const dbReviewItem = ozonDb.data[id];
+
+                if (
+                    dbReviewItem &&
+                    dbReviewItem.time &&
+                    Date.now() - dbReviewItem.time <= time &&
+                    !options.force
+                ) {
+                    logMsg(`Already updated by time`, item);
+                    return false;
+                }
+
+                return true;
+            });
 
             logMsg(`Page ${pageId} items ${items.length} after filter`);
 
-            if (!items.length) {
+            if (!beforeFilterCount) {
                 logMsg(`Page ${pageId} items not found`);
 
                 pageId = options.pages + 1;
@@ -447,24 +445,23 @@ export async function getItemsByQuery(query, queue) {
                     10
                 );
 
-                if (!(id in ozonDb.data) || options.force) {
+                if (!(id in ozonDb.data)) {
                     ozonDb.data[id] = {
                         link: result,
                     };
-
-                    ozonDb.write();
-
-                    queue.add(
-                        () => getOzonItem(result, id, query, queue, browser),
-                        {
-                            priority: 9,
-                        }
-                    );
-
-                    logMsg(`Add item ${id} on page ${pageId} for process`);
-                } else {
-                    logMsg(`Item ${id} on page ${pageId} already processed`);
                 }
+
+                updateTime(ozonDb, id);
+                updateTags(ozonDb, itemId, query);
+
+                logMsg(`Add item ${id} on page ${pageId} for process`);
+
+                queue.add(
+                    () => getOzonItem(result, id, query, queue, browser),
+                    {
+                        priority: priorities.item,
+                    }
+                );
             }
 
             logMsg(`Found ${items.length} items on page ${pageId}`);

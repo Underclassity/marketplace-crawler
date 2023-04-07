@@ -31,12 +31,12 @@ export async function createPage(
 
         page.on("request", (req) => {
             // ["image", "other", "script", "font", "stylesheet"].indexOf(req.resourceType()) != -1
-            return !types.includes(req.resourceType())
+            return types.includes(req.resourceType())
                 ? Promise.resolve()
-                      .then(() => req.continue())
+                      .then(() => req.abort())
                       .catch((e) => {})
                 : Promise.resolve()
-                      .then(() => req.abort())
+                      .then(() => req.continue())
                       .catch((e) => {});
         });
     }

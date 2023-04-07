@@ -10,13 +10,16 @@ import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import AdblockerPlugin from "puppeteer-extra-plugin-adblocker";
 
+import { updateTags, updateTime } from "../helpers/db.js";
 import autoScroll from "../helpers/auto-scroll.js";
 import browserConfig from "../helpers/browser-config.js";
 import createPage from "../helpers/create-page.js";
+import downloadItem from "../helpers/download.js";
 import getHeaders from "../helpers/get-headers.js";
 import goSettings from "../helpers/go-settings.js";
 import log from "../helpers/log.js";
 import options from "../options.js";
+import priorities from "../helpers/priorities.js";
 import sleep from "../helpers/sleep.js";
 
 const dbPath = path.resolve(options.directory, "db");
@@ -47,11 +50,13 @@ puppeteer.use(
 puppeteer.use(StealthPlugin());
 
 function logMsg(msg, id) {
+    const query = options.query || "";
+
     if (id) {
-        return log(`[Aliexpress] ${options.query}: ${id} - ${msg}`);
+        return log(`[Aliexpress] ${query}: ${id} - ${msg}`);
     }
 
-    return log(`[Aliexpress] ${options.query}: ${msg}`);
+    return log(`[Aliexpress] ${query}: ${msg}`);
 }
 
 export async function download(review, id, queue) {
@@ -74,63 +79,7 @@ export async function download(review, id, queue) {
 
         const itemPath = path.resolve(dirPath, name);
 
-        let isSizeEqual = true;
-
-        if (fs.existsSync(itemPath)) {
-            await queue.add(
-                async () => {
-                    try {
-                        const headRequest = await axios(url, {
-                            method: "head",
-                        });
-                        let { headers } = headRequest;
-
-                        const contentLength = parseInt(
-                            headers["content-length"]
-                        );
-                        const size = fs.statSync(itemPath).size;
-
-                        isSizeEqual = contentLength == size;
-
-                        logMsg(
-                            `Size ${name} equal ${isSizeEqual} - ${url}`,
-                            id
-                        );
-                    } catch (error) {
-                        console.log(error);
-                    }
-                },
-                { priority: 9 }
-            );
-        }
-
-        if (fs.existsSync(itemPath) && isSizeEqual) {
-            logMsg(`Already downloaded ${name} - ${url}`, id);
-            return true;
-        }
-
-        logMsg(`Try to download ${name} - ${url}`, id);
-
-        queue.add(
-            async () => {
-                try {
-                    const res = await axios(url, {
-                        responseType: "stream",
-                        timeout: options.timeout * 2,
-                    });
-
-                    res.data.pipe(fs.createWriteStream(itemPath));
-
-                    logMsg(`Downloaded ${name}`, id);
-
-                    return true;
-                } catch (error) {
-                    logMsg(`Download error ${name}`, id);
-                    console.error(error.message);
-                }
-            },
-            { priority: 10 }
-        );
+        downloadItem(url, itemPath, queue);
     }
 
     return false;
@@ -156,15 +105,13 @@ export async function getItemReviewsPage(itemId, pageId) {
 
         reviewsData = request.data.data;
     } catch (error) {
-        console.log(error.message);
+        logMsg(`Error get reviews page ${pageId}: ${error.message}`, itemId);
     }
 
     return reviewsData;
 }
 
 export async function scrapeItem(itemId, queue) {
-    logMsg(`Try to get`, itemId);
-
     const time = options.time * 60 * 60 * 1000;
 
     const dbReviewItem = aliexpressDb.data[itemId];
@@ -178,6 +125,8 @@ export async function scrapeItem(itemId, queue) {
         logMsg(`Already updated by time`, itemId);
         return false;
     }
+
+    logMsg(`Try to get item`, itemId);
 
     let found = false;
     let reviews = [];
@@ -239,14 +188,12 @@ export async function scrapeItem(itemId, queue) {
         }
 
         for (const reviewItem of reviews) {
-            if (!(reviewItem.evaluationId in dbReviewItem.reviews)) {
-                dbReviewItem.reviews[reviewItem.evaluationId] = reviewItem;
-            }
+            aliexpressDb.data[itemId].reviews[reviewItem.evaluationId] =
+                reviewItem;
+            aliexpressDb.write();
         }
 
-        dbReviewItem.time = Date.now();
-
-        aliexpressDb.write();
+        updateTime(aliexpressDb, itemId);
 
         reviews = reviews
             .filter((reviewItem) => reviewItem.images)
@@ -331,19 +278,9 @@ export async function processPage(
     logMsg(`Found ${items.length} on page ${pageId}`);
 
     for (const item of items) {
-        if (item in aliexpressDb.data) {
-            if (!aliexpressDb.data[item].tags.includes(query)) {
-                aliexpressDb.data[item].tags = [query].concat(
-                    aliexpressDb.data[item].tags
-                );
-            }
-        } else {
-            aliexpressDb.data[item] = {
-                tags: [query],
-            };
-        }
+        updateTags(aliexpressDb, item, query);
 
-        queue.add(() => scrapeItem(item, queue), { priority: 9 });
+        queue.add(() => scrapeItem(item, queue), { priority: priorities.item });
     }
 
     aliexpressDb.write();
@@ -371,6 +308,54 @@ export async function processPage(
     await page.close();
 
     return pagesCount;
+}
+
+export function updateItems(queue) {
+    logMsg("Update items");
+
+    aliexpressDb.read();
+
+    const items = Object.keys(aliexpressDb.data);
+
+    for (const itemId of items) {
+        queue.add(() => scrapeItem(itemId, queue), {
+            priority: priorities.item,
+        });
+    }
+
+    return true;
+}
+
+export function updateReviews(queue) {
+    logMsg("Update reviews");
+
+    aliexpressDb.read();
+
+    const items = Object.keys(aliexpressDb.data);
+
+    for (const itemId of items) {
+        const item = aliexpressDb.data[itemId];
+
+        if (
+            !item ||
+            !("reviews" in item) ||
+            !Object.keys(item.reviews).length
+        ) {
+            continue;
+        }
+
+        for (const reviewId in item.reviews) {
+            const reviewItem = item.reviews[reviewId];
+
+            if (!reviewItem.images || !reviewItem.images.length) {
+                continue;
+            }
+
+            download(reviewItem, itemId, queue);
+        }
+    }
+
+    return true;
 }
 
 export async function getItemsByQuery(query, queue) {
