@@ -12,8 +12,9 @@ import {
 
 import downloadItem from "../helpers/download.js";
 
-import options from "../options.js";
 import log from "../helpers/log.js";
+import options from "../options.js";
+import priorities from "../helpers/priorities.js";
 
 const dbPath = path.resolve(options.directory, "db");
 
@@ -125,7 +126,7 @@ export async function processItem(product, queue) {
 
             amazonDb.write();
         },
-        { priority: 1 }
+        { priority: priorities.item }
     );
 }
 
@@ -140,8 +141,19 @@ export async function updateItems(queue) {
 
     amazonDb.read();
 
+    const time = options.time * 60 * 60 * 1000;
+
     for (const itemId in amazonDb.data) {
         const item = amazonDb.data[itemId];
+
+        if (item?.time && Date.now() - item.time <= time && !options.force) {
+            logMsg(`Already updated by time`, item);
+            continue;
+        }
+
+        if ("deleted" in item && item.deleted) {
+            continue;
+        }
 
         processItem(item, queue);
     }
@@ -157,7 +169,16 @@ export async function updateReviews(queue) {
     for (const itemId in amazonDb.data) {
         const item = amazonDb.data[itemId];
 
+        if (item?.time && Date.now() - item.time <= time && !options.force) {
+            logMsg(`Already updated by time`, item);
+            continue;
+        }
+
         if (!("reviews" in item) || !Object.keys(item.reviews)) {
+            continue;
+        }
+
+        if ("deleted" in item && item.deleted) {
             continue;
         }
 
@@ -190,7 +211,7 @@ export async function getItemsByQuery(query, queue) {
                     console.log(error.message);
                 }
             },
-            { priority: 0 }
+            { priority: priorities.item }
         );
 
         if (!results) {

@@ -13,6 +13,8 @@ import priorities from "./priorities.js";
 
 import options from "../options.js";
 
+const isWin = process.platform === "win32";
+
 const dbPath = path.resolve(options.directory, "db");
 
 if (!fs.existsSync(dbPath)) {
@@ -142,9 +144,9 @@ export async function processFile(filepath, queue, id, prefix) {
         }
 
         return true;
-    } catch (err) {
+    } catch (error) {
         logMsg(`Convert error ${filepath}`, id, prefix);
-        console.log(err);
+        console.log(error.message);
         return false;
     }
 }
@@ -213,7 +215,7 @@ export async function downloadFile(url, filepath, queue, id, prefix) {
 export async function downloadVideo(url, filepath, queue, id, prefix) {
     const filename = path.basename(filepath);
 
-    return queue.add(
+    return await queue.add(
         async () => {
             try {
                 const ffmpegCommand = `ffmpeg${
@@ -238,15 +240,23 @@ export async function downloadVideo(url, filepath, queue, id, prefix) {
 /**
  * Check file size
  *
- * @param   {String}  url       File url
- * @param   {String}  filepath  Download filepath
- * @param   {Object}  queue     Queue instance
- * @param   {String}  id        Item ID
- * @param   {String}  prefix    Prefix for logs
+ * @param   {String}   url       File url
+ * @param   {String}   filepath  Download filepath
+ * @param   {Object}   queue     Queue instance
+ * @param   {String}   id        Item ID
+ * @param   {String}   prefix    Prefix for logs
+ * @param   {Boolean}  isVideo   Is video flag
  *
- * @return  {Boolean}           Result
+ * @return  {Boolean}            Result
  */
-export async function checkSize(url, filepath, queue, id, prefix) {
+export async function checkSize(
+    url,
+    filepath,
+    queue,
+    id,
+    prefix,
+    isVideo = false
+) {
     const filename = path.basename(filepath);
 
     if (!fs.existsSync(filepath)) {
@@ -257,6 +267,16 @@ export async function checkSize(url, filepath, queue, id, prefix) {
     if (!fs.statSync(filepath).size) {
         logMsg(`File ${filename} is empty`, id, prefix);
         return false;
+    }
+
+    if (isVideo) {
+        logMsg(
+            `File ${filename} is video with size ${fs.statSync(filepath).size}`,
+            id,
+            prefix
+        );
+
+        return true;
     }
 
     logMsg(`Try to check size ${filename}`, id, prefix);
@@ -342,12 +362,24 @@ export async function downloadItem(url, filepath, queue, isVideo = false) {
         `${parsedPath.name}.webp`
     );
 
+    if (convertDb.data.includes(filepath)) {
+        logMsg(`File ${filepath} found in convert cache`, id, prefix);
+        return false;
+    }
+
     if (fs.existsSync(webpFilepath)) {
         logMsg("Webp file exists", id, prefix);
         return true;
     }
 
-    const isSizeEqual = await checkSize(url, filepath, queue, id, prefix);
+    const isSizeEqual = await checkSize(
+        url,
+        filepath,
+        queue,
+        id,
+        prefix,
+        isVideo
+    );
 
     const tempFilepath = path.resolve(tempDirPath, path.basename(filepath));
     let isDownloaded = false;
@@ -368,7 +400,11 @@ export async function downloadItem(url, filepath, queue, isVideo = false) {
 
             fs.renameSync(tempFilepath, filepath);
         } else if (fs.existsSync(tempFilepath)) {
-            fs.unlinkSync(tempFilepath);
+            try {
+                fs.unlinkSync(tempFilepath);
+            } catch (error) {
+                console.log(error.message);
+            }
         }
     }
 

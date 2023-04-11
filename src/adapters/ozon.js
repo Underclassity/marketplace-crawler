@@ -136,7 +136,7 @@ export async function getOzonItem(link, id, query, queue, browser) {
         try {
             data = await response.json();
         } catch (error) {
-            console.log(error);
+            console.log(error.message);
             return false;
         }
 
@@ -290,8 +290,7 @@ export async function getOzonItem(link, id, query, queue, browser) {
         // await page.close();
         // await browserClose(browser);
     } catch (error) {
-        console.log("Error", id);
-        console.log(error);
+        logMsg(`Error: ${error.message}`, id);
 
         // await page.close();
         // await browserClose(browser);
@@ -320,13 +319,12 @@ export async function updateItems(queue) {
     for (const itemId in ozonDb.data) {
         const item = ozonDb.data[itemId];
 
-        if (
-            item &&
-            item.time &&
-            Date.now() - item.time <= time &&
-            !options.force
-        ) {
-            logMsg(`Already updated by time`, item);
+        if (item?.time && Date.now() - item.time <= time && !options.force) {
+            logMsg(`Already updated by time`, itemId);
+            continue;
+        }
+
+        if ("deleted" in item && item.deleted) {
             continue;
         }
 
@@ -343,6 +341,47 @@ export async function updateReviews(queue) {
 
     for (const itemId in ozonDb.data) {
         const item = ozonDb.data[itemId];
+
+        if (item?.time && Date.now() - item.time <= time && !options.force) {
+            logMsg(`Already updated by time`, itemId);
+            continue;
+        }
+
+        if (!("reviews" in item) || !Object.keys(item.reviews).length) {
+            continue;
+        }
+
+        if ("deleted" in item && item.deleted) {
+            continue;
+        }
+
+        for (const reviewId in item.reviews) {
+            const reviewItem = item.reviews[reviewId];
+
+            if (reviewItem.content.photos.length) {
+                for (const photoItem of reviewItem.content.photos) {
+                    download(
+                        reviewItem.itemId,
+                        queue,
+                        photoItem.url,
+                        "photo",
+                        photoItem.uuid
+                    );
+                }
+            }
+
+            if (reviewItem.content.videos.length) {
+                for (const videoItem of reviewItem.content.videos) {
+                    download(
+                        reviewItem.itemId,
+                        queue,
+                        videoItem.url,
+                        "video",
+                        videoItem.uuid
+                    );
+                }
+            }
+        }
     }
 
     return true;
@@ -357,126 +396,135 @@ export async function getItemsByQuery(query, queue) {
     let ended = false;
 
     for (let pageId = options.start; pageId <= options.pages; pageId++) {
-        // queue.add(
-        //     async () => {
-        if (ended) {
-            return true;
-        }
-
-        logMsg(`Try to get page ${pageId}`);
-
-        let page;
-
-        try {
-            page = await createPage(browser, true);
-
-            await page.goto(
-                `https://ozon.by/search/?from_global=true&text=${query}&page=${pageId}`,
-                goSettings
-            );
-
-            await autoScroll(page);
-
-            // wait 5 sec for items load
-            await sleep(5000);
-
-            let items = await page.evaluate(() => {
-                return Array.from(
-                    document.querySelector(".widget-search-result-container")
-                        .firstChild.children
-                ).map((item) => {
-                    return item.firstChild ? item.firstChild.href : null;
-                });
-            });
-
-            logMsg(`Page ${pageId} items ${items.length} before filter`);
-
-            items = items
-                .filter((item) => item)
-                .sort()
-                .filter((item, index, array) => {
-                    return array.indexOf(item) === index;
-                })
-                .map((link) => {
-                    const ind = link.indexOf("/?asb=");
-
-                    if (ind == -1) {
-                        return link;
-                    }
-
-                    return link.slice(0, ind);
-                });
-
-            const beforeFilterCount = items.length;
-
-            items = items.filter((item) => {
-                const id = parseInt(item.slice(item.lastIndexOf("-") + 1), 10);
-
-                const time = options.time * 60 * 60 * 1000;
-
-                const dbReviewItem = ozonDb.data[id];
-
-                if (
-                    dbReviewItem &&
-                    dbReviewItem.time &&
-                    Date.now() - dbReviewItem.time <= time &&
-                    !options.force
-                ) {
-                    logMsg(`Already updated by time`, item);
-                    return false;
+        queue.add(
+            async () => {
+                if (ended) {
+                    return true;
                 }
 
-                return true;
-            });
+                logMsg(`Try to get page ${pageId}`);
 
-            logMsg(`Page ${pageId} items ${items.length} after filter`);
+                let page;
 
-            if (!beforeFilterCount) {
-                logMsg(`Page ${pageId} items not found`);
+                try {
+                    page = await createPage(browser, true);
 
-                pageId = options.pages + 1;
-                ended = true;
-                return true;
-            }
+                    await page.goto(
+                        `https://ozon.by/search/?from_global=true&text=${query}&page=${pageId}`,
+                        goSettings
+                    );
 
-            for (const result of items) {
-                const id = parseInt(
-                    result.slice(result.lastIndexOf("-") + 1),
-                    10
-                );
+                    await autoScroll(page);
 
-                if (!(id in ozonDb.data)) {
-                    ozonDb.data[id] = {
-                        link: result,
-                    };
+                    // wait 5 sec for items load
+                    await sleep(5000);
+
+                    let items = await page.evaluate(() => {
+                        return Array.from(
+                            document.querySelector(
+                                ".widget-search-result-container"
+                            ).firstChild.children
+                        ).map((item) => {
+                            return item.firstChild
+                                ? item.firstChild.href
+                                : null;
+                        });
+                    });
+
+                    logMsg(
+                        `Page ${pageId} items ${items.length} before filter`
+                    );
+
+                    items = items
+                        .filter((item) => item)
+                        .sort()
+                        .filter((item, index, array) => {
+                            return array.indexOf(item) === index;
+                        })
+                        .map((link) => {
+                            const ind = link.indexOf("/?asb=");
+
+                            if (ind == -1) {
+                                return link;
+                            }
+
+                            return link.slice(0, ind);
+                        });
+
+                    const beforeFilterCount = items.length;
+
+                    items = items.filter((item) => {
+                        const id = parseInt(
+                            item.slice(item.lastIndexOf("-") + 1),
+                            10
+                        );
+
+                        const time = options.time * 60 * 60 * 1000;
+
+                        const dbReviewItem = ozonDb.data[id];
+
+                        if (
+                            dbReviewItem &&
+                            dbReviewItem.time &&
+                            Date.now() - dbReviewItem.time <= time &&
+                            !options.force
+                        ) {
+                            logMsg(`Already updated by time`, item);
+                            return false;
+                        }
+
+                        return true;
+                    });
+
+                    logMsg(`Page ${pageId} items ${items.length} after filter`);
+
+                    if (!beforeFilterCount) {
+                        logMsg(`Page ${pageId} items not found`);
+
+                        pageId = options.pages + 1;
+                        ended = true;
+                        return true;
+                    }
+
+                    for (const result of items) {
+                        const id = parseInt(
+                            result.slice(result.lastIndexOf("-") + 1),
+                            10
+                        );
+
+                        if (!(id in ozonDb.data)) {
+                            ozonDb.data[id] = {
+                                link: result,
+                            };
+                        }
+
+                        updateTime(ozonDb, id);
+                        updateTags(ozonDb, id, query);
+
+                        logMsg(`Add item ${id} on page ${pageId} for process`);
+
+                        queue.add(
+                            () =>
+                                getOzonItem(result, id, query, queue, browser),
+                            {
+                                priority: priorities.item,
+                            }
+                        );
+                    }
+
+                    logMsg(`Found ${items.length} items on page ${pageId}`);
+                } catch (error) {
+                    logMsg(`Page ${pageId} failed`);
+                    console.log(error.message);
                 }
 
-                updateTime(ozonDb, id);
-                updateTags(ozonDb, itemId, query);
-
-                logMsg(`Add item ${id} on page ${pageId} for process`);
-
-                queue.add(
-                    () => getOzonItem(result, id, query, queue, browser),
-                    {
-                        priority: priorities.item,
-                    }
-                );
-            }
-
-            logMsg(`Found ${items.length} items on page ${pageId}`);
-        } catch (error) {
-            logMsg(`Page ${pageId} failed`);
-            console.log(error);
-        }
-
-        if (page) {
-            await page.close();
-            page = undefined;
-        }
-        //     },
-        //     { priority: 1 }
-        // );
+                if (page) {
+                    await page.close();
+                    page = undefined;
+                }
+            },
+            { priority: priorities.page }
+        );
     }
 
     // wait for all pages processed

@@ -66,7 +66,11 @@ export function updateTags(db, itemId, tag) {
         return false;
     }
 
-    if (!tag) {
+    if (tag) {
+        tag = tag.trim();
+    }
+
+    if (!tag || !tag.length) {
         console.log("Tag not defined!");
         return false;
     }

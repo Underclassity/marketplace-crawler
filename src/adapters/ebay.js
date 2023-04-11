@@ -138,6 +138,10 @@ export function updateItems(queue) {
             continue;
         }
 
+        if ("deleted" in item && item.deleted) {
+            continue;
+        }
+
         queue.add(() => getItem(itemId, queue), {
             priority: priorities.item,
         });
@@ -154,7 +158,21 @@ export function updateReviews(queue) {
     for (const itemId in ebayDb.data) {
         const item = ebayDb.data[itemId];
 
+        if (
+            item &&
+            item.time &&
+            Date.now() - item.time <= time &&
+            !options.force
+        ) {
+            logMsg(`Already updated by time`, item);
+            continue;
+        }
+
         if (!("reviews" in item) || !Object.keys(item.reviews).length) {
+            continue;
+        }
+
+        if ("deleted" in item && item.deleted) {
             continue;
         }
 

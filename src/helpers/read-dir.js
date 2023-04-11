@@ -8,8 +8,8 @@ import path from "node:path";
  *
  * @return  {Array}       Files array
  */
-export const readDir = (dir) =>
-    fs
+export function readDir(dir) {
+    return fs
         .readdirSync(dir)
         .reduce(
             (files, file) =>
@@ -18,5 +18,6 @@ export const readDir = (dir) =>
                     : files.concat(path.join(dir, file)),
             []
         );
+}
 
 export default readDir;

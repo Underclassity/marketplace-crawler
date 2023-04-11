@@ -88,10 +88,13 @@ export async function download(review, id, queue) {
 export async function getItemReviewsPage(itemId, pageId) {
     let reviewsData = {};
 
+    logMsg(`Process page ${pageId}`, itemId);
+
     try {
         const request = await axios(
             "https://feedback.aliexpress.com/pc/searchEvaluation.do",
             {
+                timeout: options.timeout,
                 headers: getHeaders(),
                 params: {
                     productId: itemId,
@@ -112,6 +115,11 @@ export async function getItemReviewsPage(itemId, pageId) {
 }
 
 export async function scrapeItem(itemId, queue) {
+    if (!itemId) {
+        logMsg(`Item not defined`, itemId);
+        return false;
+    }
+
     const time = options.time * 60 * 60 * 1000;
 
     const dbReviewItem = aliexpressDb.data[itemId];
@@ -134,8 +142,6 @@ export async function scrapeItem(itemId, queue) {
     try {
         let maxPages = options.pages;
 
-        logMsg(`Process 1`, itemId);
-
         const firstPageReviews = await getItemReviewsPage(itemId, 1);
 
         if (firstPageReviews && firstPageReviews.totalPage) {
@@ -154,11 +160,11 @@ export async function scrapeItem(itemId, queue) {
             for (let pageId = 2; pageId <= maxPages; pageId++) {
                 await queue.add(
                     async () => {
+                        console.log(itemId, pageId, stoped);
+
                         if (stoped) {
                             return true;
                         }
-
-                        logMsg(`Process ${pageId}`, itemId);
 
                         const jsonData = await getItemReviewsPage(
                             itemId,
@@ -175,15 +181,15 @@ export async function scrapeItem(itemId, queue) {
                             reviews.push(...jsonData.evaViewList);
                         }
                     },
-                    { priority: 9 }
+                    { priority: priorities.item }
                 );
             }
         }
 
         logMsg(`Reviews length ${reviews.length}`, itemId);
 
-        if (!("reviews" in dbReviewItem)) {
-            dbReviewItem.reviews = {};
+        if (aliexpressDb.data[itemId]) {
+            aliexpressDb.data[itemId] = { reviews: {} };
             aliexpressDb.write();
         }
 
@@ -194,6 +200,7 @@ export async function scrapeItem(itemId, queue) {
         }
 
         updateTime(aliexpressDb, itemId);
+        updateTags(aliexpressDb, itemId, options.query);
 
         reviews = reviews
             .filter((reviewItem) => reviewItem.images)
@@ -315,7 +322,28 @@ export function updateItems(queue) {
 
     aliexpressDb.read();
 
-    const items = Object.keys(aliexpressDb.data);
+    const time = options.time * 60 * 60 * 1000;
+
+    const items = Object.keys(aliexpressDb.data)
+        .filter((itemId) => {
+            const item = aliexpressDb.data[itemId];
+
+            if (
+                item?.time &&
+                Date.now() - item.time <= time &&
+                !options.force
+            ) {
+                logMsg(`Already updated by time`, itemId);
+                return false;
+            }
+
+            return true;
+        })
+        .filter((itemId) => {
+            return "deleted" in aliexpressDb.data[itemId]
+                ? !aliexpressDb.data[itemId].deleted
+                : true;
+        });
 
     for (const itemId of items) {
         queue.add(() => scrapeItem(itemId, queue), {
@@ -331,7 +359,26 @@ export function updateReviews(queue) {
 
     aliexpressDb.read();
 
-    const items = Object.keys(aliexpressDb.data);
+    const items = Object.keys(aliexpressDb.data)
+        .filter((itemId) => {
+            const item = aliexpressDb.data[itemId];
+
+            if (
+                item?.time &&
+                Date.now() - item.time <= time &&
+                !options.force
+            ) {
+                logMsg(`Already updated by time`, itemId);
+                return false;
+            }
+
+            return true;
+        })
+        .filter((itemId) => {
+            return "deleted" in aliexpressDb.data[itemId]
+                ? !aliexpressDb.data[itemId].deleted
+                : true;
+        });
 
     for (const itemId of items) {
         const item = aliexpressDb.data[itemId];
@@ -382,7 +429,7 @@ export async function getItemsByQuery(query, queue) {
                     options.pages = pagesCount;
                 }
             },
-            { priority: 0 }
+            { priority: priorities.page }
         );
     }
 

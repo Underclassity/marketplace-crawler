@@ -27,7 +27,7 @@ export async function getProxyList() {
 
         proxies = proxies.slice(proxies.length - 100);
     } catch (error) {
-        console.log(error);
+        console.log(error.message);
     }
 
     return proxies;

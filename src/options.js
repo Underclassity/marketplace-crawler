@@ -65,7 +65,7 @@ export const options = yargs(hideBin(process.argv))
     })
     .option("logs", {
         describe: "Logs flag",
-        default: false,
+        default: true,
         type: "boolean",
     })
     .option("id", {
@@ -77,6 +77,16 @@ export const options = yargs(hideBin(process.argv))
         describe: "Time to update in hours",
         default: 12,
         type: "number",
+    })
+    .option("include", {
+        type: "array",
+        describe: "Include adapters array",
+        default: [],
+    })
+    .option("exclude", {
+        type: "array",
+        describe: "Exclude adapters array",
+        default: [],
     })
     .option("pageSize", {
         type: "number",
