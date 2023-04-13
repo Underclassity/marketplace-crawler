@@ -1,3 +1,6 @@
+import path from "node:path";
+import fs from "node:fs";
+
 import PQueue from "p-queue";
 
 import puppeteer from "puppeteer-extra";
@@ -48,6 +51,12 @@ puppeteer.use(
 puppeteer.use(StealthPlugin());
 
 (async () => {
+    const tempPath = path.resolve(options.directory, "temp");
+
+    if (fs.existsSync(tempPath)) {
+        fs.rmSync(tempPath, { recursive: true });
+    }
+
     const ids = getAdaptersIds();
 
     if (!ids.length) {

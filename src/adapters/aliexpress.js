@@ -60,8 +60,6 @@ function logMsg(msg, id) {
 }
 
 export async function download(review, id, queue) {
-    // console.log(review);
-
     const dirPath = path.resolve(
         options.directory,
         "download",
@@ -125,8 +123,7 @@ export async function scrapeItem(itemId, queue) {
     const dbReviewItem = aliexpressDb.data[itemId];
 
     if (
-        dbReviewItem &&
-        dbReviewItem.time &&
+        dbReviewItem?.time &&
         Date.now() - dbReviewItem.time <= time &&
         !options.force
     ) {
@@ -144,7 +141,7 @@ export async function scrapeItem(itemId, queue) {
 
         const firstPageReviews = await getItemReviewsPage(itemId, 1);
 
-        if (firstPageReviews && firstPageReviews.totalPage) {
+        if (firstPageReviews?.totalPage) {
             maxPages = firstPageReviews.totalPage || 1;
 
             if (Array.isArray(firstPageReviews.evaViewList)) {
@@ -160,8 +157,6 @@ export async function scrapeItem(itemId, queue) {
             for (let pageId = 2; pageId <= maxPages; pageId++) {
                 await queue.add(
                     async () => {
-                        console.log(itemId, pageId, stoped);
-
                         if (stoped) {
                             return true;
                         }
@@ -194,9 +189,15 @@ export async function scrapeItem(itemId, queue) {
         }
 
         for (const reviewItem of reviews) {
-            aliexpressDb.data[itemId].reviews[reviewItem.evaluationId] =
-                reviewItem;
-            aliexpressDb.write();
+            if (
+                !(reviewItem.evaluationId in aliexpressDb.data[itemId].reviews)
+            ) {
+                logMsg(`Add new review ${reviewItem.evaluationId}`, itemId);
+
+                aliexpressDb.data[itemId].reviews[reviewItem.evaluationId] =
+                    reviewItem;
+                aliexpressDb.write();
+            }
         }
 
         updateTime(aliexpressDb, itemId);
@@ -213,11 +214,8 @@ export async function scrapeItem(itemId, queue) {
         logMsg(`Reviews length after filter ${reviews.length}`, itemId);
 
         found = true;
-    } catch (err) {
-        console.log(itemId);
-        console.log(err);
-        await sleep(60000);
-
+    } catch (error) {
+        logMsg(`Error reviews get: ${error.message}`, itemId);
         // await sleep(60000);
     }
 
@@ -237,7 +235,7 @@ export async function processPage(
 
     const page = await createPage(browser, true);
 
-    if (options.url && options.url.length) {
+    if (options.url?.length) {
         let url = options.url;
 
         url = url.replace(/&page=\d+/g, "");
@@ -300,8 +298,10 @@ export async function processPage(
                 ".total-page",
                 (el) => el.textContent
             );
-        } catch (err) {
-            console.log(err);
+        } catch (error) {
+            logMsg(
+                `Total pages not found on page ${pageId} error: ${error.message}`
+            );
             pagesCount = 0;
         }
 
@@ -359,6 +359,8 @@ export function updateReviews(queue) {
 
     aliexpressDb.read();
 
+    const time = options.time * 60 * 60 * 1000;
+
     const items = Object.keys(aliexpressDb.data)
         .filter((itemId) => {
             const item = aliexpressDb.data[itemId];
@@ -394,6 +396,10 @@ export function updateReviews(queue) {
         for (const reviewId in item.reviews) {
             const reviewItem = item.reviews[reviewId];
 
+            // if ("video" in reviewItem || "videos" in reviewItem) {
+            //     console.log(reviewItem);
+            // }
+
             if (!reviewItem.images || !reviewItem.images.length) {
                 continue;
             }
@@ -405,7 +411,7 @@ export function updateReviews(queue) {
     return true;
 }
 
-export async function getItemsByQuery(query, queue) {
+export async function getItemsByQuery(queue) {
     logMsg("Get items call");
 
     let totalFound = false;
@@ -417,7 +423,7 @@ export async function getItemsByQuery(query, queue) {
             async () => {
                 const pagesCount = await processPage(
                     page,
-                    query,
+                    options.query,
                     browser,
                     totalFound,
                     queue

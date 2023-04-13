@@ -14,6 +14,7 @@ import AdblockerPlugin from "puppeteer-extra-plugin-adblocker";
 import autoScroll from "../helpers/auto-scroll.js";
 import createPage from "../helpers/create-page.js";
 import downloadItem from "../helpers/download.js";
+import getHeaders from "../helpers/get-headers.js";
 import goSettings from "../helpers/go-settings.js";
 import log from "../helpers/log.js";
 import options from "../options.js";
@@ -80,6 +81,7 @@ async function getPhotosURLs(itemId) {
             {
                 timeout: options.timeout,
                 responseType: "document",
+                headers: getHeaders(),
             }
         );
 
@@ -128,12 +130,7 @@ export function updateItems(queue) {
     for (const itemId in ebayDb.data) {
         const item = ebayDb.data[itemId];
 
-        if (
-            item &&
-            item.time &&
-            Date.now() - item.time <= time &&
-            !options.force
-        ) {
+        if (item?.time && Date.now() - item.time <= time && !options.force) {
             logMsg(`Already updated by time`, item);
             continue;
         }
@@ -155,15 +152,12 @@ export function updateReviews(queue) {
 
     ebayDb.read();
 
+    const time = options.time * 60 * 60 * 1000;
+
     for (const itemId in ebayDb.data) {
         const item = ebayDb.data[itemId];
 
-        if (
-            item &&
-            item.time &&
-            Date.now() - item.time <= time &&
-            !options.force
-        ) {
+        if (item?.time && Date.now() - item.time <= time && !options.force) {
             logMsg(`Already updated by time`, item);
             continue;
         }
@@ -228,7 +222,7 @@ export async function getItem(id, queue) {
     return true;
 }
 
-export async function getItemsByQuery(query, queue) {
+export async function getItemsByQuery(queue) {
     const browser = await puppeteer.launch({
         headless: options.headless,
     });
@@ -242,7 +236,7 @@ export async function getItemsByQuery(query, queue) {
         const page = await createPage(browser, true);
 
         await page.goto(
-            `https://www.ebay.com/sch/i.html?_fsrp=1&_sop=12&_nkw=${query.replace(
+            `https://www.ebay.com/sch/i.html?_fsrp=1&_sop=12&_nkw=${options.query.replace(
                 /\s/g,
                 "+"
             )}&LH_ItemCondition=1500%7C1750%7C3000&rt=nc&_ipg=${itemsPerPage}&_pgn=${pageId}`,
@@ -282,8 +276,7 @@ export async function getItemsByQuery(query, queue) {
                 const dbReviewItem = ebayDb.data[item];
 
                 if (
-                    dbReviewItem &&
-                    dbReviewItem.time &&
+                    dbReviewItem?.time &&
                     Date.now() - dbReviewItem.time <= time &&
                     !options.force
                 ) {

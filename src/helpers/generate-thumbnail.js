@@ -2,8 +2,12 @@ import path from "node:path";
 import fs from "node:fs";
 
 import sizeOf from "image-size";
+import prettyBytes from "pretty-bytes";
+
+import { processFile, extractVideoFrames } from "./download.js";
 import commandCall from "./command-call.js";
-import { processFile } from "./download.js";
+import priorities from "./priorities.js";
+import logMsg from "./log-msg.js";
 
 import options from "../options.js";
 
@@ -22,8 +26,6 @@ const resultsFolderPath = path.resolve(options.directory, "thumbnails");
  * @return  {Boolean}          Result
  */
 export async function generateThumbail(dir, prefix, queue, force = false) {
-    console.log(dir);
-
     if (!dir || !fs.existsSync(dir)) {
         console.log("Directory not defined!");
         return false;
@@ -55,18 +57,19 @@ export async function generateThumbail(dir, prefix, queue, force = false) {
         .readdirSync(dir)
         .filter((filepath) => fs.statSync(path.resolve(dir, filepath)).isFile())
         .filter((filepath) => !filepath.includes(".json"));
+    // .filter((filepath) => !filepath.includes(".mp4"));
 
     const isExist = fs.existsSync(itemThumbnailPath);
     const isExistWebp = fs.existsSync(itemThumbnailPathWebp);
     const isForce = options.force || force;
 
     if (!isForce && isExistWebp) {
-        console.log(`${dir}: Webp thumbnail found`);
+        logMsg(`Webp thumbnail found`, id, prefix);
         return true;
     }
 
     if (isExist && !isExistWebp && !isForce) {
-        console.log(`${dir}: Thumbnail found, convert to webp`);
+        logMsg(`Thumbnail found, convert to webp`, id, prefix);
         processFile(itemThumbnailPath, queue, path.basename(dir), id);
         return true;
     }
@@ -76,15 +79,19 @@ export async function generateThumbail(dir, prefix, queue, force = false) {
         !isForce &&
         fs.statSync(itemThumbnailPath).size
     ) {
-        console.log(`${dir}: Thumbnail found`);
+        logMsg(`Thumbnail found`, id, prefix);
         return false;
     }
 
     if (isExist && (options.force || force)) {
-        fs.unlinkSync(itemThumbnailPath);
+        try {
+            fs.unlinkSync(itemThumbnailPath);
+        } catch (error) {
+            logMsg(`Unlink thumbnail error: ${error.message}`, id, prefix);
+        }
     }
 
-    console.log(`${dir}: Process (${options.force}, ${force})`);
+    logMsg(`Process (${options.force}, ${force})`, id, prefix);
 
     // take random elements
     itemImages = itemImages.sort(() => Math.random() - Math.random());
@@ -100,10 +107,49 @@ export async function generateThumbail(dir, prefix, queue, force = false) {
         .slice(0, 16)
         .map((filename) => path.resolve(dir, filename));
 
+    const videos = images.filter((item) => item.includes(".mp4"));
+
+    if (videos.length) {
+        for (const videoFilePath of videos) {
+            let videoFrames = await extractVideoFrames(
+                videoFilePath,
+                false,
+                1,
+                id,
+                prefix
+            );
+
+            videoFrames = videoFrames
+                .sort((a, b) => {
+                    const aSize = fs.statSync(a).size;
+                    const bSize = fs.statSync(b).size;
+
+                    return bSize - aSize;
+                })
+                .forEach((filepath, index) => {
+                    if (index <= 1) {
+                        images.push(filepath);
+                    } else {
+                        try {
+                            fs.unlinkSync(filepath);
+                        } catch (error) {
+                            logMsg(
+                                `Delete frame for ${filepath} error: ${error.message} (${options.force}, ${force})`,
+                                id,
+                                prefix
+                            );
+                        }
+                    }
+                });
+        }
+
+        images = images.sort(() => Math.random() - Math.random()).slice(0, 16);
+    }
+
     const length = images.length;
 
     if (length == 0) {
-        console.log(`${dir}: Images not found (${options.force}, ${force})`);
+        logMsg(`Images not found (${options.force}, ${force})`, id, prefix);
         return false;
     }
 
@@ -135,15 +181,15 @@ export async function generateThumbail(dir, prefix, queue, force = false) {
             `${id}-${counter}.jpg`
         );
 
-        if (fs.existsSync(imageCropedPath)) {
-            counter++;
-            cropedImages.push(imageCropedPath);
-            continue;
-        }
+        // if (fs.existsSync(imageCropedPath)) {
+        //     counter++;
+        //     cropedImages.push(imageCropedPath);
+        //     continue;
+        // }
 
         await queue.add(
             async () => {
-                console.log(`${dir}: Cut ${path.basename(image)}`);
+                logMsg(`Cut ${path.basename(image)}`, id, prefix);
 
                 try {
                     const size = await sizeOf(image);
@@ -158,17 +204,29 @@ export async function generateThumbail(dir, prefix, queue, force = false) {
                     counter++;
 
                     cropedImages.push(imageCropedPath);
+
+                    logMsg(`Cuted ${path.basename(image)}`, id, prefix);
                 } catch (error) {
-                    console.log(error.message);
+                    logMsg(
+                        `Cut ${path.basename(image)} error: ${error.message}`,
+                        id,
+                        prefix
+                    );
                 }
             },
-            { priority: 5 }
+            { priority: priorities.cut }
         );
     }
 
     await queue.add(
         async () => {
             try {
+                logMsg(
+                    `Generate thumbnail ${path.basename(image)}`,
+                    id,
+                    prefix
+                );
+
                 const command = `${
                     isWin ? "magick.exe" : ""
                 } montage -monitor -geometry ${size}x -tile ${grid} -quality 80 ${cropedImages.join(
@@ -176,22 +234,38 @@ export async function generateThumbail(dir, prefix, queue, force = false) {
                 )} ${itemThumbnailPath}`;
 
                 await commandCall(command);
+
+                logMsg(
+                    `Generated thumbnail ${path.basename(image)}`,
+                    id,
+                    prefix
+                );
             } catch (error) {
-                console.log(error.message);
+                logMsg(
+                    `Generate thumbnail ${path.basename(image)} error: ${
+                        error.message
+                    }`,
+                    id,
+                    prefix
+                );
             }
         },
-        { priority: 10 }
+        { priority: priorities.thumbnail }
     );
 
     for (const image of cropedImages) {
-        fs.unlinkSync(image);
+        try {
+            fs.unlinkSync(image);
+        } catch (error) {
+            logMsg(`Unlink croped image error: ${error.message}`, id, prefix);
+        }
     }
 
     if (fs.existsSync(itemThumbnailPath)) {
         processFile(itemThumbnailPath, queue, path.basename(dir), id);
     }
 
-    console.log(`${dir}: End process`);
+    logMsg(`End process`, id, prefix);
 
     return true;
 }

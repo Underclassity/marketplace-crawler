@@ -336,7 +336,7 @@ export async function getItemsByQuery(queue) {
         logMsg(`Page ${page} found ${results.length} items`);
 
         for (const itemId of results) {
-            if (options.query && options.query.length) {
+            if (options.query?.length) {
                 const dbReviewItem = wildberriesDb.data[itemId];
 
                 if (dbReviewItem) {

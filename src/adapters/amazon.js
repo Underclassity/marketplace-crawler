@@ -77,8 +77,7 @@ export async function processItem(product, queue) {
     const dbReviewItem = amazonDb.data[product.asin];
 
     if (
-        dbReviewItem &&
-        dbReviewItem.time &&
+        dbReviewItem?.time &&
         Date.now() - dbReviewItem.time <= time &&
         !options.force
     ) {
@@ -94,6 +93,7 @@ export async function processItem(product, queue) {
                 reviews = await amazonReviews({
                     asin: product.asin,
                     number: product?.reviews?.total_reviews || 2000,
+                    timeout: options.timeout,
                 });
             } catch (error) {
                 reviews = false;
@@ -166,6 +166,8 @@ export async function updateReviews(queue) {
 
     amazonDb.read();
 
+    const time = options.time * 60 * 60 * 1000;
+
     for (const itemId in amazonDb.data) {
         const item = amazonDb.data[itemId];
 
@@ -190,7 +192,7 @@ export async function updateReviews(queue) {
     return true;
 }
 
-export async function getItemsByQuery(query, queue) {
+export async function getItemsByQuery(queue) {
     logMsg("Get items call");
 
     for (let page = options.start; page < options.pages; page++) {
@@ -200,10 +202,11 @@ export async function getItemsByQuery(query, queue) {
             async () => {
                 try {
                     results = await amazonProducts({
-                        keyword: query,
+                        keyword: options.query,
                         bulk: false,
                         page,
                         queue,
+                        timeout: options.timeout,
                     });
                 } catch (error) {
                     results = false;

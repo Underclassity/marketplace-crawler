@@ -8,9 +8,9 @@ import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import AdblockerPlugin from "puppeteer-extra-plugin-adblocker";
 
+// import browserClose from "../helpers/browser-close.js";
 import { updateTime, updateTags } from "../helpers/db.js";
 import autoScroll from "../helpers/auto-scroll.js";
-import browserClose from "../helpers/browser-close.js";
 import createPage from "../helpers/create-page.js";
 import downloadItem from "../helpers/download.js";
 import goSettings from "../helpers/go-settings.js";
@@ -78,7 +78,7 @@ async function download(id, queue, url, type = "photo", uuid) {
     return false;
 }
 
-export async function getOzonItem(link, id, query, queue, browser) {
+export async function getOzonItem(link, id, queue, browser) {
     logMsg("Try to get reviews", id);
 
     if (!link) {
@@ -339,6 +339,8 @@ export async function updateItems(queue) {
 export async function updateReviews(queue) {
     ozonDb.read();
 
+    const time = options.time * 60 * 60 * 1000;
+
     for (const itemId in ozonDb.data) {
         const item = ozonDb.data[itemId];
 
@@ -387,7 +389,7 @@ export async function updateReviews(queue) {
     return true;
 }
 
-export async function getItemsByQuery(query, queue) {
+export async function getItemsByQuery(queue) {
     const browser = await puppeteer.launch({
         headless: options.headless,
         devtools: options.headless ? false : true,
@@ -410,7 +412,7 @@ export async function getItemsByQuery(query, queue) {
                     page = await createPage(browser, true);
 
                     await page.goto(
-                        `https://ozon.by/search/?from_global=true&text=${query}&page=${pageId}`,
+                        `https://ozon.by/search/?from_global=true&text=${options.query}&page=${pageId}`,
                         goSettings
                     );
 
@@ -464,12 +466,11 @@ export async function getItemsByQuery(query, queue) {
                         const dbReviewItem = ozonDb.data[id];
 
                         if (
-                            dbReviewItem &&
-                            dbReviewItem.time &&
+                            dbReviewItem?.time &&
                             Date.now() - dbReviewItem.time <= time &&
                             !options.force
                         ) {
-                            logMsg(`Already updated by time`, item);
+                            logMsg(`Already updated by time`, id);
                             return false;
                         }
 
@@ -499,13 +500,12 @@ export async function getItemsByQuery(query, queue) {
                         }
 
                         updateTime(ozonDb, id);
-                        updateTags(ozonDb, id, query);
+                        updateTags(ozonDb, id, options.query);
 
                         logMsg(`Add item ${id} on page ${pageId} for process`);
 
                         queue.add(
-                            () =>
-                                getOzonItem(result, id, query, queue, browser),
+                            () => getOzonItem(result, id, queue, browser),
                             {
                                 priority: priorities.item,
                             }

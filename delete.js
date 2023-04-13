@@ -20,7 +20,7 @@ const dbs = {};
 
 for (const id of ids) {
     const dbAdapter = new JSONFileSync(
-        path.resolve(path.resolve("./db/"), "wildberries.json")
+        path.resolve(path.resolve("./db/"), `${id}.json`)
     );
 
     dbs[id] = new LowSync(dbAdapter);

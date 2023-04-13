@@ -12,13 +12,17 @@ export const priorities = options.reviews
           review: 3,
           checkSize: 4,
           download: 5,
+          cut: 6,
+          thumbnail: 7,
       }
     : {
-          page: 5,
-          item: 4,
-          review: 3,
-          checkSize: 2,
-          download: 1,
+          page: 7,
+          item: 6,
+          review: 5,
+          checkSize: 4,
+          download: 3,
+          cut: 2,
+          thumbnail: 1,
       };
 
 export default priorities;

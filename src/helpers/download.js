@@ -8,7 +8,9 @@ import { LowSync } from "lowdb";
 import { JSONFileSync } from "lowdb/node";
 
 import commandCall from "./command-call.js";
-import log from "./log.js";
+import generateThumbail from "./generate-thumbnail.js";
+import getHeaders from "./get-headers.js";
+import logMsg from "./log-msg.js";
 import priorities from "./priorities.js";
 
 import options from "../options.js";
@@ -37,40 +39,91 @@ if (!fs.existsSync(tempDirPath)) {
     fs.mkdirSync(tempDirPath);
 }
 
+const downloadCache = {};
+
 /**
- * Log message helper
+ * Delete file by filepath helper
  *
- * @param   {String}  msg     Message string
+ * @param   {String}  filepath  File filepath
  * @param   {String}  id      ID
  * @param   {String}  prefix  Prfix
  *
- * @return  {Boolean}         Log result
+ * @return  {Boolean}           Result
  */
-function logMsg(msg, id, prefix) {
-    if (!msg || !id || !prefix) {
-        if (!msg) {
-            console.log("Message not defined!");
-        }
-
-        if (!id) {
-            console.log("ID not defined!");
-        }
-
-        if (!prefix) {
-            console.log("Prefix not defined!");
-        }
-
-        console.trace();
+function deleteHelper(filepath, id, prefix) {
+    if (!fs.existsSync(filepath)) {
+        logMsg(`${filepath} not exists`, id, prefix);
         return false;
     }
 
-    const query = options.query || "";
+    try {
+        fs.unlinkSync(filepath);
+        logMsg(`Deleted ${filepath}`, id, prefix);
+        return true;
+    } catch (error) {
+        logMsg(`Delete error ${filepath}: ${error.message}`, id, prefix);
+        return false;
+    }
+}
 
-    if (id) {
-        return log(`[${prefix}] ${query}: ${id} - ${msg}`);
+/**
+ * Delete file by filepath helper
+ *
+ * @param   {String}  videoFilePath  Video file filepath
+ * @param   {Number}  fps            FPS to extract
+ * @param   {Number}  r              Rate frames per second
+ * @param   {String}  id      ID
+ * @param   {String}  prefix  Prfix
+ *
+ * @return  {Array}                  Frame array
+ */
+export async function extractVideoFrames(
+    videoFilePath,
+    fps = 5,
+    r = 1,
+    id,
+    prefix
+) {
+    const parsedPath = path.parse(videoFilePath);
+
+    let videoFrames = fs
+        .readdirSync(tempDirPath)
+        .filter((filename) => filename.includes(`${parsedPath.name}-frame`))
+        .map((filename) => path.resolve(tempDirPath, filename));
+
+    if (videoFrames.length) {
+        return videoFrames;
     }
 
-    return log(`[${prefix}] ${query}: ${msg}`);
+    logMsg(`Get video frames from ${parsedPath.base}`, id, prefix);
+
+    const command = `ffmpeg -i "${videoFilePath}" ${
+        fps ? `-vf fps=${fps}` : ""
+    } ${r ? `-r ${r}` : ""} "${tempDirPath}/${parsedPath.name}-frame%04d.png"`;
+
+    try {
+        await commandCall(command);
+
+        videoFrames = fs
+            .readdirSync(tempDirPath)
+            .filter((filename) => filename.includes(`${parsedPath.name}-frame`))
+            .map((filename) => path.resolve(tempDirPath, filename));
+
+        logMsg(
+            `Get ${videoFrames.length} video frames for ${parsedPath.base}`,
+            id,
+            prefix
+        );
+
+        return videoFrames;
+    } catch (error) {
+        logMsg(
+            `Get frames error for ${parsedPath.base}: ${error.message}`,
+            id,
+            prefix
+        );
+        return [];
+    }
 }
 
 /**
@@ -126,7 +179,8 @@ export async function processFile(filepath, queue, id, prefix) {
                 prefix
             );
 
-            fs.unlinkSync(filepath);
+            deleteHelper(filepath, id, prefix);
+
             fs.renameSync(tempWebpFilepath, outputFilename);
         } else {
             logMsg(
@@ -137,7 +191,7 @@ export async function processFile(filepath, queue, id, prefix) {
                 prefix
             );
 
-            fs.unlinkSync(tempWebpFilepath);
+            deleteHelper(tempWebpFilepath, id, prefix);
 
             convertDb.data.push(filepath);
             convertDb.write();
@@ -145,8 +199,7 @@ export async function processFile(filepath, queue, id, prefix) {
 
         return true;
     } catch (error) {
-        logMsg(`Convert error ${filepath}`, id, prefix);
-        console.log(error.message);
+        logMsg(`Convert error ${filepath}: ${error.message}`, id, prefix);
         return false;
     }
 }
@@ -174,26 +227,32 @@ export async function downloadFile(url, filepath, queue, id, prefix) {
     return await queue.add(
         async () => {
             try {
-                const res = await axios(url, {
-                    responseType: "stream",
+                const fileRequest = await axios(url, {
+                    responseType: "arraybuffer",
                     timeout: options.timeout * 2,
+                    headers: getHeaders(),
                 });
 
-                res.data.pipe(fs.createWriteStream(filepath));
+                fs.writeFileSync(filepath, fileRequest.data);
+
+                // res.data.pipe(fs.createWriteStream(filepath));
 
                 logMsg(
-                    `Downloaded ${filename} to ${path.dirname(filepath)}`,
+                    `Downloaded ${filename} to ${path.dirname(
+                        filepath
+                    )}(size ${prettyBytes(fs.statSync(filepath).size)})`,
                     id,
                     prefix
                 );
                 return true;
             } catch (error) {
                 logMsg(
-                    `Download error ${filename} to ${path.dirname(filepath)}`,
+                    `Download error ${filename} to ${path.dirname(filepath)}: ${
+                        error.message
+                    }`,
                     id,
                     prefix
                 );
-                console.error(error.message);
                 return false;
             }
         },
@@ -217,19 +276,29 @@ export async function downloadVideo(url, filepath, queue, id, prefix) {
 
     return await queue.add(
         async () => {
+            logMsg(`Start video download ${filename}`, id, prefix);
+
             try {
-                const ffmpegCommand = `ffmpeg${
+                // const ffmpegCommand = `ffmpeg${
+                //     isWin ? ".exe" : ""
+                // } -i "${url}" "${filepath.toString()}"`;
+
+                const ytDlpCommand = `yt-dlp${
                     isWin ? ".exe" : ""
-                } -i "${url}" "${filepath.toString()}"`;
+                } --downloader ffmpeg --hls-use-mpegts -o "${filepath.toString()}" "${url}"`;
 
-                await commandCall(ffmpegCommand);
+                // const result = await commandCall(ffmpegCommand);
+                const result = await commandCall(ytDlpCommand);
 
-                logMsg(`Downloaded video ${filename}`, id, prefix);
+                logMsg(`Downloaded video ${filename}: ${result}`, id, prefix);
 
                 return true;
             } catch (error) {
-                logMsg(`Download error video ${filename}`, id, prefix);
-                console.log(error.message);
+                logMsg(
+                    `Download error video ${filename}: ${error}`,
+                    id,
+                    prefix
+                );
                 return false;
             }
         },
@@ -260,21 +329,23 @@ export async function checkSize(
     const filename = path.basename(filepath);
 
     if (!fs.existsSync(filepath)) {
-        logMsg(`File ${filepath} not found for check size`, id, prefix);
+        // logMsg(`File ${filepath} not found for check size`, id, prefix);
         return false;
     }
 
     if (!fs.statSync(filepath).size) {
-        logMsg(`File ${filename} is empty`, id, prefix);
+        // logMsg(`File ${filename} is empty`, id, prefix);
         return false;
     }
 
     if (isVideo) {
-        logMsg(
-            `File ${filename} is video with size ${fs.statSync(filepath).size}`,
-            id,
-            prefix
-        );
+        // logMsg(
+        //     `File ${filename} is video with size ${prettyBytes(
+        //         fs.statSync(filepath).size
+        //     )}`,
+        //     id,
+        //     prefix
+        // );
 
         return true;
     }
@@ -288,7 +359,8 @@ export async function checkSize(
             try {
                 const headRequest = await axios(url, {
                     method: "head",
-                    timeout: 5000,
+                    timeout: options.timeout,
+                    headers: getHeaders(),
                 });
                 const { headers } = headRequest;
 
@@ -305,8 +377,11 @@ export async function checkSize(
                     prefix
                 );
             } catch (error) {
-                logMsg(`Filesize ${filename} check error`, id, prefix);
-                console.error(error);
+                logMsg(
+                    `Filesize ${filename} check error: ${error.message}`,
+                    id,
+                    prefix
+                );
             }
 
             return isSizeEqual;
@@ -362,13 +437,24 @@ export async function downloadItem(url, filepath, queue, isVideo = false) {
         `${parsedPath.name}.webp`
     );
 
+    if (url in downloadCache) {
+        logMsg(
+            `File ${parsedPath.name} already in download process`,
+            id,
+            prefix
+        );
+        return false;
+    }
+
     if (convertDb.data.includes(filepath)) {
-        logMsg(`File ${filepath} found in convert cache`, id, prefix);
+        // logMsg(`File ${parsedPath.name} found in convert cache`, id, prefix);
         return false;
     }
 
     if (fs.existsSync(webpFilepath)) {
-        logMsg("Webp file exists", id, prefix);
+        deleteHelper(filepath, id, prefix);
+
+        // logMsg("Webp file exists", id, prefix);
         return true;
     }
 
@@ -387,29 +473,51 @@ export async function downloadItem(url, filepath, queue, isVideo = false) {
     if (isSizeEqual) {
         isDownloaded = true;
     } else {
+        downloadCache[url] = true;
+
         isDownloaded = isVideo
             ? await downloadVideo(url, tempFilepath, queue, id, prefix)
             : await downloadFile(url, tempFilepath, queue, id, prefix);
 
-        if (isDownloaded && fs.existsSync(tempFilepath)) {
+        const isTempExist = fs.existsSync(tempFilepath);
+
+        logMsg(
+            `Downloaded ${parsedPath.base} is ${isDownloaded}, exist ${isTempExist}`,
+            id,
+            prefix
+        );
+
+        if (isDownloaded && isTempExist) {
             logMsg(
-                `Moved ${parsedPath.name} from temp to ${parsedPath.dir}`,
+                `Moved ${parsedPath.base} from temp to ${parsedPath.dir}`,
                 id,
                 prefix
             );
 
-            fs.renameSync(tempFilepath, filepath);
-        } else if (fs.existsSync(tempFilepath)) {
             try {
-                fs.unlinkSync(tempFilepath);
+                fs.renameSync(tempFilepath, filepath);
             } catch (error) {
-                console.log(error.message);
+                logMsg(`Error rename: ${error.message}`, id, prefix);
+
+                try {
+                    fs.copyFileSync(tempFilepath, filepath);
+                } catch (error) {
+                    logMsg(`Error copy: ${error.message}`, id, prefix);
+                }
             }
+        } else if (isTempExist) {
+            deleteHelper(tempFilepath, id, prefix);
         }
     }
 
     if (isDownloaded && !isVideo && fs.existsSync(filepath)) {
         await processFile(filepath, queue, id, prefix);
+    }
+
+    await generateThumbail(path.dirname(filepath), prefix, queue, true);
+
+    if (url in downloadCache) {
+        delete downloadCache[url];
     }
 
     return true;
