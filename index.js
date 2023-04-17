@@ -10,6 +10,7 @@ import AdblockerPlugin from "puppeteer-extra-plugin-adblocker";
 import options from "./src/options.js";
 
 import getAdaptersIds from "./src/helpers/get-adapters-ids.js";
+import sleep from "./src/helpers/sleep.js";
 
 // import {
 //     getItemsByQuery as getItemsByQueryFromAliexpress,
@@ -107,6 +108,10 @@ puppeteer.use(StealthPlugin());
             updateReviews(queue);
         }
 
+        while (queue.size) {
+            await sleep(100);
+        }
+
         // updateReviewsFromAliexpress(queue);
         // updateReviewsFromAmazon(queue);
         // updateReviewsFromEbay(queue);
@@ -123,6 +128,10 @@ puppeteer.use(StealthPlugin());
             const { updateItems } = await import(`./src/adapters/${id}.js`);
 
             updateItems(queue);
+        }
+
+        while (queue.size) {
+            await sleep(100);
         }
 
         // updateItemsFromAliexpress(queue);
@@ -169,6 +178,12 @@ puppeteer.use(StealthPlugin());
         const { getItemsByQuery } = await import(`./src/adapters/${id}.js`);
 
         getItemsByQuery(queue);
+    }
+
+    while (queue.size) {
+        console.log(queue.size, queue.pending);
+
+        await sleep(100);
     }
 
     // getItemsByQueryFromAliexpress(options.query, queue);

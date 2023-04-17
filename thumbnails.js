@@ -24,6 +24,10 @@ if (ids.length) {
 
         const idFolderPath = path.resolve(downloadPath, id);
 
+        if (!fs.existsSync(idFolderPath)) {
+            continue;
+        }
+
         const items = fs
             .readdirSync(idFolderPath)
             .filter((item) =>

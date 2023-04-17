@@ -275,6 +275,7 @@ export async function getOzonItem(link, id, queue, browser) {
 
             for (const reviewId in resultReviews) {
                 if (!(reviewId in ozonDb.data[id].reviews)) {
+                    logMsg(`Add new review ${reviewId}`, id);
                     ozonDb.data[id].reviews[reviewId] = resultReviews[reviewId];
                 }
             }

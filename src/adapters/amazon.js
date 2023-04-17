@@ -113,6 +113,8 @@ export async function processItem(product, queue) {
                 }
 
                 if (!(reviewItem.id in amazonDb.data[product.asin].reviews)) {
+                    logMsg(`Add new review ${reviewItem.id}`, product.asin);
+
                     amazonDb.data[product.asin].reviews[reviewItem.id] =
                         reviewItem;
                 }

@@ -205,6 +205,8 @@ export async function getItem(id, queue) {
 
     for (const photoObject of photos) {
         if (!(photoObject.id in ebayDb.data[id].reviews)) {
+            logMsg(`Add new review ${photoObject.id}`, id);
+
             ebayDb.data[id].reviews[photoObject.id] = photoObject;
             ebayDb.write();
         }

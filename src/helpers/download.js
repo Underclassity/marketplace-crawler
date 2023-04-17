@@ -229,7 +229,7 @@ export async function downloadFile(url, filepath, queue, id, prefix) {
             try {
                 const fileRequest = await axios(url, {
                     responseType: "arraybuffer",
-                    timeout: options.timeout * 2,
+                    // timeout: options.timeout * 2,
                     headers: getHeaders(),
                 });
 
@@ -244,6 +244,7 @@ export async function downloadFile(url, filepath, queue, id, prefix) {
                     id,
                     prefix
                 );
+
                 return true;
             } catch (error) {
                 logMsg(
@@ -253,6 +254,7 @@ export async function downloadFile(url, filepath, queue, id, prefix) {
                     id,
                     prefix
                 );
+
                 return false;
             }
         },
@@ -405,6 +407,10 @@ export async function checkSize(
  * @return  {Boolean}            Result
  */
 export async function downloadItem(url, filepath, queue, isVideo = false) {
+    if (!options.download) {
+        return true;
+    }
+
     if (!url) {
         console.error("Url not defined!");
         return false;

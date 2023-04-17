@@ -18,6 +18,16 @@ export const options = yargs(hideBin(process.argv))
         type: "string",
         default: false,
     })
+    .option("download", {
+        describe: "Download reviews flag",
+        default: true,
+        type: "boolean",
+    })
+    .option("thumbnail", {
+        describe: "Thumbnail generate flag",
+        default: true,
+        type: "boolean",
+    })
     .option("update", {
         describe: "Update items flag",
         default: false,

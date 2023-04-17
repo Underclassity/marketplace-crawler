@@ -47,6 +47,7 @@ export async function getFeedback(id, feedback, queue) {
     }
 
     if (!(feedback.id in wildberriesDb.data[id].reviews)) {
+        logMsg(`Add new review ${feedback.id}`, id);
         wildberriesDb.data[id].reviews[feedback.id] = feedback;
         wildberriesDb.write();
     }
@@ -124,37 +125,49 @@ export async function getFeedbacks(id, queue) {
 
     logMsg(`Found ${fullInfo.feedbackCountWithPhoto} feedbacks`, id);
 
-    const itterations = Math.round(fullInfo.feedbackCountWithPhoto / 30);
+    const itterations = fullInfo.feedbackCountWithPhoto
+        ? Math.round(fullInfo.feedbackCountWithPhoto / 30)
+        : 0;
 
     const feedbacks = [];
 
-    for (let i = 0; i <= itterations; i++) {
-        const iterFeedbacks = await queue.add(
-            async () => {
-                const itterData = await feedbacksRequest(id, i * 30);
+    if (itterations) {
+        for (let i = 0; i <= itterations; i++) {
+            const iterFeedbacks = await queue.add(
+                async () => {
+                    const itterData = await feedbacksRequest(id, i * 30);
 
-                if (!itterData) {
-                    return [];
-                }
+                    if (!itterData) {
+                        return [];
+                    }
 
-                return itterData.feedbacks;
+                    return itterData.feedbacks;
 
-                // itterData.feedbacks.forEach((item) =>
-                //     queue.add(
-                //         async () => await getFeedback(id, item, queue),
-                //         {
-                //             priority: priorities.review,
-                //         }
-                //     )
-                // );
-            },
-            { priority: priorities.review }
-        );
+                    // itterData.feedbacks.forEach((item) =>
+                    //     queue.add(
+                    //         async () => await getFeedback(id, item, queue),
+                    //         {
+                    //             priority: priorities.review,
+                    //         }
+                    //     )
+                    // );
+                },
+                { priority: priorities.review }
+            );
 
-        feedbacks.push(...iterFeedbacks);
+            feedbacks.push(...iterFeedbacks);
+        }
     }
 
     logMsg(`Found ${feedbacks.length} feedbacks items`, id);
+
+    for (const feedback of feedbacks) {
+        if (!(feedback.id in wildberriesDb.data[id].reviews)) {
+            logMsg(`Add new feedback ${feedback.id}`, id);
+            wildberriesDb.data[id].reviews[feedback.id] = feedback;
+            wildberriesDb.write();
+        }
+    }
 
     for (const feedback of feedbacks) {
         await queue.add(async () => await getFeedback(id, feedback, queue), {

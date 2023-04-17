@@ -2,7 +2,6 @@ import path from "node:path";
 import fs from "node:fs";
 
 import sizeOf from "image-size";
-import prettyBytes from "pretty-bytes";
 
 import { processFile, extractVideoFrames } from "./download.js";
 import commandCall from "./command-call.js";
@@ -26,6 +25,10 @@ const resultsFolderPath = path.resolve(options.directory, "thumbnails");
  * @return  {Boolean}          Result
  */
 export async function generateThumbail(dir, prefix, queue, force = false) {
+    if (!options.thumbnail) {
+        return false;
+    }
+
     if (!dir || !fs.existsSync(dir)) {
         console.log("Directory not defined!");
         return false;
@@ -222,7 +225,7 @@ export async function generateThumbail(dir, prefix, queue, force = false) {
         async () => {
             try {
                 logMsg(
-                    `Generate thumbnail ${path.basename(image)}`,
+                    `Generate thumbnail ${path.basename(itemThumbnailPath)}`,
                     id,
                     prefix
                 );
@@ -236,15 +239,15 @@ export async function generateThumbail(dir, prefix, queue, force = false) {
                 await commandCall(command);
 
                 logMsg(
-                    `Generated thumbnail ${path.basename(image)}`,
+                    `Generated thumbnail ${path.basename(itemThumbnailPath)}`,
                     id,
                     prefix
                 );
             } catch (error) {
                 logMsg(
-                    `Generate thumbnail ${path.basename(image)} error: ${
-                        error.message
-                    }`,
+                    `Generate thumbnail ${path.basename(
+                        itemThumbnailPath
+                    )} error: ${error.message}`,
                     id,
                     prefix
                 );

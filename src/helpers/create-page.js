@@ -12,6 +12,12 @@ export async function createPage(
     intersection = false,
     types = ["image", "font", "stylesheet"]
 ) {
+    if (!browser) {
+        console.log("Browser not defined!");
+        console.trace();
+        return false;
+    }
+
     const page = await browser.newPage();
 
     await page.setUserAgent(
