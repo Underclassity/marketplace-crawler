@@ -1,6 +1,14 @@
 import options from "../options.js";
 
-let ids = ["aliexpress", "amazon", "decathlon", "ebay", "ozon", "wildberries"];
+let ids = [
+    "aliexpress",
+    "amazon",
+    "decathlon",
+    "ebay",
+    "onliner",
+    "ozon",
+    "wildberries",
+];
 
 export function getAdaptersIds() {
     if (!options.include.length && !options.exclude.length) {
