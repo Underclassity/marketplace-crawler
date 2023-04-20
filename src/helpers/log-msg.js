@@ -13,20 +13,22 @@ import options from "../options.js";
  */
 export function logMsg(msg, id, prefix) {
     if (!msg || !id || !prefix) {
-        if (!msg) {
+        if (msg == undefined) {
             console.log("Message not defined!");
+            console.trace();
         }
 
-        if (!id) {
+        if (id == undefined) {
             console.log("ID not defined!");
+            console.trace();
         }
 
-        if (!prefix) {
+        if (prefix == undefined) {
             console.log("Prefix not defined!");
+            console.trace();
         }
 
-        console.trace();
-        return false;
+        // return false;
     }
 
     const query = options.query || "";

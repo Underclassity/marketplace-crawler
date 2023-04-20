@@ -18,6 +18,11 @@ export const options = yargs(hideBin(process.argv))
         type: "string",
         default: false,
     })
+    .option("proxy", {
+        describe: "Proxy use flag",
+        default: true,
+        type: "boolean",
+    })
     .option("download", {
         describe: "Download reviews flag",
         default: true,

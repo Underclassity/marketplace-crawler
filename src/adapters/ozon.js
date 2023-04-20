@@ -9,7 +9,7 @@ import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import AdblockerPlugin from "puppeteer-extra-plugin-adblocker";
 
 // import browserClose from "../helpers/browser-close.js";
-import { updateTime, updateTags } from "../helpers/db.js";
+import { updateTime, updateTags, getItems } from "../helpers/db.js";
 import autoScroll from "../helpers/auto-scroll.js";
 import createPage from "../helpers/create-page.js";
 import downloadItem from "../helpers/download.js";
@@ -89,6 +89,11 @@ export async function getOzonItem(link, id, queue, browser) {
             logMsg(`${id} not found in db`);
             return false;
         }
+    }
+
+    if (!browser) {
+        logMsg("Browser not defined!");
+        return false;
     }
 
     // const browser = await puppeteer.launch({
@@ -218,12 +223,17 @@ export async function getOzonItem(link, id, queue, browser) {
         logMsg(`Found ${reviews.length} reviews`, id);
 
         if (!reviews.length) {
+            logMsg("Ended", id);
+
             isReviews = true;
 
             if (page?.close) {
                 await page.close();
                 page = undefined;
             }
+
+            updateTime(ozonDb, id);
+            updateTags(ozonDb, id, options.query);
 
             // await browserClose(browser);
             return false;
@@ -304,10 +314,15 @@ export async function getOzonItem(link, id, queue, browser) {
 
     logMsg("Ended", id);
 
+    updateTime(ozonDb, id);
+    updateTags(ozonDb, id, options.query);
+
     return true;
 }
 
 export async function updateItems(queue) {
+    logMsg("Update items");
+
     ozonDb.read();
 
     const browser = await puppeteer.launch({
@@ -315,47 +330,27 @@ export async function updateItems(queue) {
         devtools: options.headless ? false : true,
     });
 
-    const time = options.time * 60 * 60 * 1000;
-
-    for (const itemId in ozonDb.data) {
+    getItems(ozonDb, "Ozon").forEach((itemId) => {
         const item = ozonDb.data[itemId];
 
-        if (item?.time && Date.now() - item.time <= time && !options.force) {
-            logMsg(`Already updated by time`, itemId);
-            continue;
-        }
-
-        if ("deleted" in item && item.deleted) {
-            continue;
-        }
-
-        queue.add(() => getOzonItem(item.link, itemId, false, queue, browser), {
+        queue.add(() => getOzonItem(item.link, itemId, queue, browser), {
             priority: priorities.item,
         });
-    }
+    });
 
     return true;
 }
 
 export async function updateReviews(queue) {
+    logMsg("Update reviews");
+
     ozonDb.read();
 
-    const time = options.time * 60 * 60 * 1000;
-
-    for (const itemId in ozonDb.data) {
+    getItems(ozonDb, "Ozon").forEach((itemId) => {
         const item = ozonDb.data[itemId];
 
-        if (item?.time && Date.now() - item.time <= time && !options.force) {
-            logMsg(`Already updated by time`, itemId);
-            continue;
-        }
-
         if (!("reviews" in item) || !Object.keys(item.reviews).length) {
-            continue;
-        }
-
-        if ("deleted" in item && item.deleted) {
-            continue;
+            return;
         }
 
         for (const reviewId in item.reviews) {
@@ -385,7 +380,7 @@ export async function updateReviews(queue) {
                 }
             }
         }
-    }
+    });
 
     return true;
 }
@@ -499,9 +494,6 @@ export async function getItemsByQuery(queue) {
                                 link: result,
                             };
                         }
-
-                        updateTime(ozonDb, id);
-                        updateTags(ozonDb, id, options.query);
 
                         logMsg(`Add item ${id} on page ${pageId} for process`);
 

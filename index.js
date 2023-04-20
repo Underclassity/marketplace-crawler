@@ -11,6 +11,7 @@ import options from "./src/options.js";
 
 import getAdaptersIds from "./src/helpers/get-adapters-ids.js";
 import sleep from "./src/helpers/sleep.js";
+import updateProxies from "./src/helpers/proxy-helpers.js";
 
 // import {
 //     getItemsByQuery as getItemsByQueryFromAliexpress,
@@ -52,6 +53,10 @@ puppeteer.use(
 puppeteer.use(StealthPlugin());
 
 (async () => {
+    if (options.proxy && options.force) {
+        await updateProxies();
+    }
+
     const tempPath = path.resolve(options.directory, "temp");
 
     if (fs.existsSync(tempPath)) {

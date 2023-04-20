@@ -1,3 +1,6 @@
+import options from "../options.js";
+import logMsg from "./log-msg.js";
+
 /**
  * Check DB and item ID
  *
@@ -88,6 +91,38 @@ export function updateTags(db, itemId, tag) {
     db.write();
 
     return true;
+}
+
+export function getItems(db, prefix) {
+    if (!db || !db.write) {
+        logMsg("DB not defined!", false, false);
+        return false;
+    }
+
+    const time = options.time * 60 * 60 * 1000;
+
+    return Object.keys(db.data)
+        .filter((id) => {
+            const item = db.data[id];
+
+            if (
+                item?.time &&
+                Date.now() - item.time <= time &&
+                !options.force
+            ) {
+                logMsg(`Already updated by time`, id, prefix);
+                return false;
+            }
+
+            if ("deleted" in item && item.deleted) {
+                logMsg(`Deleted item`, id, prefix);
+
+                return false;
+            }
+
+            return true;
+        })
+        .sort((a, b) => a.localeCompare(b));
 }
 
 export default updateTime;

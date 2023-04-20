@@ -6,7 +6,7 @@ import axios from "axios";
 import { LowSync } from "lowdb";
 import { JSONFileSync } from "lowdb/node";
 
-import { updateTime, updateTags } from "../helpers/db.js";
+import { updateTime, updateTags, getItems } from "../helpers/db.js";
 import downloadItem from "../helpers/download.js";
 import log from "../helpers/log.js";
 import options from "../options.js";
@@ -50,6 +50,10 @@ export async function getFeedback(id, feedback, queue) {
         logMsg(`Add new review ${feedback.id}`, id);
         wildberriesDb.data[id].reviews[feedback.id] = feedback;
         wildberriesDb.write();
+    }
+
+    if (!options.download) {
+        return true;
     }
 
     const photos = feedback.photos.map(
@@ -105,8 +109,6 @@ export async function getItemInfo(id) {
 export async function getFeedbacks(id, queue) {
     logMsg(`Feedbacks get`, id);
 
-    const fullInfo = await getItemInfo(id);
-
     if (!wildberriesDb.data[id]) {
         wildberriesDb.data[id] = {};
         wildberriesDb.write();
@@ -117,45 +119,20 @@ export async function getFeedbacks(id, queue) {
         wildberriesDb.write();
     }
 
-    if (!fullInfo) {
-        logMsg(`No feedbacks found`, id);
-
-        return false;
-    }
-
-    logMsg(`Found ${fullInfo.feedbackCountWithPhoto} feedbacks`, id);
-
-    const itterations = fullInfo.feedbackCountWithPhoto
-        ? Math.round(fullInfo.feedbackCountWithPhoto / 30)
-        : 0;
-
     const feedbacks = [];
 
-    if (itterations) {
-        for (let i = 0; i <= itterations; i++) {
-            const iterFeedbacks = await queue.add(
-                async () => {
-                    const itterData = await feedbacksRequest(id, i * 30);
+    let stoped = false;
+    let i = 0;
 
-                    if (!itterData) {
-                        return [];
-                    }
+    while (!stoped) {
+        const itterData = await feedbacksRequest(id, i * 30);
 
-                    return itterData.feedbacks;
+        i++;
 
-                    // itterData.feedbacks.forEach((item) =>
-                    //     queue.add(
-                    //         async () => await getFeedback(id, item, queue),
-                    //         {
-                    //             priority: priorities.review,
-                    //         }
-                    //     )
-                    // );
-                },
-                { priority: priorities.review }
-            );
-
-            feedbacks.push(...iterFeedbacks);
+        if (itterData.feedbacks.length) {
+            feedbacks.push(...itterData.feedbacks);
+        } else {
+            stoped = true;
         }
     }
 
@@ -213,11 +190,28 @@ export async function itemsRequest(page = 1) {
 
     try {
         const getItemsRequest = await axios(
-            `
-        https://search.wb.ru/exactmatch/sng/common/v4/search?query=${options.query}&resultset=catalog&limit=100&sort=popular&page=4&appType=128&curr=byn&locale=by&lang=ru&dest=12358386,12358404,3,-59208&regions=1,4,22,30,31,33,40,48,66,68,69,70,80,83&emp=0&reg=1&pricemarginCoeff=1.0&offlineBonus=0&onlineBonus=0&spp=0&page=${page}
-        `,
+            `https://search.wb.ru/exactmatch/sng/common/v4/search`,
             {
                 timeout: options.timeout,
+                params: {
+                    query: options.query,
+                    resultset: "catalog",
+                    limit: 100,
+                    sort: "popular",
+                    page,
+                    appType: "12",
+                    curr: "byn",
+                    locale: "by",
+                    lang: "ru",
+                    dest: "12358386,12358404,3,-59208",
+                    regions: "1,4,22,30,31,33,40,48,66,68,69,70,80,83",
+                    emp: 0,
+                    reg: 1,
+                    pricemarginCoeff: "1.0",
+                    offlineBonus: 0,
+                    onlineBonus: 0,
+                    spp: 0,
+                },
             }
         );
 
@@ -234,23 +228,11 @@ export function updateItems(queue) {
 
     wildberriesDb.read();
 
-    const time = options.time * 60 * 60 * 1000;
-
-    for (const itemId in wildberriesDb.data) {
-        const item = wildberriesDb.data[itemId];
-
-        if (item?.time && Date.now() - item.time <= time && !options.force) {
-            continue;
-        }
-
-        if ("deleted" in item && item.deleted) {
-            continue;
-        }
-
+    getItems(wildberriesDb, "wildberries").forEach((itemId) =>
         queue.add(() => getFeedbacks(itemId, queue), {
             priority: priorities.item,
-        });
-    }
+        })
+    );
 
     return true;
 }
@@ -285,7 +267,7 @@ export function updateReviews(queue) {
                     `https://feedbackphotos.wbstatic.net/${item.fullSizeUri}`
             );
 
-            logMsg(`Try to download ${photos.length} photos`, itemId);
+            logMsg(`Get ${photos.length} photos`, itemId);
 
             const itemFolderPath = path.resolve(
                 path.resolve(options.directory, "./download", "wildberries"),
@@ -323,6 +305,7 @@ export async function getItemsByQuery(queue) {
         }
 
         if (!getItemsData.data.products.length) {
+            logMsg(`No items left`);
             page = options.pages;
             continue;
         }

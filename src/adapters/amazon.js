@@ -15,6 +15,7 @@ import downloadItem from "../helpers/download.js";
 import log from "../helpers/log.js";
 import options from "../options.js";
 import priorities from "../helpers/priorities.js";
+import { updateTime, updateTags, getItems } from "../helpers/db.js";
 
 const dbPath = path.resolve(options.directory, "db");
 
@@ -64,8 +65,6 @@ async function downloadImages(asin, review, queue) {
 }
 
 export async function processItem(product, queue) {
-    logMsg("Try to get reviews", product.asin);
-
     if (!(product.asin in amazonDb.data)) {
         amazonDb.data[product.asin] = product;
         amazonDb.data[product.asin].reviews = {};
@@ -85,8 +84,10 @@ export async function processItem(product, queue) {
         return false;
     }
 
-    queue.add(
+    await queue.add(
         async () => {
+            logMsg("Try to get reviews", product.asin);
+
             let reviews;
 
             try {
@@ -97,11 +98,13 @@ export async function processItem(product, queue) {
                 });
             } catch (error) {
                 reviews = false;
-                logMsg("Error get reviews", product.asin);
-                console.log(error.message);
+                logMsg(`Error get reviews: ${error.message}`, product.asin);
             }
 
             if (!reviews) {
+                logMsg("Reviews not found", product.asin);
+                updateTime(amazonDb, product.asin);
+                updateTags(amazonDb, product.asin, options.query);
                 return false;
             }
 
@@ -117,6 +120,7 @@ export async function processItem(product, queue) {
 
                     amazonDb.data[product.asin].reviews[reviewItem.id] =
                         reviewItem;
+                    amazonDb.write();
                 }
 
                 if (reviewItem?.photos?.length) {
@@ -124,9 +128,8 @@ export async function processItem(product, queue) {
                 }
             }
 
-            dbReviewItem.time = Date.now();
-
-            amazonDb.write();
+            updateTime(amazonDb, product.asin);
+            updateTags(amazonDb, product.asin, options.query);
         },
         { priority: priorities.item }
     );
@@ -143,22 +146,10 @@ export async function updateItems(queue) {
 
     amazonDb.read();
 
-    const time = options.time * 60 * 60 * 1000;
-
-    for (const itemId in amazonDb.data) {
+    getItems(amazonDb, "Amazon").forEach((itemId) => {
         const item = amazonDb.data[itemId];
-
-        if (item?.time && Date.now() - item.time <= time && !options.force) {
-            logMsg(`Already updated by time`, item);
-            continue;
-        }
-
-        if ("deleted" in item && item.deleted) {
-            continue;
-        }
-
         processItem(item, queue);
-    }
+    });
 
     return true;
 }
@@ -212,8 +203,7 @@ export async function getItemsByQuery(queue) {
                     });
                 } catch (error) {
                     results = false;
-                    logMsg(`Error get from page ${page}`);
-                    console.log(error.message);
+                    logMsg(`Error get from page ${page}: ${error.message}`);
                 }
             },
             { priority: priorities.item }

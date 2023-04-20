@@ -10,7 +10,7 @@ import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import AdblockerPlugin from "puppeteer-extra-plugin-adblocker";
 
-import { updateTags, updateTime } from "../helpers/db.js";
+import { updateTags, updateTime, getItems } from "../helpers/db.js";
 import autoScroll from "../helpers/auto-scroll.js";
 import browserConfig from "../helpers/browser-config.js";
 import createPage from "../helpers/create-page.js";
@@ -104,6 +104,8 @@ export async function getItemReviewsPage(itemId, pageId) {
             }
         );
 
+        logMsg(`Get data on page ${pageId}`, itemId);
+
         reviewsData = request.data.data;
     } catch (error) {
         logMsg(`Error get reviews page ${pageId}: ${error.message}`, itemId);
@@ -151,33 +153,28 @@ export async function scrapeItem(itemId, queue) {
             logMsg(`Set max pages to ${maxPages}`, itemId);
         }
 
-        if (maxPages >= 2) {
+        if (maxPages > 1) {
             let stoped = false;
 
             for (let pageId = 2; pageId <= maxPages; pageId++) {
-                await queue.add(
-                    async () => {
-                        if (stoped) {
-                            return true;
-                        }
+                // await queue.add(
+                //     async () => {
 
-                        const jsonData = await getItemReviewsPage(
-                            itemId,
-                            pageId
-                        );
+                if (stoped) {
+                    continue;
+                }
 
-                        if (
-                            !jsonData.evaViewList ||
-                            !jsonData.evaViewList.length
-                        ) {
-                            pageId = options.pages;
-                            stoped = true;
-                        } else {
-                            reviews.push(...jsonData.evaViewList);
-                        }
-                    },
-                    { priority: priorities.item }
-                );
+                const jsonData = await getItemReviewsPage(itemId, pageId);
+
+                if (!jsonData.evaViewList || !jsonData.evaViewList.length) {
+                    pageId = options.pages;
+                    stoped = true;
+                } else {
+                    reviews.push(...jsonData.evaViewList);
+                }
+                //     },
+                //     { priority: priorities.item }
+                // );
             }
         }
 
@@ -322,34 +319,11 @@ export function updateItems(queue) {
 
     aliexpressDb.read();
 
-    const time = options.time * 60 * 60 * 1000;
-
-    const items = Object.keys(aliexpressDb.data)
-        .filter((itemId) => {
-            const item = aliexpressDb.data[itemId];
-
-            if (
-                item?.time &&
-                Date.now() - item.time <= time &&
-                !options.force
-            ) {
-                logMsg(`Already updated by time`, itemId);
-                return false;
-            }
-
-            return true;
-        })
-        .filter((itemId) => {
-            return "deleted" in aliexpressDb.data[itemId]
-                ? !aliexpressDb.data[itemId].deleted
-                : true;
-        });
-
-    for (const itemId of items) {
+    getItems(aliexpressDb, "aliexpress").forEach((itemId) =>
         queue.add(() => scrapeItem(itemId, queue), {
             priority: priorities.item,
-        });
-    }
+        })
+    );
 
     return true;
 }
