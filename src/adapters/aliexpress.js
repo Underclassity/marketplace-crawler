@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import axios from "axios";
+import cheerio from "cheerio";
 
 import { LowSync } from "lowdb";
 import { JSONFileSync } from "lowdb/node";
@@ -10,7 +11,7 @@ import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import AdblockerPlugin from "puppeteer-extra-plugin-adblocker";
 
-import { updateTags, updateTime, getItems } from "../helpers/db.js";
+import { updateTags, updateTime, getItems, addRewiew } from "../helpers/db.js";
 import autoScroll from "../helpers/auto-scroll.js";
 import browserConfig from "../helpers/browser-config.js";
 import createPage from "../helpers/create-page.js";
@@ -59,6 +60,15 @@ function logMsg(msg, id) {
     return log(`[Aliexpress] ${query}: ${msg}`);
 }
 
+/**
+ * Process review download
+ *
+ * @param   {Object}  review  Review
+ * @param   {Number}  id      Item ID
+ * @param   {Object}  queue   Queue instance
+ *
+ * @return  {Boolean}         Result
+ */
 export async function download(review, id, queue) {
     const dirPath = path.resolve(
         options.directory,
@@ -80,9 +90,17 @@ export async function download(review, id, queue) {
         downloadItem(url, itemPath, queue);
     }
 
-    return false;
+    return true;
 }
 
+/**
+ * Get reviews for item from page
+ *
+ * @param   {Number}  itemId  Item ID
+ * @param   {Number}  pageId  Reviews page number
+ *
+ * @return  {Object}          Reviews object
+ */
 export async function getItemReviewsPage(itemId, pageId) {
     let reviewsData = {};
 
@@ -114,6 +132,14 @@ export async function getItemReviewsPage(itemId, pageId) {
     return reviewsData;
 }
 
+/**
+ * Scrap item by ID helper
+ *
+ * @param   {Number}  itemId  Item ID
+ * @param   {Object}  queue   Queue instance
+ *
+ * @return  {Boolean}         Result
+ */
 export async function scrapeItem(itemId, queue) {
     if (!itemId) {
         logMsg(`Item not defined`, itemId);
@@ -180,21 +206,14 @@ export async function scrapeItem(itemId, queue) {
 
         logMsg(`Reviews length ${reviews.length}`, itemId);
 
-        if (aliexpressDb.data[itemId]) {
-            aliexpressDb.data[itemId] = { reviews: {} };
-            aliexpressDb.write();
-        }
-
         for (const reviewItem of reviews) {
-            if (
-                !(reviewItem.evaluationId in aliexpressDb.data[itemId].reviews)
-            ) {
-                logMsg(`Add new review ${reviewItem.evaluationId}`, itemId);
-
-                aliexpressDb.data[itemId].reviews[reviewItem.evaluationId] =
-                    reviewItem;
-                aliexpressDb.write();
-            }
+            addRewiew(
+                aliexpressDb,
+                itemId,
+                reviewItem.evaluationId,
+                reviewItem,
+                "aliexpress"
+            );
         }
 
         updateTime(aliexpressDb, itemId);
@@ -219,6 +238,69 @@ export async function scrapeItem(itemId, queue) {
     return found ? reviews : false;
 }
 
+async function processPageByXhr(pageId, queue) {
+    if (!pageId) {
+        logMsg("Page ID not defined!");
+        return false;
+    }
+
+    const pageURL = `https://www.aliexpress.com/w/wholesale-${options.query.replace(
+        /\s/g,
+        "-"
+    )}.html?page=${pageId}`;
+
+    try {
+        logMsg(`Try to get items for page ${pageId}`);
+
+        const request = await axios(pageURL, {
+            timeout: options.timeout,
+            responseType: "document",
+            // headers: getHeaders(),
+        });
+
+        const html = request.data;
+
+        const $ = cheerio.load(html);
+
+        const links = [];
+
+        $("a").each((index, image) => {
+            links.push($(image).attr("href"));
+        });
+
+        links = links
+            .filter((link) => link.includes("/item/"))
+            .map((link) =>
+                parseInt(
+                    link.slice(
+                        link.indexOf("/item/") + 6,
+                        link.indexOf(".html")
+                    ),
+                    10
+                )
+            )
+            .filter((value, index, array) => array.indexOf(value) == index);
+
+        console.log(links.length);
+        console.log(links);
+    } catch (error) {
+        logMsg(`Get items from page ${pageId} error: ${error.message}`);
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * Process page for query
+ * @param   {Number}  pageId       Page number
+ * @param   {String}  query        Query string
+ * @param   {Object}  browser      Puppeteer browser instance
+ * @param   {Number}  totalFound   Total items found number
+ * @param   {Object}  queue        Queue instance
+ *
+ * @return  {Number}               Pages count
+ */
 export async function processPage(
     pageId,
     query = "",
@@ -226,11 +308,16 @@ export async function processPage(
     totalFound,
     queue
 ) {
+    if (!pageId) {
+        logMsg("Page ID not defined!");
+        return false;
+    }
+
     aliexpressDb.read();
 
     logMsg(`Process page ${pageId}`);
 
-    const page = await createPage(browser, true);
+    const page = await createPage(browser, false);
 
     if (options.url?.length) {
         let url = options.url;
@@ -239,10 +326,15 @@ export async function processPage(
 
         await page.goto(`${url}&page=${pageId}`, goSettings);
     } else {
-        const pageUrl = `https://aliexpress.com/wholesale?trafficChannel=main&d=y&CatId=0&SearchText=${query.replace(
+        // const pageUrl = `https://aliexpress.com/wholesale?trafficChannel=main&d=y&CatId=0&SearchText=${query.replace(
+        //     /\s/g,
+        //     "+"
+        // )}&ltype=wholesale&SortType=total_tranpro_desc&page=${pageId}`;
+
+        const pageUrl = `https://aliexpress.ru/wholesale?SearchText=${query.replace(
             /\s/g,
             "+"
-        )}&ltype=wholesale&SortType=total_tranpro_desc&page=${pageId}`;
+        )}&g=y&page=${pageId}`;
 
         await page.goto(pageUrl, goSettings);
     }
@@ -314,49 +406,44 @@ export async function processPage(
     return pagesCount;
 }
 
-export function updateItems(queue) {
+/**
+ * Update items
+ *
+ * @param   {Object}  queue   Queue instance
+ *
+ * @return  {Boolean}         Result
+ */
+export async function updateItems(queue) {
     logMsg("Update items");
 
     aliexpressDb.read();
 
-    getItems(aliexpressDb, "aliexpress").forEach((itemId) =>
+    getItems(aliexpressDb, "Aliexpress").forEach((itemId) =>
         queue.add(() => scrapeItem(itemId, queue), {
             priority: priorities.item,
         })
     );
 
+    while (queue.size || queue.pending) {
+        await sleep(1000);
+    }
+
     return true;
 }
 
-export function updateReviews(queue) {
+/**
+ * Update items reviews
+ *
+ * @param   {Object}  queue   Queue instance
+ *
+ * @return  {Boolean}         Result
+ */
+export async function updateReviews(queue) {
     logMsg("Update reviews");
 
     aliexpressDb.read();
 
-    const time = options.time * 60 * 60 * 1000;
-
-    const items = Object.keys(aliexpressDb.data)
-        .filter((itemId) => {
-            const item = aliexpressDb.data[itemId];
-
-            if (
-                item?.time &&
-                Date.now() - item.time <= time &&
-                !options.force
-            ) {
-                logMsg(`Already updated by time`, itemId);
-                return false;
-            }
-
-            return true;
-        })
-        .filter((itemId) => {
-            return "deleted" in aliexpressDb.data[itemId]
-                ? !aliexpressDb.data[itemId].deleted
-                : true;
-        });
-
-    for (const itemId of items) {
+    getItems(aliexpressDb, "Aliexpress").forEach((itemId) => {
         const item = aliexpressDb.data[itemId];
 
         if (
@@ -364,7 +451,8 @@ export function updateReviews(queue) {
             !("reviews" in item) ||
             !Object.keys(item.reviews).length
         ) {
-            continue;
+            // logMsg("Reviews not found!", itemId);
+            return false;
         }
 
         for (const reviewId in item.reviews) {
@@ -380,11 +468,22 @@ export function updateReviews(queue) {
 
             download(reviewItem, itemId, queue);
         }
+    });
+
+    while (queue.size || queue.pending) {
+        await sleep(1000);
     }
 
     return true;
 }
 
+/**
+ * Get items by query helper
+ *
+ * @param   {Object}  queue   Queue instance
+ *
+ * @return  {Boolean}         Result
+ */
 export async function getItemsByQuery(queue) {
     logMsg("Get items call");
 
@@ -393,6 +492,13 @@ export async function getItemsByQuery(queue) {
     const browser = await puppeteer.launch(browserConfig);
 
     for (let page = options.start; page <= options.pages; page++) {
+        // await queue.add(
+        //     async () => {
+        //         await processPageByXhr(page, queue);
+        //     },
+        //     { priority: priorities.page }
+        // );
+
         await queue.add(
             async () => {
                 const pagesCount = await processPage(
@@ -403,18 +509,19 @@ export async function getItemsByQuery(queue) {
                     queue
                 );
 
-                if (pagesCount > 0 && pagesCount < options.pages) {
-                    logMsg(`Set total pages to ${pagesCount}`);
-                    totalFound = true;
-                    options.pages = pagesCount;
+                if (!(pagesCount > 0 && pagesCount < options.pages)) {
+                    return;
                 }
+                logMsg(`Set total pages to ${pagesCount}`);
+                totalFound = true;
+                options.pages = pagesCount;
             },
             { priority: priorities.page }
         );
     }
 
-    while (queue.size && queue.pending) {
-        await sleep(5 * 1000);
+    while (queue.size || queue.pending || !queue.isPaused) {
+        await sleep(5 * 1000); // wait for 5 sec for queue process
     }
 
     const pages = await browser.pages();
@@ -422,6 +529,8 @@ export async function getItemsByQuery(queue) {
     await Promise.all(pages.map((page) => page.close()));
 
     await browser.close();
+
+    return true;
 }
 
 export default getItemsByQuery;

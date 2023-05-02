@@ -11,12 +11,12 @@ import logMsg from "./log-msg.js";
  */
 export function dbItemCheck(db, itemId) {
     if (!db || !db.write) {
-        console.log("DB not defined!");
+        logMsg("DB not defined!", false, false);
         return false;
     }
 
     if (!itemId) {
-        console.log("Item ID not defined!");
+        logMsg("Item ID not defined!", false, false);
         return false;
     }
 
@@ -74,7 +74,7 @@ export function updateTags(db, itemId, tag) {
     }
 
     if (!tag || !tag.length) {
-        console.log("Tag not defined!");
+        logMsg("Tag not defined!", false, false);
         return false;
     }
 
@@ -93,9 +93,17 @@ export function updateTags(db, itemId, tag) {
     return true;
 }
 
-export function getItems(db, prefix) {
+/**
+ * Get items from DB
+ *
+ * @param   {Object}  db      Items DB
+ * @param   {String}  prefix  Log prefix
+ *
+ * @return  {Array}           Items IDs array
+ */
+export function getItems(db, prefix = false) {
     if (!db || !db.write) {
-        logMsg("DB not defined!", false, false);
+        logMsg("DB not defined!", false, prefix);
         return false;
     }
 
@@ -120,9 +128,60 @@ export function getItems(db, prefix) {
                 return false;
             }
 
+            if (options.id?.length && id.toString() != options.id) {
+                return false;
+            }
+
             return true;
         })
         .sort((a, b) => a.localeCompare(b));
+}
+
+/**
+ * Add review to DB
+ *
+ * @param   {Object}  db           Items DB
+ * @param   {String}  itemId       Item ID
+ * @param   {String}  reviewId     Review ID
+ * @param   {Object}  review       Review object
+ * @param   {String}  prefix       Log prefix
+ * @return  {Boolean}              Result
+ */
+export function addRewiew(db, itemId, reviewId, review, prefix = false) {
+    if (!dbItemCheck(db, itemId)) {
+        return false;
+    }
+
+    if (!review || !reviewId) {
+        logMsg("Review not defined!", id, prefix);
+        return false;
+    }
+
+    if (!(itemId in db)) {
+        db[itemId] = {
+            reviews: {},
+        };
+        db.write();
+    }
+
+    if (!("reviews" in db[itemId])) {
+        db[itemId].reviews = {};
+        db.write();
+    }
+
+    if (!(reviewId in db[itemId].reviews) && !options.force) {
+        db[itemId].reviews[reviewId] = review;
+        db.write();
+        logMsg(`Add new review ${reviewId} in DB`, itemId, prefix);
+    } else if (db[itemId].reviews[reviewId] != review || options.force) {
+        db[itemId].reviews[reviewId] = review;
+        db.write();
+        logMsg(`Update review ${reviewId} in DB`, itemId, prefix);
+    } else {
+        logMsg(`Review ${reviewId} already saved in DB`, itemId, prefix);
+    }
+
+    return true;
 }
 
 export default updateTime;

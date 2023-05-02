@@ -203,12 +203,22 @@ export async function generateThumbail(dir, prefix, queue, force = false) {
                         isWin ? "magick.exe" : ""
                     } convert ${image} -gravity Center -crop ${cropFactor}x${cropFactor}+0+0 ${imageCropedPath}`;
 
-                    await commandCall(command);
-                    counter++;
+                    const { result, error } = await commandCall(command);
 
-                    cropedImages.push(imageCropedPath);
+                    if (result) {
+                        counter++;
+                        cropedImages.push(imageCropedPath);
 
-                    logMsg(`Cuted ${path.basename(image)}`, id, prefix);
+                        logMsg(`Cuted ${path.basename(image)}`, id, prefix);
+                    } else {
+                        logMsg(
+                            `Cut ${path.basename(image)} error: ${
+                                error.message
+                            }`,
+                            id,
+                            prefix
+                        );
+                    }
                 } catch (error) {
                     logMsg(
                         `Cut ${path.basename(image)} error: ${error.message}`,
@@ -236,13 +246,25 @@ export async function generateThumbail(dir, prefix, queue, force = false) {
                     " "
                 )} ${itemThumbnailPath}`;
 
-                await commandCall(command);
+                const { result, error } = await commandCall(command);
 
-                logMsg(
-                    `Generated thumbnail ${path.basename(itemThumbnailPath)}`,
-                    id,
-                    prefix
-                );
+                if (result) {
+                    logMsg(
+                        `Generated thumbnail ${path.basename(
+                            itemThumbnailPath
+                        )}`,
+                        id,
+                        prefix
+                    );
+                } else {
+                    logMsg(
+                        `Generate thumbnail ${path.basename(
+                            itemThumbnailPath
+                        )} error: ${error.message}`,
+                        id,
+                        prefix
+                    );
+                }
             } catch (error) {
                 logMsg(
                     `Generate thumbnail ${path.basename(

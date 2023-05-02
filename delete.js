@@ -6,15 +6,11 @@ import inquirer from "inquirer";
 import { LowSync } from "lowdb";
 import { JSONFileSync } from "lowdb/node";
 
+import getAdaptersIds from "./src/helpers/get-adapters-ids.js";
+
 import options from "./src/options.js";
 
-const downloadPath = path.resolve(options.directory, "download");
-
-const ids = fs
-    .readdirSync(downloadPath)
-    .filter((item) =>
-        fs.statSync(path.resolve(downloadPath, item)).isDirectory()
-    );
+const ids = getAdaptersIds();
 
 const dbs = {};
 
@@ -131,7 +127,7 @@ async function deleteItem(id) {
     while (!stoped) {
         const answer = await inquirer.prompt([
             {
-                type: "number",
+                type: "string",
                 name: "itemId",
                 message: "Item ID?",
                 default: false,

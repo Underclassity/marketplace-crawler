@@ -45,6 +45,15 @@ function logMsg(msg, id) {
     return log(`[Amazon] ${query}: ${msg}`);
 }
 
+/**
+ * Download product images helper
+ *
+ * @param   {Number}  asin    Product asin
+ * @param   {Object}  review  Review object
+ * @param   {Object}  queue   Queue
+ *
+ * @return  {Boolean}         Result
+ */
 async function downloadImages(asin, review, queue) {
     const dirPath = path.resolve(downloadDirPath, asin);
 
@@ -64,6 +73,14 @@ async function downloadImages(asin, review, queue) {
     return true;
 }
 
+/**
+ * Process item
+ *
+ * @param   {Object}  product  Item object
+ * @param   {Object}  queue    Queue
+ *
+ * @return  {Boolean}          Result
+ */
 export async function processItem(product, queue) {
     if (!(product.asin in amazonDb.data)) {
         amazonDb.data[product.asin] = product;
@@ -135,12 +152,29 @@ export async function processItem(product, queue) {
     );
 }
 
+/**
+ * Process given items
+ *
+ * @param   {Array}    products  Products array
+ * @param   {Object}   queue     Queue
+ *
+ * @return  {Boolean}            Result
+ */
 export async function processItems(products, queue) {
     for (const product of products) {
         await processItem(product, queue);
     }
+
+    return true;
 }
 
+/**
+ * Update items
+ *
+ * @param   {Object}  queue  Queue
+ *
+ * @return  {Boolean}        Result
+ */
 export async function updateItems(queue) {
     logMsg("Update items");
 
@@ -154,37 +188,40 @@ export async function updateItems(queue) {
     return true;
 }
 
+/**
+ * Update reviews helper
+ *
+ * @param   {Object}  queue  Queue
+ *
+ * @return  {Boolean}        Result
+ */
 export async function updateReviews(queue) {
     logMsg("Update reviews");
 
     amazonDb.read();
 
-    const time = options.time * 60 * 60 * 1000;
-
-    for (const itemId in amazonDb.data) {
+    getItems(amazonDb, "Amazon").forEach((itemId) => {
         const item = amazonDb.data[itemId];
 
-        if (item?.time && Date.now() - item.time <= time && !options.force) {
-            logMsg(`Already updated by time`, item);
-            continue;
-        }
-
         if (!("reviews" in item) || !Object.keys(item.reviews)) {
-            continue;
-        }
-
-        if ("deleted" in item && item.deleted) {
-            continue;
+            return false;
         }
 
         for (const reviewId in item.reviews) {
             downloadImages(itemId, item.reviews[reviewId], queue);
         }
-    }
+    });
 
     return true;
 }
 
+/**
+ * Get items by query
+ *
+ * @param   {Object}   queue  Queue
+ *
+ * @return  {Boolean}         Result
+ */
 export async function getItemsByQuery(queue) {
     logMsg("Get items call");
 

@@ -42,6 +42,7 @@
         "async": "^3.2.4",
         "bluebird": "^3.7.2",
         "cheerio": "^1.0.0-rc.12",
+        "cross-spawn": "^7.0.3",
         "image-size": "^1.0.2",
         "inquirer": "^9.1.5",
         "json2csv": "^6.0.0-alpha.2",

@@ -20,7 +20,7 @@ export const options = yargs(hideBin(process.argv))
     })
     .option("proxy", {
         describe: "Proxy use flag",
-        default: true,
+        default: false,
         type: "boolean",
     })
     .option("download", {
@@ -30,6 +30,16 @@ export const options = yargs(hideBin(process.argv))
     })
     .option("thumbnail", {
         describe: "Thumbnail generate flag",
+        default: true,
+        type: "boolean",
+    })
+    .option("image", {
+        describe: "Download image flag",
+        default: true,
+        type: "boolean",
+    })
+    .option("video", {
+        describe: "Download video flag",
         default: true,
         type: "boolean",
     })
@@ -86,7 +96,7 @@ export const options = yargs(hideBin(process.argv))
     .option("id", {
         describe: "ID to get",
         default: false,
-        type: "number",
+        type: "string",
     })
     .option("time", {
         describe: "Time to update in hours",

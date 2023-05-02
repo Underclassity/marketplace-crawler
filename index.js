@@ -57,11 +57,11 @@ puppeteer.use(StealthPlugin());
         await updateProxies();
     }
 
-    const tempPath = path.resolve(options.directory, "temp");
+    // const tempPath = path.resolve(options.directory, "temp");
 
-    if (fs.existsSync(tempPath)) {
-        fs.rmSync(tempPath, { recursive: true });
-    }
+    // if (fs.existsSync(tempPath)) {
+    //     fs.rmSync(tempPath, { recursive: true });
+    // }
 
     const ids = getAdaptersIds();
 
@@ -185,10 +185,8 @@ puppeteer.use(StealthPlugin());
         getItemsByQuery(queue);
     }
 
-    while (queue.size) {
-        console.log(queue.size, queue.pending);
-
-        await sleep(100);
+    while (queue.size || queue.pending) {
+        await sleep(1000);
     }
 
     // getItemsByQueryFromAliexpress(options.query, queue);

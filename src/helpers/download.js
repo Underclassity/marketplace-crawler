@@ -1,5 +1,5 @@
 import fs from "node:fs";
-import path, { parse } from "node:path";
+import path from "node:path";
 
 import axios from "axios";
 import prettyBytes from "pretty-bytes";
@@ -12,6 +12,7 @@ import generateThumbail from "./generate-thumbnail.js";
 import getHeaders from "./get-headers.js";
 import logMsg from "./log-msg.js";
 import priorities from "./priorities.js";
+import sleep from "./sleep.js";
 
 import options from "../options.js";
 
@@ -52,7 +53,7 @@ const downloadCache = {};
  */
 function deleteHelper(filepath, id, prefix) {
     if (!fs.existsSync(filepath)) {
-        logMsg(`${filepath} not exists`, id, prefix);
+        // logMsg(`${filepath} not exists`, id, prefix);
         return false;
     }
 
@@ -99,21 +100,31 @@ export async function extractVideoFrames(
 
     const command = `ffmpeg -i "${videoFilePath}" ${
         fps ? `-vf fps=${fps}` : ""
-    } ${r ? `-r ${r}` : ""} "${tempDirPath}/${parsedPath.name}-frame%04d.png"`;
+    } ${r ? `-r ${r}` : ""} "${tempDirPath}/${parsedPath.name}-frame%04d.jpg"`;
 
     try {
-        await commandCall(command);
+        const { result, error } = await commandCall(command);
 
-        videoFrames = fs
-            .readdirSync(tempDirPath)
-            .filter((filename) => filename.includes(`${parsedPath.name}-frame`))
-            .map((filename) => path.resolve(tempDirPath, filename));
+        if (result) {
+            videoFrames = fs
+                .readdirSync(tempDirPath)
+                .filter((filename) =>
+                    filename.includes(`${parsedPath.name}-frame`)
+                )
+                .map((filename) => path.resolve(tempDirPath, filename));
 
-        logMsg(
-            `Get ${videoFrames.length} video frames for ${parsedPath.base}`,
-            id,
-            prefix
-        );
+            logMsg(
+                `Get ${videoFrames.length} video frames for ${parsedPath.base}`,
+                id,
+                prefix
+            );
+        } else {
+            logMsg(
+                `Get video frames for ${parsedPath.base} error: ${error}`,
+                id,
+                prefix
+            );
+        }
 
         return videoFrames;
     } catch (error) {
@@ -216,16 +227,20 @@ export async function processFile(filepath, queue, id, prefix) {
  * @return  {Boolean}           Result
  */
 export async function downloadFile(url, filepath, queue, id, prefix) {
-    const filename = path.basename(filepath);
+    if (!options.image) {
+        return true;
+    }
 
-    logMsg(
-        `Try to download ${filename} to ${path.dirname(filepath)}`,
-        id,
-        prefix
-    );
+    const filename = path.basename(filepath);
 
     return await queue.add(
         async () => {
+            logMsg(
+                `Try to download ${filename} to ${path.dirname(filepath)}`,
+                id,
+                prefix
+            );
+
             try {
                 const fileRequest = await axios(url, {
                     responseType: "arraybuffer",
@@ -274,38 +289,54 @@ export async function downloadFile(url, filepath, queue, id, prefix) {
  * @return  {Boolean}           Result
  */
 export async function downloadVideo(url, filepath, queue, id, prefix) {
+    if (!options.video) {
+        return true;
+    }
+
     const filename = path.basename(filepath);
 
-    return await queue.add(
+    const ytDlpCommand = `yt-dlp${
+        isWin ? ".exe" : ""
+    } --quiet --downloader ffmpeg --hls-use-mpegts -o "${filepath.toString()}" "${url}"`;
+
+    // const ffmpegCommand = `ffmpeg${
+    //     isWin ? ".exe" : ""
+    // } -i "${url}" "${filepath.toString()}"`;
+
+    let commandResult;
+
+    await queue.add(
         async () => {
             logMsg(`Start video download ${filename}`, id, prefix);
 
-            try {
-                // const ffmpegCommand = `ffmpeg${
-                //     isWin ? ".exe" : ""
-                // } -i "${url}" "${filepath.toString()}"`;
+            commandResult = await commandCall(ytDlpCommand);
 
-                const ytDlpCommand = `yt-dlp${
-                    isWin ? ".exe" : ""
-                } --downloader ffmpeg --hls-use-mpegts -o "${filepath.toString()}" "${url}"`;
-
-                // const result = await commandCall(ffmpegCommand);
-                const result = await commandCall(ytDlpCommand);
-
-                logMsg(`Downloaded video ${filename}: ${result}`, id, prefix);
-
-                return true;
-            } catch (error) {
-                logMsg(
-                    `Download error video ${filename}: ${error}`,
-                    id,
-                    prefix
-                );
-                return false;
-            }
+            return commandResult;
         },
-        { priority: priorities.download }
+        {
+            priority: priorities.download,
+        }
     );
+
+    while (!commandResult) {
+        await sleep(500);
+    }
+
+    if (commandResult.result && fs.existsSync(filepath)) {
+        logMsg(
+            `Downloaded video ${filename}: ${commandResult.result}`,
+            id,
+            prefix
+        );
+    } else {
+        logMsg(
+            `Download error video ${filename}: ${commandResult.stderr}`,
+            id,
+            prefix
+        );
+    }
+
+    return commandResult.result;
 }
 
 /**
@@ -331,23 +362,23 @@ export async function checkSize(
     const filename = path.basename(filepath);
 
     if (!fs.existsSync(filepath)) {
-        // logMsg(`File ${filepath} not found for check size`, id, prefix);
+        logMsg(`File ${filepath} not found for check size`, id, prefix);
         return false;
     }
 
     if (!fs.statSync(filepath).size) {
-        // logMsg(`File ${filename} is empty`, id, prefix);
+        logMsg(`File ${filename} is empty`, id, prefix);
         return false;
     }
 
     if (isVideo) {
-        // logMsg(
-        //     `File ${filename} is video with size ${prettyBytes(
-        //         fs.statSync(filepath).size
-        //     )}`,
-        //     id,
-        //     prefix
-        // );
+        logMsg(
+            `File ${filename} is video with size ${prettyBytes(
+                fs.statSync(filepath).size
+            )}`,
+            id,
+            prefix
+        );
 
         return true;
     }
@@ -453,7 +484,7 @@ export async function downloadItem(url, filepath, queue, isVideo = false) {
     }
 
     if (convertDb.data.includes(filepath)) {
-        // logMsg(`File ${parsedPath.name} found in convert cache`, id, prefix);
+        logMsg(`File ${parsedPath.name} found in convert cache`, id, prefix);
         return false;
     }
 
