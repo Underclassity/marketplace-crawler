@@ -23,6 +23,9 @@ const queue = new PQueue({
             return path.extname(item) != ".webp";
         })
         .filter((item) => {
+            return path.extname(item) != ".heic";
+        })
+        .filter((item) => {
             return path.extname(item) != ".json";
         })
         .filter((item) => {

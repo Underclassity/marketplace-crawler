@@ -1,3 +1,5 @@
+import getUserAgent from "./get-user-agent.js";
+
 /**
  * Create page in puppeteer
  *
@@ -20,9 +22,7 @@ export async function createPage(
 
     const page = await browser.newPage();
 
-    await page.setUserAgent(
-        "Mozilla/5.0 (Windows NT 5.1; rv:5.0) Gecko/20100101 Firefox/5.0"
-    );
+    await page.setUserAgent(getUserAgent());
 
     await page.setViewport({
         width: 1920,

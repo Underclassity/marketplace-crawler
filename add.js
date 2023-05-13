@@ -6,13 +6,14 @@ import { LowSync } from "lowdb";
 import { JSONFileSync } from "lowdb/node";
 
 import getAdaptersIds from "./src/helpers/get-adapters-ids.js";
+import logMsg from "./src/helpers/log-msg.js";
 
 import options from "./src/options.js";
 
 const ids = getAdaptersIds();
 
 if (ids.length > 1) {
-    console.log("Define 1 adapter to add item");
+    logMsg("Define 1 adapter to add item", false, false);
     process.exit();
 }
 
@@ -33,14 +34,14 @@ async function addItem(id) {
     // convert id to string
     id = id.toString();
 
-    if (!(id in db.data)) {
-        console.log(`Add new item ${id} to ${ids[0]}`);
+    if (id in db.data) {
+        logMsg(`Item ${id} already in DB`, id, false);
+    } else {
+        logMsg(`Add new item ${id} to ${ids[0]}`, id, false);
 
         db.data[id] = {
             reviews: {},
         };
-    } else {
-        console.log(`Item ${id} already in DB`);
     }
 
     return true;

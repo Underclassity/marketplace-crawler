@@ -1,8 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import axios from "axios";
-
 import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import AdblockerPlugin from "puppeteer-extra-plugin-adblocker";
@@ -15,7 +13,6 @@ import { updateTime, updateTags, getItems } from "../helpers/db.js";
 import browserConfig from "../helpers/browser-config.js";
 import createPage from "../helpers/create-page.js";
 import downloadItem from "../helpers/download.js";
-import getHeaders from "../helpers/get-headers.js";
 import goSettings from "../helpers/go-settings.js";
 import log from "../helpers/log.js";
 import options from "../options.js";

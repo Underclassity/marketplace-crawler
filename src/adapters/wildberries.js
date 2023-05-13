@@ -6,7 +6,7 @@ import axios from "axios";
 import { LowSync } from "lowdb";
 import { JSONFileSync } from "lowdb/node";
 
-import { updateTime, updateTags, getItems, addRewiew } from "../helpers/db.js";
+import { updateTime, updateTags, getItems, addReview } from "../helpers/db.js";
 import downloadItem from "../helpers/download.js";
 import getHeaders from "../helpers/get-headers.js";
 import log from "../helpers/log.js";
@@ -61,9 +61,13 @@ export async function getFeedback(id, feedback, queue) {
         return false;
     }
 
-    addRewiew(wildberriesDb, id, feedback.id, feedback, "wildberries");
+    addReview(wildberriesDb, id, feedback.id, feedback, "wildberries");
 
     if (!options.download) {
+        return true;
+    }
+
+    if (!feedback?.photos?.length) {
         return true;
     }
 
@@ -127,6 +131,31 @@ export async function getItemInfo(id) {
 }
 
 /**
+ * Get feedbacks by XHR
+ *
+ * @param   {String}  id  Item ID
+ *
+ * @return  {Array}       Feedbacks array
+ */
+export async function getFeedbackByXhr(id) {
+    logMsg("Get all reviews by XHR", id);
+
+    try {
+        const request = await axios(
+            `https://feedbacks1.wb.ru/feedbacks/v1/${id}`
+        );
+
+        const { feedbacks } = request.data;
+
+        return feedbacks || [];
+    } catch (error) {
+        logMsg(`Get all reviews by XHR error: ${error.message}`);
+    }
+
+    return [];
+}
+
+/**
  * Get item price info
  *
  * @param   {Number}  id  Item ID
@@ -174,7 +203,7 @@ export async function getPriceInfo(id) {
  * @return  {Boolean}        Result
  */
 export async function getFeedbacks(id, queue) {
-    logMsg(`Feedbacks get`, id);
+    logMsg("Feedbacks get", id);
 
     if (!wildberriesDb.data[id]) {
         wildberriesDb.data[id] = {};
@@ -186,32 +215,39 @@ export async function getFeedbacks(id, queue) {
         wildberriesDb.write();
     }
 
-    const feedbacks = [];
+    // const feedbacks = [];
 
-    let stoped = false;
-    let i = 0;
+    // let stoped = false;
+    // let i = 0;
 
-    while (!stoped) {
-        const itterData = await feedbacksRequest(id, i * 30);
+    // while (!stoped) {
+    //     const itterData = await feedbacksRequest(id, i * 30);
 
-        i++;
+    //     i++;
 
-        if (itterData.feedbacks.length) {
-            feedbacks.push(...itterData.feedbacks);
-        } else {
-            stoped = true;
-        }
-    }
+    //     if (itterData?.feedbacks?.length) {
+    //         feedbacks.push(...itterData.feedbacks);
+    //     } else {
+    //         stoped = true;
+    //     }
+    // }
+
+    const feedbacks = await getFeedbackByXhr(id);
 
     logMsg(`Found ${feedbacks.length} feedbacks items`, id);
 
     for (const feedback of feedbacks) {
-        if (!(feedback.id in wildberriesDb.data[id].reviews)) {
-            logMsg(`Add new feedback ${feedback.id}`, id);
-            wildberriesDb.data[id].reviews[feedback.id] = feedback;
-            wildberriesDb.write();
-        }
+        addReview(
+            wildberriesDb,
+            id,
+            feedback.id,
+            feedback,
+            "Wildberries",
+            false
+        );
     }
+
+    wildberriesDb.write();
 
     for (const feedback of feedbacks) {
         queue.add(async () => getFeedback(id, feedback, queue), {
@@ -271,7 +307,7 @@ export async function feedbacksRequest(id, skip) {
 
         return request.data;
     } catch (error) {
-        logMsg(`Error: ${error.message}`, id);
+        logMsg(`Get feedbacks with skip ${skip} error: ${error.message}`, id);
     }
 
     return false;
@@ -346,11 +382,13 @@ export function updateItems(queue) {
  * @return  {Boolean}        Result
  */
 export function updateReviews(queue) {
-    logMsg("Update reviews");
-
     wildberriesDb.read();
 
-    getItems(wildberriesDb, "Wildberries").forEach((itemId) => {
+    const items = getItems(wildberriesDb, "Wildberries");
+
+    logMsg(`Update ${items.length} items reviews`);
+
+    items.forEach((itemId) => {
         const item = wildberriesDb.data[itemId];
 
         if (!("reviews" in item) || !Object.keys(item.reviews).length) {
@@ -359,6 +397,10 @@ export function updateReviews(queue) {
 
         for (const reviewId in item.reviews) {
             const feedback = item.reviews[reviewId];
+
+            if (!feedback?.photos?.length) {
+                continue;
+            }
 
             const photos = feedback.photos.map(
                 (item) =>

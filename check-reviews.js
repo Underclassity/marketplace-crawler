@@ -6,9 +6,10 @@ import { JSONFileSync } from "lowdb/node";
 import options from "./src/options.js";
 
 import getAdaptersIds from "./src/helpers/get-adapters-ids.js";
+import logMsg from "./src/helpers/log-msg.js";
 
 async function analyzeDb(db, id) {
-    console.log(`Analyze reviews: ${id}`);
+    logMsg(`Analyze reviews`, id, false);
 
     let urls = [];
 
@@ -47,13 +48,13 @@ async function analyzeDb(db, id) {
                     break;
                 case "wildberries":
                     if (review?.photos?.length) {
-                        for (let item of review.photos) {
+                        for (const item of review.photos) {
                             urls.push(item.fullSizeUri);
                         }
                     }
 
                     if (review?.video) {
-                        console.log(review.video);
+                        logMsg(review.video);
                     }
                     break;
                 default:
@@ -62,12 +63,12 @@ async function analyzeDb(db, id) {
         }
     }
 
-    console.log(`${id}: Before sort ${urls.length}`);
+    logMsg(`Before sort ${urls.length}`, id, false);
 
     urls = urls.filter((item, index, array) => array.indexOf(item) === index);
 
-    console.log(`${id}: After sort ${urls.length}`);
-    console.log(new Array(25).join("-"));
+    logMsg(`After sort ${urls.length}`, id, false);
+    logMsg(new Array(25).join("-"), id, false);
 
     return true;
 }

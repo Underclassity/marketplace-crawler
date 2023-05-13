@@ -11,7 +11,8 @@ import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import AdblockerPlugin from "puppeteer-extra-plugin-adblocker";
 
-import { updateTags, updateTime, getItems, addRewiew } from "../helpers/db.js";
+import { getProxy } from "../helpers/proxy-helpers.js";
+import { updateTags, updateTime, getItems, addReview } from "../helpers/db.js";
 import autoScroll from "../helpers/auto-scroll.js";
 import browserConfig from "../helpers/browser-config.js";
 import createPage from "../helpers/create-page.js";
@@ -61,6 +62,125 @@ function logMsg(msg, id) {
 }
 
 /**
+ * Get user ID from string
+ *
+ * @param   {String}  str  User URL string
+ *
+ * @return  {String}       User ID
+ */
+export function getUserId(str) {
+    return str
+        .replace(
+            "https://feedback.aliexpress.ru/display/detail.htm?ownerMemberId=",
+            ""
+        )
+        .replace("&memberType=buyer", "");
+}
+
+/**
+ * Get user reviews
+ *
+ * @param   {String}  username  User ID(username)
+ * @param   {Object}  browser   Puppeteer instance
+ *
+ * @return  {Array}             Items array with user reviews
+ */
+export async function getUserReviews(username, browser) {
+    logMsg(`Get user ${username} items`);
+
+    const page = await createPage(browser);
+
+    let items = [];
+
+    for (let pageNumber = 1; pageNumber < options.pages; pageNumber++) {
+        logMsg(`Process page ${pageNumber} for user ${username}`);
+
+        try {
+            await page.goto(
+                `https://feedback.aliexpress.com/display/detail.htm?ownerMemberId=${username}&memberType=buyer&page=${pageNumber}`,
+                goSettings
+            );
+
+            const hrefs = await page.$$eval(".product-name a", (links) => {
+                return Array.from(links).map((link) =>
+                    link.getAttribute("href")
+                );
+            });
+
+            const pageItems = hrefs
+                .filter((href) => href.includes("/item/"))
+                .filter((href) => href.length)
+                .map((href) =>
+                    parseInt(
+                        href.slice(
+                            href.indexOf("/item/-/") + 8,
+                            href.indexOf(".html")
+                        ),
+                        10
+                    )
+                )
+                .filter((index) => index > 10)
+                .filter((value, index, self) => self.indexOf(value) === index);
+
+            items = items.concat(pageItems);
+
+            if (!pageItems.length) {
+                pageNumber = options.pages;
+            }
+        } catch (error) {
+            logMsg(
+                `Process page ${pageNumber} for user ${username} error: ${error.message}`
+            );
+        }
+    }
+
+    await page.close();
+
+    logMsg(`Get ${items.length} for user ${username}`);
+
+    return items;
+}
+
+/**
+ * Load browser for process cache and session
+ *
+ * @return  {Boolean}  Result
+ */
+export async function processCookiesAndSession() {
+    logMsg("Try to save cache");
+
+    const puppeteerPath = path.resolve("./puppeteer/");
+
+    if (!fs.existsSync(puppeteerPath)) {
+        fs.mkdirSync(puppeteerPath);
+    }
+
+    const browser = await puppeteer.launch({
+        headless: false,
+        devtools: true,
+        userDataDir: path.resolve(options.directory, "puppeteer"),
+    });
+
+    const page = await browser.newPage();
+
+    try {
+        await page.goto("https://aliexpress.ru/", goSettings);
+
+        logMsg("Load start page, wait for 1 min");
+
+        await sleep(60000);
+    } catch (error) {
+        logMsg(`Go to start page error: ${error.message}`);
+    }
+
+    await page.close();
+
+    browser.close();
+
+    return true;
+}
+
+/**
  * Process review download
  *
  * @param   {Object}  review  Review
@@ -81,13 +201,48 @@ export async function download(review, id, queue) {
         fs.mkdirSync(dirPath, { recursive: true });
     }
 
-    for (const url of review.images) {
-        const parsePath = path.parse(url);
-        const name = parsePath.base;
+    if (review?.images?.length) {
+        logMsg(
+            `Download ${review.evaluationId || review.id} review ${
+                review.images.length
+            } images`,
+            id
+        );
 
-        const itemPath = path.resolve(dirPath, name);
+        for (let url of review.images) {
+            if (typeof url == "object") {
+                url = url.url;
+            }
 
-        downloadItem(url, itemPath, queue);
+            const parsePath = path.parse(url);
+            const name = parsePath.base;
+
+            const itemPath = path.resolve(dirPath, name);
+
+            downloadItem(url, itemPath, queue);
+        }
+    }
+
+    if (review?.additionalReview?.images?.length) {
+        logMsg(
+            `Download ${review.evaluationId || review.id} additional review ${
+                review.additionalReview.images.length
+            } images`,
+            id
+        );
+
+        for (let url of review.additionalReview.images) {
+            if (typeof url == "object") {
+                url = url.url;
+            }
+
+            const parsePath = path.parse(url);
+            const name = parsePath.base;
+
+            const itemPath = path.resolve(dirPath, name);
+
+            downloadItem(url, itemPath, queue);
+        }
     }
 
     return true;
@@ -107,20 +262,46 @@ export async function getItemReviewsPage(itemId, pageId) {
     logMsg(`Process page ${pageId}`, itemId);
 
     try {
-        const request = await axios(
-            "https://feedback.aliexpress.com/pc/searchEvaluation.do",
-            {
-                timeout: options.timeout,
-                headers: getHeaders(),
-                params: {
-                    productId: itemId,
-                    page: pageId,
-                    pageSize: 10,
-                    filter: "all",
-                },
-                method: "GET",
-            }
-        );
+        const config = {
+            url: "https://feedback.aliexpress.com/pc/searchEvaluation.do",
+            timeout: options.timeout,
+            headers: getHeaders(),
+            params: {
+                productId: itemId,
+                page: pageId,
+                pageSize: 10,
+                filter: "all",
+            },
+            method: "GET",
+        };
+
+        // const config = {
+        //     url: `https://aliexpress.ru/aer-api/v1/review/filters?product_id=${itemId}`,
+        //     timeout: options.timeout,
+        //     headers: getHeaders(),
+        //     body: {
+        //         productId: itemId.toString(),
+        //         starFilter: "all",
+        //         sort: "default",
+        //         page: pageId,
+        //         pageSize: 10,
+        //         translate: true,
+        //         local: false,
+        //     },
+        //     method: "POST",
+        // };
+
+        if (options.proxy) {
+            const { protocol, host, port } = getProxy();
+
+            config.proxy = {
+                protocol,
+                host,
+                port,
+            };
+        }
+
+        const request = await axios(config);
 
         logMsg(`Get data on page ${pageId}`, itemId);
 
@@ -207,10 +388,10 @@ export async function scrapeItem(itemId, queue) {
         logMsg(`Reviews length ${reviews.length}`, itemId);
 
         for (const reviewItem of reviews) {
-            addRewiew(
+            addReview(
                 aliexpressDb,
                 itemId,
-                reviewItem.evaluationId,
+                reviewItem.evaluationId || reviewItem.id,
                 reviewItem,
                 "aliexpress"
             );
@@ -238,6 +419,287 @@ export async function scrapeItem(itemId, queue) {
     return found ? reviews : false;
 }
 
+/**
+ * Scrape item by ID with Puppeteer
+ *
+ * @param   {String}  itemId      Item ID
+ * @param   {Object}  browser     Browser instance
+ * @param   {Object}  startPage   Home page
+ * @param   {Object}  queue       Queue instance
+ *
+ * @return  {Boolean}             Result
+ */
+export async function scrapeItemByBrowser(itemId, browser, startPage, queue) {
+    logMsg("Start scrape item", itemId);
+
+    // const page = await createPage(browser, true);
+
+    // let isData = false;
+    // let isEnded = false;
+    // let pageId = 0;
+
+    // await page.setRequestInterception(true);
+
+    // page.on("response", async (response) => {
+    //     const url = response.url();
+    //     const method = response.request().method();
+
+    //     if (!url.includes("/review/v1/")) {
+    //         return false;
+    //     }
+
+    //     if (method !== "POST") {
+    //         return false;
+    //     }
+
+    //     // logMsg(`[${method}] ${url}`);
+
+    //     let data;
+
+    //     try {
+    //         const { data } = await response.json();
+
+    //         if (data?.reviews?.length) {
+    //             for (const reviewItem of data.reviews) {
+    //                 addReview(
+    //                     aliexpressDb,
+    //                     itemId,
+    //                     reviewItem.id,
+    //                     reviewItem,
+    //                     "Aliexpress"
+    //                 );
+    //             }
+    //         } else {
+    //             isEnded = true;
+    //         }
+    //     } catch (error) {
+    //         logMsg(`Get respoonse data error: ${error.message}`);
+    //         return false;
+    //     }
+
+    //     isData = false;
+
+    //     if (data?.ret) {
+    //         logMsg("Captcha error", itemId);
+    //         isEnded = true;
+    //     }
+    // });
+
+    let result = false;
+
+    // try {
+    // await page.goto(
+    //     `https://aliexpress.ru/item/${itemId}.html`,
+    //     goSettings
+    // );
+
+    // logMsg("Item page loaded", itemId);
+
+    // await autoScroll(page);
+
+    // const isCaptcha = await page.$("#baxia-punish");
+    // const isCaptchaPopup = await page.$(".baxia-dialog");
+
+    // if (isCaptcha || isCaptchaPopup) {
+    //     throw new Error("Captcha found");
+    // }
+
+    let maxPages = 10;
+    let ended = false;
+    const pageSize = 20;
+
+    for (let pageId = 1; pageId <= maxPages; pageId++) {
+        await queue.add(
+            async () => {
+                if (ended) {
+                    logMsg("Ended page get", itemId);
+                    return false;
+                }
+
+                const isCaptcha = await startPage.$("#baxia-punish");
+                const isCaptchaPopup = await startPage.$(".baxia-dialog");
+
+                if (isCaptcha || isCaptchaPopup) {
+                    // if (!options.headless) {
+                    await sleep(Math.random() * 60 * 1000); // Waif random time, from 0 to 5 min
+                    // }
+
+                    pageId = maxPages;
+                    ended = true;
+
+                    logMsg("Captcha found", itemId);
+
+                    return false;
+                }
+
+                logMsg(`Get reviews page ${pageId}`, itemId);
+
+                const data = await startPage.evaluate(
+                    async (id, pageNum, pageCount, opt) => {
+                        try {
+                            const request = await fetch(
+                                `https://aliexpress.ru/aer-jsonapi/review/v1/desktop/product/reviews?product_id=${id}&_bx-v=2.2.3`,
+                                {
+                                    credentials: "include",
+                                    body: `{"productId":"${id}","pageSize":${pageCount},"pageNum":${pageNum},"reviewFilters":[],"starFilter":"StarFilter_ALL_STARS","sort":"ReviewSort_USEFUL"}`,
+                                    method: "POST",
+                                    mode: "cors",
+                                    timeout: opt.timeout,
+                                }
+                            );
+
+                            return await request.json();
+                        } catch (error) {
+                            return error;
+                        }
+                    },
+                    itemId,
+                    pageId,
+                    pageSize,
+                    options
+                );
+
+                if (data?.data?.totalAmount) {
+                    maxPages = Math.round(data.data.totalAmount / pageSize) + 1;
+                    logMsg(`Set reviews max page to ${maxPages}`, itemId);
+                }
+
+                if (data?.data?.paginationStatusText) {
+                    logMsg(
+                        `Status page ${pageId}: ${data?.data?.paginationStatusText}`,
+                        itemId
+                    );
+                }
+
+                if (data?.data?.reviews?.length) {
+                    logMsg(
+                        `Found ${data.data.reviews.length} from ${data.data.totalAmount} reviews on reviews page ${pageId}`,
+                        itemId
+                    );
+
+                    for (const reviewItem of data.data.reviews) {
+                        addReview(
+                            aliexpressDb,
+                            itemId,
+                            reviewItem.id,
+                            reviewItem,
+                            "Aliexpress",
+                            false
+                        );
+                    }
+
+                    aliexpressDb.write();
+
+                    const sleepTime = Math.random() * options.timeout;
+
+                    logMsg(
+                        `Wait for ${Math.round(
+                            sleepTime / 1000
+                        )} sec on reviews page ${pageId}`,
+                        itemId
+                    );
+
+                    await sleep(sleepTime); // Waif random time, from 0 to 1 min
+
+                    logMsg(`End waiting on reviews page ${pageId}`, itemId);
+
+                    return true;
+                }
+
+                if (data?.ret || data?.url) {
+                    logMsg("Request captcha! Wait for 5 min", itemId);
+                    await sleep(Math.random() * 60 * 1000);
+                    return false;
+                }
+
+                logMsg("No reviews found", itemId);
+
+                pageId = maxPages;
+                ended = true;
+
+                return true;
+            },
+            {
+                priority: priorities.page,
+            }
+        );
+    }
+
+    updateTime(aliexpressDb, itemId);
+    updateTags(aliexpressDb, itemId, options.query);
+
+    result = true;
+
+    // let count = 0;
+
+    // while (!isEnded) {
+    //     // console.log(isData, isEnded);
+
+    //     if (isData) {
+    //         if (count < 10) {
+    //             logMsg("Wait 1 sec for data", itemId);
+    //             await sleep(1000);
+    //             count++;
+    //         } else {
+    //             count = 0;
+    //             isData = false;
+    //         }
+    //     } else {
+    //         const isNextButton = await page.$(
+    //             'button[data-type="forward"]'
+    //         );
+
+    //         // console.log(isNextButton);
+
+    //         if (isNextButton) {
+    //             logMsg("Click next", itemId);
+
+    //             await page.evaluate(() => {
+    //                 document
+    //                     .querySelector('button[data-type="forward"]')
+    //                     .click();
+
+    //                 return true;
+    //             });
+
+    //             isData = true;
+    //         } else if (!isData) {
+    //             logMsg("No next founded", itemId);
+
+    //             isEnded = true;
+    //         }
+    //     }
+    // }
+
+    // console.log("Wait for 1 min");
+
+    // await sleep(60000);
+    // } catch (error) {
+    //     logMsg(`Go to item error: ${error.message}`, itemId);
+    // }
+
+    // await page.close();
+
+    logMsg("Get all reviews for item", itemId);
+
+    if ("reviews" in aliexpressDb.data[itemId] && result) {
+        const reviews = Object.keys(aliexpressDb.data[itemId].reviews)
+            .map((reviewId) => aliexpressDb.data[itemId].reviews[reviewId])
+            .filter((reviewItem) => {
+                return reviewItem?.images?.length ||
+                    reviewItem?.additionalReview?.images?.length
+                    ? true
+                    : false;
+            });
+
+        for (const reviewItem of reviews) {
+            await download(reviewItem, itemId, queue);
+        }
+    }
+
+    return true;
+}
+
 async function processPageByXhr(pageId, queue) {
     if (!pageId) {
         logMsg("Page ID not defined!");
@@ -255,7 +717,7 @@ async function processPageByXhr(pageId, queue) {
         const request = await axios(pageURL, {
             timeout: options.timeout,
             responseType: "document",
-            // headers: getHeaders(),
+            headers: getHeaders(),
         });
 
         const html = request.data;
@@ -280,9 +742,6 @@ async function processPageByXhr(pageId, queue) {
                 )
             )
             .filter((value, index, array) => array.indexOf(value) == index);
-
-        console.log(links.length);
-        console.log(links);
     } catch (error) {
         logMsg(`Get items from page ${pageId} error: ${error.message}`);
         return false;
@@ -414,19 +873,74 @@ export async function processPage(
  * @return  {Boolean}         Result
  */
 export async function updateItems(queue) {
-    logMsg("Update items");
-
     aliexpressDb.read();
 
-    getItems(aliexpressDb, "Aliexpress").forEach((itemId) =>
-        queue.add(() => scrapeItem(itemId, queue), {
-            priority: priorities.item,
-        })
+    const puppeteerPath = path.resolve("./puppeteer/");
+
+    if (!fs.existsSync(puppeteerPath)) {
+        fs.mkdirSync(puppeteerPath);
+    }
+
+    const browser = await puppeteer.launch(browserConfig);
+
+    const items = getItems(aliexpressDb, "Aliexpress");
+
+    logMsg(`Update ${items.length} items`);
+
+    const startPage = await createPage(browser, false);
+
+    await startPage.goto(`https://aliexpress.ru/`, goSettings);
+
+    logMsg("Start page loaded");
+
+    // await autoScroll(startPage);
+
+    // const isCaptcha = await startPage.$("#baxia-punish");
+    // const isCaptchaPopup = await startPage.$(".baxia-dialog");
+
+    // if (isCaptcha || isCaptchaPopup) {
+    //     if (!options.headless) {
+    //         await sleep(1 * 60000); // wait 1 min
+    //     }
+
+    //     throw new Error("Captcha found");
+    // }
+
+    items.forEach((itemId) =>
+        queue.add(
+            () => scrapeItemByBrowser(itemId, browser, startPage, queue),
+            {
+                priority: priorities.item,
+            }
+        )
     );
+
+    let count = 0;
 
     while (queue.size || queue.pending) {
         await sleep(1000);
+
+        count += 1;
+
+        if (count >= 10) {
+            logMsg(
+                `Queue size: page-${queue.sizeBy({
+                    priority: priorities.page,
+                })} items-${queue.sizeBy({
+                    priority: priorities.item,
+                })} reviews-${queue.sizeBy({
+                    priority: priorities.review,
+                })} download-${queue.sizeBy({
+                    priority: priorities.download,
+                })}`
+            );
+            count = 0;
+        }
     }
+
+    logMsg("End items update");
+
+    await browser.close();
 
     return true;
 }
@@ -439,11 +953,13 @@ export async function updateItems(queue) {
  * @return  {Boolean}         Result
  */
 export async function updateReviews(queue) {
-    logMsg("Update reviews");
-
     aliexpressDb.read();
 
-    getItems(aliexpressDb, "Aliexpress").forEach((itemId) => {
+    const items = getItems(aliexpressDb, "Aliexpress");
+
+    logMsg(`Update reviews for ${items.length}`);
+
+    items.forEach((itemId) => {
         const item = aliexpressDb.data[itemId];
 
         if (
@@ -473,6 +989,8 @@ export async function updateReviews(queue) {
     while (queue.size || queue.pending) {
         await sleep(1000);
     }
+
+    logMsg("End reviews update");
 
     return true;
 }

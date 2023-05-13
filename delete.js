@@ -7,6 +7,7 @@ import { LowSync } from "lowdb";
 import { JSONFileSync } from "lowdb/node";
 
 import getAdaptersIds from "./src/helpers/get-adapters-ids.js";
+import logMsg from "./src/helpers/log-msg.js";
 
 import options from "./src/options.js";
 
@@ -31,7 +32,7 @@ for (const id of ids) {
  * @return  {Boolean}      Result
  */
 async function deleteItem(id) {
-    console.log(`Try to delete ${id}`);
+    logMsg("Try to delete", id, false);
 
     // convert id to string
     id = id.toString();
@@ -70,14 +71,14 @@ async function deleteItem(id) {
     }
 
     if (foundInIds.length > 1) {
-        console.log(`Found item ${id} in ${foundInIds.join(",")}`);
-        console.log("Include or exclude adapters for delete");
+        logMsg(`Found item ${id} in ${foundInIds.join(",")}`, id, false);
+        logMsg("Include or exclude adapters for delete", id, false);
 
         return false;
     }
 
     if (!foundInIds.length) {
-        console.log(`Item ${id} not found in databases`);
+        logMsg(`Item ${id} not found in databases`, id, false);
         return false;
     }
 

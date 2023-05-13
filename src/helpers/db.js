@@ -22,7 +22,12 @@ export function dbItemCheck(db, itemId) {
 
     if (!(itemId in db.data)) {
         db.data[itemId] = {};
-        db.write();
+
+        try {
+            db.write();
+        } catch (error) {
+            console.log(error);
+        }
     }
 
     return true;
@@ -50,7 +55,11 @@ export function updateTime(db, itemId, time = Date.now()) {
         };
     }
 
-    db.write();
+    try {
+        db.write();
+    } catch (error) {
+        console.log(error);
+    }
 
     return true;
 }
@@ -88,7 +97,11 @@ export function updateTags(db, itemId, tag) {
         db.data[itemId].tags.push(tag);
     }
 
-    db.write();
+    try {
+        db.write();
+    } catch (error) {
+        console.log(error);
+    }
 
     return true;
 }
@@ -134,20 +147,33 @@ export function getItems(db, prefix = false) {
 
             return true;
         })
-        .sort((a, b) => a.localeCompare(b));
+        .sort((a, b) => {
+            const aReviewsCount = a.reviews ? Object.keys(a.reviews).length : 0;
+            const bReviewsCount = b.reviews ? Object.keys(b.reviews).length : 0;
+
+            return aReviewsCount - bReviewsCount;
+        });
 }
 
 /**
  * Add review to DB
  *
- * @param   {Object}  db           Items DB
- * @param   {String}  itemId       Item ID
- * @param   {String}  reviewId     Review ID
- * @param   {Object}  review       Review object
- * @param   {String}  prefix       Log prefix
- * @return  {Boolean}              Result
+ * @param   {Object}   db           Items DB
+ * @param   {String}   itemId       Item ID
+ * @param   {String}   reviewId     Review ID
+ * @param   {Object}   review       Review object
+ * @param   {String}   prefix       Log prefix
+ * @param   {Boolean}  write        Log prefix
+ * @return  {Boolean}               Result
  */
-export function addRewiew(db, itemId, reviewId, review, prefix = false) {
+export function addReview(
+    db,
+    itemId,
+    reviewId,
+    review,
+    prefix = false,
+    write = true
+) {
     if (!dbItemCheck(db, itemId)) {
         return false;
     }
@@ -157,25 +183,39 @@ export function addRewiew(db, itemId, reviewId, review, prefix = false) {
         return false;
     }
 
-    if (!(itemId in db)) {
-        db[itemId] = {
+    function dbWrite() {
+        if (!write) {
+            return false;
+        }
+
+        try {
+            db.write();
+        } catch (error) {
+            logMsg(`Write DB error: ${error.message}`, false, false);
+        }
+
+        return true;
+    }
+
+    if (!(itemId in db.data)) {
+        db.data[itemId] = {
             reviews: {},
         };
-        db.write();
+        dbWrite();
     }
 
-    if (!("reviews" in db[itemId])) {
-        db[itemId].reviews = {};
-        db.write();
+    if (!("reviews" in db.data[itemId])) {
+        db.data[itemId].reviews = {};
+        dbWrite();
     }
 
-    if (!(reviewId in db[itemId].reviews) && !options.force) {
-        db[itemId].reviews[reviewId] = review;
-        db.write();
+    if (!(reviewId in db.data[itemId].reviews) && !options.force) {
+        db.data[itemId].reviews[reviewId] = review;
+        dbWrite();
         logMsg(`Add new review ${reviewId} in DB`, itemId, prefix);
-    } else if (db[itemId].reviews[reviewId] != review || options.force) {
-        db[itemId].reviews[reviewId] = review;
-        db.write();
+    } else if (db.data[itemId].reviews[reviewId] != review || options.force) {
+        db.data[itemId].reviews[reviewId] = review;
+        dbWrite();
         logMsg(`Update review ${reviewId} in DB`, itemId, prefix);
     } else {
         logMsg(`Review ${reviewId} already saved in DB`, itemId, prefix);

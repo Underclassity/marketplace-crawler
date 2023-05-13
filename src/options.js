@@ -83,10 +83,10 @@ export const options = yargs(hideBin(process.argv))
         default: true,
         type: "boolean",
     })
-    .option("time", {
-        describe: "Time to update",
-        default: 4,
-        type: "number",
+    .option("cookies", {
+        describe: "Run browser for update cookies and session",
+        default: false,
+        type: "boolean",
     })
     .option("logs", {
         describe: "Logs flag",

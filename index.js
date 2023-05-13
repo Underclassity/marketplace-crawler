@@ -1,5 +1,5 @@
-import path from "node:path";
-import fs from "node:fs";
+// import path from "node:path";
+// import fs from "node:fs";
 
 import PQueue from "p-queue";
 
@@ -12,6 +12,8 @@ import options from "./src/options.js";
 import getAdaptersIds from "./src/helpers/get-adapters-ids.js";
 import sleep from "./src/helpers/sleep.js";
 import updateProxies from "./src/helpers/proxy-helpers.js";
+
+import { processCookiesAndSession } from "./src/adapters/aliexpress.js";
 
 // import {
 //     getItemsByQuery as getItemsByQueryFromAliexpress,
@@ -107,14 +109,18 @@ puppeteer.use(StealthPlugin());
     if (options.reviews) {
         console.log("Update items reviews");
 
+        if (ids.includes("aliexpress") && options.cookies) {
+            await processCookiesAndSession();
+        }
+
         for (const id of ids) {
             const { updateReviews } = await import(`./src/adapters/${id}.js`);
 
             updateReviews(queue);
         }
 
-        while (queue.size) {
-            await sleep(100);
+        while (queue.size || queue.pending) {
+            await sleep(1000);
         }
 
         // updateReviewsFromAliexpress(queue);
@@ -129,14 +135,18 @@ puppeteer.use(StealthPlugin());
     if (options.update) {
         console.log("Update items");
 
+        if (ids.includes("aliexpress") && options.cookies) {
+            await processCookiesAndSession();
+        }
+
         for (const id of ids) {
             const { updateItems } = await import(`./src/adapters/${id}.js`);
 
             updateItems(queue);
         }
 
-        while (queue.size) {
-            await sleep(100);
+        while (queue.size || queue.pending) {
+            await sleep(1000);
         }
 
         // updateItemsFromAliexpress(queue);
@@ -185,7 +195,7 @@ puppeteer.use(StealthPlugin());
         getItemsByQuery(queue);
     }
 
-    while (queue.size || queue.pending) {
+    while (queue.size || queue.pending || !queue.isPaused) {
         await sleep(1000);
     }
 

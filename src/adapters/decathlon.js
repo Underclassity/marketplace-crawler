@@ -11,12 +11,12 @@ import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import AdblockerPlugin from "puppeteer-extra-plugin-adblocker";
 
+import { updateTime, updateTags, addReview, getItems } from "../helpers/db.js";
 import autoScroll from "../helpers/auto-scroll.js";
 import createPage from "../helpers/create-page.js";
 import goSettings from "../helpers/go-settings.js";
 import log from "../helpers/log.js";
 import sleep from "../helpers/sleep.js";
-import { updateTime, updateTags } from "../helpers/db.js";
 
 import options from "../options.js";
 import priorities from "../helpers/priorities.js";
@@ -58,8 +58,17 @@ function logMsg(msg, id) {
     return log(`[Decathlon] ${query}: ${msg}`);
 }
 
+/**
+ * Get reviews for item
+ *
+ * @param   {String}  id     Item ID
+ * @param   {Object}  queue  Queue instance
+ *
+ * @return  {Boolean}        Result
+ */
 export async function getReviews(id, queue) {
     if (!id) {
+        logMsg("ID not defined!");
         return false;
     }
 
@@ -141,11 +150,7 @@ export async function getReviews(id, queue) {
         }
 
         for (const item of reviews) {
-            if (!(item.id in decathlonDb.data[id].reviews)) {
-                logMsg(`Add new review ${item.id}`, id);
-                decathlonDb.data[id].reviews[item.id] = item;
-                decathlonDb.write();
-            }
+            addReview(decathlonDb, id, item.id, item, "Decathlon");
         }
 
         logMsg(`All reviews get for model ${model_id}`, id);
@@ -159,6 +164,13 @@ export async function getReviews(id, queue) {
     return true;
 }
 
+/**
+ * Get all items from pages
+ *
+ * @param   {Object}  queue  Queue instance
+ *
+ * @return  {Boolean}        Result
+ */
 export async function getItemsOnPages(queue) {
     logMsg(`Get items for ${options.query}`);
 
@@ -305,25 +317,23 @@ export async function getItemsOnPages(queue) {
     return true;
 }
 
+/**
+ * Update reviews
+ *
+ * @param   {Object}  queue  Queue instance
+ *
+ * @return  {Boolean}        Result
+ */
 export async function updateReviews(queue) {
-    logMsg("Update reviews");
+    decathlonDb.read();
 
-    const time = options.time * 60 * 60 * 1000;
+    const items = getItems(decathlonDb, "Decathlon");
 
-    for (const itemId in decathlonDb.data) {
-        const item = decathlonDb.data[itemId];
+    logMsg(`Update ${items.length} items reviews`);
 
-        if (item?.time && Date.now() - item.time <= time && !options.force) {
-            logMsg(`Already updated by time`, itemId);
-            continue;
-        }
-
-        if ("deleted" in item && item.deleted) {
-            continue;
-        }
-
+    items.forEach((itemId) => {
         if (!("reviews" in item) || !Object.keys(item.reviews).length) {
-            continue;
+            return false;
         }
 
         for (const reviewId in item.reviews) {
@@ -333,7 +343,7 @@ export async function updateReviews(queue) {
                 console.log(review.body_html);
             }
         }
-    }
+    });
 
     while (queue.size) {
         await sleep(100);
@@ -342,23 +352,21 @@ export async function updateReviews(queue) {
     return true;
 }
 
+/**
+ * Update items
+ *
+ * @param   {Object}  queue  Queue instance
+ *
+ * @return  {Boolean}        Result
+ */
 export async function updateItems(queue) {
-    logMsg("Update items");
+    decathlonDb.read();
 
-    const time = options.time * 60 * 60 * 1000;
+    const items = getItems(decathlonDb, "Decathlon");
 
-    for (const itemId in decathlonDb.data) {
-        const item = decathlonDb.data[itemId];
+    logMsg(`Update ${items.length} items`);
 
-        if (item?.time && Date.now() - item.time <= time && !options.force) {
-            logMsg(`Already updated by time`, itemId);
-            continue;
-        }
-
-        if ("deleted" in item && item.deleted) {
-            continue;
-        }
-
+    for (const itemId of items) {
         await getReviews(itemId, queue);
     }
 
@@ -369,6 +377,13 @@ export async function updateItems(queue) {
     return true;
 }
 
+/**
+ * Get items from pages
+ *
+ * @param   {Object}  queue  Queue
+ *
+ * @return  {Boolean}        Result
+ */
 export async function getItemsByQuery(queue) {
     logMsg("Get items");
 

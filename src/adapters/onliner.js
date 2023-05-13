@@ -2,12 +2,11 @@ import fs from "node:fs";
 import path from "node:path";
 
 import axios from "axios";
-import cheerio from "cheerio";
 
 import { LowSync } from "lowdb";
 import { JSONFileSync } from "lowdb/node";
 
-import { updateTime, updateTags } from "../helpers/db.js";
+import { updateTime, updateTags, addReview, getItems } from "../helpers/db.js";
 import getHeaders from "../helpers/get-headers.js";
 import log from "../helpers/log.js";
 import options from "../options.js";
@@ -40,6 +39,14 @@ function logMsg(msg, id) {
     return log(`[Onliner] ${query}: ${msg}`);
 }
 
+/**
+ * Update item prices
+ *
+ * @param   {String}  id     Item ID
+ * @param   {Object}  queue  Queue instance
+ *
+ * @return  {Boolean}        Rtsult
+ */
 export async function updateItemPrices(id, queue) {
     logMsg("Try to update item prices", id);
 
@@ -110,6 +117,14 @@ export async function updateItemPrices(id, queue) {
     return false;
 }
 
+/**
+ * Update item reviews
+ *
+ * @param   {String}  id     Item ID
+ * @param   {Object}  queue  Queue instance
+ *
+ * @return  {Boolean}        Result
+ */
 export async function updateItemReviews(id, queue) {
     logMsg("Try to update", id);
 
@@ -143,12 +158,7 @@ export async function updateItemReviews(id, queue) {
                     logMsg(`${reviews.length} reviews get`, id);
 
                     for (const review of reviews) {
-                        if (!(review.id in onlinerDb.data[id].reviews)) {
-                            logMsg(`Add new review ${review.id}`, id);
-
-                            onlinerDb.data[id].reviews[review.id] = review;
-                            onlinerDb.write();
-                        }
+                        addReview(onlinerDb, id, review.id, review, "Onliner");
                     }
                 } catch (error) {
                     logMsg(`Get item reviews error: ${error.message}`, id);
@@ -161,23 +171,21 @@ export async function updateItemReviews(id, queue) {
     return false;
 }
 
+/**
+ * Update items
+ *
+ * @param   {Object}  queue  Queue instanec
+ *
+ * @return  {Boolean}        Result
+ */
 export async function updateItems(queue) {
-    logMsg("Update items");
+    onlinerDb.read();
 
-    const time = options.time * 60 * 60 * 1000;
+    const items = getItems(onlinerDb, "Onliner");
 
-    for (const itemId in onlinerDb.data) {
-        const item = onlinerDb.data[itemId];
+    logMsg(`Update ${items.length} items`);
 
-        if (item?.time && Date.now() - item.time <= time && !options.force) {
-            logMsg(`Already updated by time`, itemId);
-            continue;
-        }
-
-        if ("deleted" in item && item.deleted) {
-            continue;
-        }
-
+    for (const itemId of items) {
         await updateItemReviews(itemId, queue);
         await updateItemPrices(itemId, queue);
 
@@ -187,22 +195,22 @@ export async function updateItems(queue) {
     return true;
 }
 
+/**
+ * Update reviews
+ *
+ * @param   {Object}  queue  Queue instance
+ *
+ * @return  {Boolean}        Result
+ */
 export async function updateReviews(queue) {
-    logMsg("Update reviews");
+    onlinerDb.read();
 
-    const time = options.time * 60 * 60 * 1000;
+    const items = getItems(onlinerDb, "Onliner");
 
-    for (const itemId in onlinerDb.data) {
+    logMsg(`Update ${items.length} items reviews`);
+
+    for (const itemId of items) {
         const item = onlinerDb.data[itemId];
-
-        if (item?.time && Date.now() - item.time <= time && !options.force) {
-            logMsg(`Already updated by time`, itemId);
-            continue;
-        }
-
-        if ("deleted" in item && item.deleted) {
-            continue;
-        }
 
         if (!("reviews" in item)) {
             continue;
@@ -238,6 +246,13 @@ export async function updateReviews(queue) {
     return true;
 }
 
+/**
+ * Get items by query
+ *
+ * @param   {Object}  queue  Queue instance
+ *
+ * @return  {Boolean}        Result
+ */
 export async function getItemsByQuery(queue) {
     logMsg(`Get items for query: ${options.query}`);
 

@@ -22,6 +22,12 @@ if (!proxyDb.data) {
     proxyDb.write();
 }
 
+const proxyURLs = [
+    "https://raw.githubusercontent.com/clarketm/proxy-list/master/proxy-list-raw.txt",
+    "https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/http.txt",
+    "https://raw.githubusercontent.com/jetkai/proxy-list/main/online-proxies/txt/proxies.txt",
+];
+
 /**
  * Get random proxy config
  *
@@ -29,7 +35,7 @@ if (!proxyDb.data) {
  *
  * @return  {Object}          Proxy settings
  */
-export async function getProxy(force = false) {
+export function getProxy(force = false) {
     if (!options.proxy && !force) {
         return false;
     }
@@ -49,6 +55,7 @@ export async function getProxy(force = false) {
     log(`Try with ${host}:${port} as random proxy`);
 
     return {
+        url: randomProxy,
         protocol: "http",
         host,
         port,
@@ -58,18 +65,21 @@ export async function getProxy(force = false) {
 /**
  * Get proxy list from repo
  *
- * @return  {Array}  Proxies array list
+ * @param   {String}  url  URL for download proxy list
+ *
+ * @return  {Array}        Proxies array list
  */
-export async function getProxyList() {
+export async function getProxyList(url) {
     let proxies = [];
 
+    if (!url) {
+        return proxies;
+    }
+
     try {
-        const fileRequest = await axios(
-            "https://raw.githubusercontent.com/clarketm/proxy-list/master/proxy-list-raw.txt",
-            {
-                responseType: "text",
-            }
-        );
+        const fileRequest = await axios(url, {
+            responseType: "text",
+        });
 
         proxies = fileRequest.data.split("\n").filter((item) => item.length);
 
@@ -153,7 +163,11 @@ export async function updateProxies() {
     proxyDb.read();
 
     // get proxy list
-    let proxyList = await getProxyList();
+    let proxyList = [];
+
+    for (const proxyURL of proxyURLs) {
+        proxyList.push(...(await getProxyList(proxyURL)));
+    }
 
     log(`Found proxies: ${proxyList.length}`);
 

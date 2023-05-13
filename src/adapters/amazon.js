@@ -176,11 +176,13 @@ export async function processItems(products, queue) {
  * @return  {Boolean}        Result
  */
 export async function updateItems(queue) {
-    logMsg("Update items");
-
     amazonDb.read();
 
-    getItems(amazonDb, "Amazon").forEach((itemId) => {
+    const items = getItems(amazonDb, "Amazon");
+
+    logMsg(`Update ${items.length} items`);
+
+    items.forEach((itemId) => {
         const item = amazonDb.data[itemId];
         processItem(item, queue);
     });
@@ -196,11 +198,13 @@ export async function updateItems(queue) {
  * @return  {Boolean}        Result
  */
 export async function updateReviews(queue) {
-    logMsg("Update reviews");
-
     amazonDb.read();
 
-    getItems(amazonDb, "Amazon").forEach((itemId) => {
+    const items = getItems(amazonDb, "Amazon");
+
+    logMsg(`Update ${items.length} items reviews`);
+
+    items.forEach((itemId) => {
         const item = amazonDb.data[itemId];
 
         if (!("reviews" in item) || !Object.keys(item.reviews)) {

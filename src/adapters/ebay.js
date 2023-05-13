@@ -120,6 +120,13 @@ async function getPhotosURLs(itemId) {
     return false;
 }
 
+/**
+ * Update items
+ *
+ * @param   {Object}  queue  Queue instance
+ *
+ * @return  {Boolean}        Result
+ */
 export function updateItems(queue) {
     logMsg("Update items");
 
@@ -147,6 +154,13 @@ export function updateItems(queue) {
     return true;
 }
 
+/**
+ * Update reviews
+ *
+ * @param   {Object}  queue   Queue instance
+ *
+ * @return  {Boolean}         Rtsult
+ */
 export function updateReviews(queue) {
     logMsg("Update reviews");
 
@@ -194,6 +208,14 @@ export function updateReviews(queue) {
     return true;
 }
 
+/**
+ * Get item by ID
+ *
+ * @param   {String}  id      Item ID
+ * @param   {Object}  queue   Queue instance
+ *
+ * @return  {Boolean}         Result
+ */
 export async function getItem(id, queue) {
     logMsg(`Get photos`, id);
 
@@ -224,6 +246,13 @@ export async function getItem(id, queue) {
     return true;
 }
 
+/**
+ * Get items by query
+ *
+ * @param   {Object}  queue   Queue instance
+ *
+ * @return  {Boolean}         Result
+ */
 export async function getItemsByQuery(queue) {
     const browser = await puppeteer.launch({
         headless: options.headless,
