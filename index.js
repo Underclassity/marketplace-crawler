@@ -121,6 +121,7 @@ puppeteer.use(StealthPlugin());
 
         while (queue.size || queue.pending) {
             await sleep(1000);
+            logQueue(queue);
         }
 
         // updateReviewsFromAliexpress(queue);
@@ -147,6 +148,7 @@ puppeteer.use(StealthPlugin());
 
         while (queue.size || queue.pending) {
             await sleep(1000);
+            logQueue(queue);
         }
 
         // updateItemsFromAliexpress(queue);
@@ -197,6 +199,7 @@ puppeteer.use(StealthPlugin());
 
     while (queue.size || queue.pending || !queue.isPaused) {
         await sleep(1000);
+        logQueue(queue);
     }
 
     // getItemsByQueryFromAliexpress(options.query, queue);

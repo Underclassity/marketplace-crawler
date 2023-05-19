@@ -22,6 +22,7 @@ if (!proxyDb.data) {
     proxyDb.write();
 }
 
+// URLs to raw proxy list data from Github or other sources
 const proxyURLs = [
     "https://raw.githubusercontent.com/clarketm/proxy-list/master/proxy-list-raw.txt",
     "https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/http.txt",

@@ -393,9 +393,12 @@ export async function scrapeItem(itemId, queue) {
                 itemId,
                 reviewItem.evaluationId || reviewItem.id,
                 reviewItem,
-                "aliexpress"
+                "aliexpress",
+                false
             );
         }
+
+        aliexpressDb.write();
 
         updateTime(aliexpressDb, itemId);
         updateTags(aliexpressDb, itemId, options.query);
@@ -485,7 +488,7 @@ export async function scrapeItemByBrowser(itemId, browser, startPage, queue) {
     //     }
     // });
 
-    let result = false;
+    let result = true;
 
     // try {
     // await page.goto(
@@ -511,6 +514,10 @@ export async function scrapeItemByBrowser(itemId, browser, startPage, queue) {
     for (let pageId = 1; pageId <= maxPages; pageId++) {
         await queue.add(
             async () => {
+                if (!result) {
+                    return false;
+                }
+
                 if (ended) {
                     logMsg("Ended page get", itemId);
                     return false;
@@ -528,6 +535,21 @@ export async function scrapeItemByBrowser(itemId, browser, startPage, queue) {
                     ended = true;
 
                     logMsg("Captcha found", itemId);
+
+                    result = false;
+
+                    queue.add(
+                        () =>
+                            scrapeItemByBrowser(
+                                itemId,
+                                browser,
+                                startPage,
+                                queue
+                            ),
+                        {
+                            priority: priorities.item,
+                        }
+                    );
 
                     return false;
                 }
@@ -588,8 +610,6 @@ export async function scrapeItemByBrowser(itemId, browser, startPage, queue) {
                         );
                     }
 
-                    aliexpressDb.write();
-
                     const sleepTime = Math.random() * options.timeout;
 
                     logMsg(
@@ -609,6 +629,21 @@ export async function scrapeItemByBrowser(itemId, browser, startPage, queue) {
                 if (data?.ret || data?.url) {
                     logMsg("Request captcha! Wait for 5 min", itemId);
                     await sleep(Math.random() * 60 * 1000);
+                    result = false;
+
+                    queue.add(
+                        () =>
+                            scrapeItemByBrowser(
+                                itemId,
+                                browser,
+                                startPage,
+                                queue
+                            ),
+                        {
+                            priority: priorities.item,
+                        }
+                    );
+
                     return false;
                 }
 
@@ -624,11 +659,6 @@ export async function scrapeItemByBrowser(itemId, browser, startPage, queue) {
             }
         );
     }
-
-    updateTime(aliexpressDb, itemId);
-    updateTags(aliexpressDb, itemId, options.query);
-
-    result = true;
 
     // let count = 0;
 
@@ -683,6 +713,9 @@ export async function scrapeItemByBrowser(itemId, browser, startPage, queue) {
     logMsg("Get all reviews for item", itemId);
 
     if ("reviews" in aliexpressDb.data[itemId] && result) {
+        updateTime(aliexpressDb, itemId);
+        updateTags(aliexpressDb, itemId, options.query);
+
         const reviews = Object.keys(aliexpressDb.data[itemId].reviews)
             .map((reviewId) => aliexpressDb.data[itemId].reviews[reviewId])
             .filter((reviewItem) => {
@@ -915,27 +948,8 @@ export async function updateItems(queue) {
         )
     );
 
-    let count = 0;
-
     while (queue.size || queue.pending) {
         await sleep(1000);
-
-        count += 1;
-
-        if (count >= 10) {
-            logMsg(
-                `Queue size: page-${queue.sizeBy({
-                    priority: priorities.page,
-                })} items-${queue.sizeBy({
-                    priority: priorities.item,
-                })} reviews-${queue.sizeBy({
-                    priority: priorities.review,
-                })} download-${queue.sizeBy({
-                    priority: priorities.download,
-                })}`
-            );
-            count = 0;
-        }
     }
 
     logMsg("End items update");

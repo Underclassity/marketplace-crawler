@@ -1,6 +1,48 @@
 import options from "../options.js";
 import logMsg from "./log-msg.js";
 
+const writeCache = {};
+
+/**
+ * Write in DB helper
+ *
+ * @param   {Object}   db      DB object
+ * @param   {Boolean}  write   Write flag
+ * @param   {String}   prefix  DB prefix
+ *
+ * @return  {Boolean}          Result
+ */
+export function dbWrite(db, write = true, prefix = false) {
+    if (!db || !db.write) {
+        logMsg("DB not defined!", false, false);
+        return false;
+    }
+
+    if (!write) {
+        return false;
+    }
+
+    if (prefix && prefix in writeCache) {
+        return false;
+    }
+
+    try {
+        if (prefix) {
+            writeCache[prefix] = true;
+        }
+
+        db.write();
+
+        if (prefix) {
+            writeCache[prefix] = false;
+        }
+    } catch (error) {
+        logMsg(`Write DB error: ${error.message}`, false, prefix);
+    }
+
+    return true;
+}
+
 /**
  * Check DB and item ID
  *
@@ -55,11 +97,7 @@ export function updateTime(db, itemId, time = Date.now()) {
         };
     }
 
-    try {
-        db.write();
-    } catch (error) {
-        console.log(error);
-    }
+    dbWrite(db, true, false);
 
     return true;
 }
@@ -97,11 +135,7 @@ export function updateTags(db, itemId, tag) {
         db.data[itemId].tags.push(tag);
     }
 
-    try {
-        db.write();
-    } catch (error) {
-        console.log(error);
-    }
+    dbWrite(db, true, false);
 
     return true;
 }
@@ -183,39 +217,27 @@ export function addReview(
         return false;
     }
 
-    function dbWrite() {
-        if (!write) {
-            return false;
-        }
-
-        try {
-            db.write();
-        } catch (error) {
-            logMsg(`Write DB error: ${error.message}`, false, false);
-        }
-
-        return true;
-    }
-
     if (!(itemId in db.data)) {
         db.data[itemId] = {
             reviews: {},
         };
-        dbWrite();
+        dbWrite(db, write, prefix);
     }
 
     if (!("reviews" in db.data[itemId])) {
         db.data[itemId].reviews = {};
-        dbWrite();
+        dbWrite(db, write, prefix);
     }
 
     if (!(reviewId in db.data[itemId].reviews) && !options.force) {
         db.data[itemId].reviews[reviewId] = review;
-        dbWrite();
+        dbWrite(db, write, prefix);
+
         logMsg(`Add new review ${reviewId} in DB`, itemId, prefix);
     } else if (db.data[itemId].reviews[reviewId] != review || options.force) {
         db.data[itemId].reviews[reviewId] = review;
-        dbWrite();
+        dbWrite(db, write, prefix);
+
         logMsg(`Update review ${reviewId} in DB`, itemId, prefix);
     } else {
         logMsg(`Review ${reviewId} already saved in DB`, itemId, prefix);

@@ -233,7 +233,9 @@ export async function downloadFile(url, filepath, queue, id, prefix) {
 
     const filename = path.basename(filepath);
 
-    return await queue.add(
+    let result = true;
+
+    await queue.add(
         async () => {
             logMsg(
                 `Try to download ${filename} to ${path.dirname(filepath)}`,
@@ -270,11 +272,21 @@ export async function downloadFile(url, filepath, queue, id, prefix) {
                     prefix
                 );
 
+                result = false;
+
                 return false;
             }
         },
         { priority: priorities.download }
     );
+
+    // wait for file
+    while (result && !fs.existsSync(filepath)) {
+        logMsg(`Wait for file ${filename}`, id, prefix);
+        await sleep(1000);
+    }
+
+    return result;
 }
 
 /**
