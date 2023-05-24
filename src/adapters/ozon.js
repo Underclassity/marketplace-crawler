@@ -9,6 +9,7 @@ import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import AdblockerPlugin from "puppeteer-extra-plugin-adblocker";
 
 // import browserClose from "../helpers/browser-close.js";
+import { logQueue } from "../helpers/log-msg.js";
 import { updateTime, updateTags, getItems, addReview } from "../helpers/db.js";
 import autoScroll from "../helpers/auto-scroll.js";
 import createPage from "../helpers/create-page.js";
@@ -585,6 +586,7 @@ export async function getItemsByQuery(queue) {
     // wait for all pages processed
     while (!ended || !queue.size) {
         await sleep(100);
+        logQueue(queue);
     }
 
     // await browserClose(browser);

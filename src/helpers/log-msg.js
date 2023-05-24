@@ -32,13 +32,13 @@ export function logMsg(msg, id, prefix) {
         // return false;
     }
 
-    const query = options.query || "";
+    const query = options.query || options.brand || "";
 
-    if (id) {
-        return log(`[${prefix}] ${query}: ${id} - ${msg}`);
-    }
-
-    return log(`[${prefix}] ${query}: ${msg}`);
+    return log(
+        `${prefix ? `[${prefix}] ` : ""}${query ? `${query}: ` : ""}${
+            id ? `${id} - ` : ""
+        }${msg}`
+    );
 }
 
 /**
@@ -62,7 +62,9 @@ export function logQueue(queue) {
             priority: priorities.review,
         })} download-${queue.sizeBy({
             priority: priorities.download,
-        })}`
+        })}`,
+        false,
+        false
     );
 
     return true;

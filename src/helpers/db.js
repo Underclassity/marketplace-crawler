@@ -141,6 +141,38 @@ export function updateTags(db, itemId, tag) {
 }
 
 /**
+ * Update DB item brand
+ *
+ * @param   {Object}  db      DB instance
+ * @param   {String}  itemId  Item ID
+ *
+ * @return  {Boolean}         Result
+ */
+export function updateBrand(db, itemId) {
+    if (!dbItemCheck(db, itemId)) {
+        return false;
+    }
+
+    let brand = options.brand;
+
+    if (brand?.length) {
+        brand = brand.trim();
+    } else {
+        logMsg("Brand not defined!", false, false);
+
+        return false;
+    }
+
+    // Add brand id if not defined
+    if (!("brand" in db.data[itemId])) {
+        db.data[itemId].brand = brand;
+        dbWrite(db, true, false);
+    }
+
+    return true;
+}
+
+/**
  * Get items from DB
  *
  * @param   {Object}  db      Items DB
@@ -213,7 +245,7 @@ export function addReview(
     }
 
     if (!review || !reviewId) {
-        logMsg("Review not defined!", id, prefix);
+        logMsg("Review not defined!", itemId, prefix);
         return false;
     }
 

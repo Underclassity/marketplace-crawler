@@ -12,6 +12,7 @@ import options from "./src/options.js";
 import getAdaptersIds from "./src/helpers/get-adapters-ids.js";
 import sleep from "./src/helpers/sleep.js";
 import updateProxies from "./src/helpers/proxy-helpers.js";
+import { logQueue, logMsg } from "./src/helpers/log-msg.js";
 
 import { processCookiesAndSession } from "./src/adapters/aliexpress.js";
 
@@ -68,11 +69,11 @@ puppeteer.use(StealthPlugin());
     const ids = getAdaptersIds();
 
     if (!ids.length) {
-        console.log("No adapters defined");
+        logMsg("No adapters defined", false, false);
         return false;
     }
 
-    console.log(`Process with adapters: ${ids.join(",")}`);
+    logMsg(`Process with adapters: ${ids.join(",")}`, false, false);
 
     const queue = new PQueue({
         concurrency: options.throat,
@@ -87,7 +88,7 @@ puppeteer.use(StealthPlugin());
     //         devtools: options.headless ? false : true,
     //     });
 
-    //     console.log(`Update item ${options.id}`);
+    //     logMsg(`Update item ${options.id}`, false, false);
 
     //     queue.add(
     //         () =>
@@ -107,7 +108,7 @@ puppeteer.use(StealthPlugin());
     // }
 
     if (options.reviews) {
-        console.log("Update items reviews");
+        logMsg("Update items reviews", false, false);
 
         if (ids.includes("aliexpress") && options.cookies) {
             await processCookiesAndSession();
@@ -130,11 +131,11 @@ puppeteer.use(StealthPlugin());
         // updateReviewsFromOzon(queue);
         // updateReviewsFromWildberries(queue);
 
-        return false;
+        return true;
     }
 
     if (options.update) {
-        console.log("Update items");
+        logMsg("Update items", false, false);
 
         if (ids.includes("aliexpress") && options.cookies) {
             await processCookiesAndSession();
@@ -157,37 +158,66 @@ puppeteer.use(StealthPlugin());
         // updateItemsFromOzon(queue);
         // updateItemsFromWildberries(queue);
 
-        return false;
+        return true;
+    }
+
+    if (options.brand) {
+        logMsg("Get all brand items", false, false);
+
+        if (ids.includes("aliexpress") && options.cookies) {
+            await processCookiesAndSession();
+        }
+
+        for (const id of ids) {
+            const { getItemsByBrand } = await import(`./src/adapters/${id}.js`);
+
+            if (getItemsByBrand) {
+                getItemsByBrand(queue);
+            }
+        }
+
+        while (queue.size || queue.pending) {
+            await sleep(1000);
+            logQueue(queue);
+        }
+
+        return true;
     }
 
     if (!options.query) {
-        console.log("Query not defined!");
+        logMsg("Query not defined!", false, false);
 
         return false;
     }
 
-    console.log(`Get items for query: ${options.query}`);
+    logMsg(`Get items for query: ${options.query}`, false, false);
 
     // queue.on("completed", () => {
-    //     console.log("Completed");
-    //     // console.log(result);
+    //     logMsg("Completed", false, false);
+    //     // logMsg(result);
     // });
 
     // queue.on("idle", () => {
-    //     console.log(
-    //         `Queue is idle.  Size: ${queue.size}  Pending: ${queue.pending}`
+    //     logMsg(
+    //         `Queue is idle.  Size: ${queue.size}  Pending: ${queue.pending}`,
+    //         false,
+    //         false
     //     );
     // });
 
     // queue.on("add", () => {
-    //     console.log(
-    //         `Task is added.  Size: ${queue.size}  Pending: ${queue.pending}`
+    //     logMsg(
+    //         `Task is added.  Size: ${queue.size}  Pending: ${queue.pending}`,
+    //         false,
+    //         false
     //     );
     // });
 
     // queue.on("next", () => {
-    //     console.log(
-    //         `Task is completed.  Size: ${queue.size}  Pending: ${queue.pending}`
+    //     logMsg(
+    //         `Task is completed.  Size: ${queue.size}  Pending: ${queue.pending}`,
+    //         false,
+    //         false
     //     );
     // });
 
@@ -201,12 +231,6 @@ puppeteer.use(StealthPlugin());
         await sleep(1000);
         logQueue(queue);
     }
-
-    // getItemsByQueryFromAliexpress(options.query, queue);
-    // getItemsByQueryFromAmazon(options.query, queue);
-    // getItemsByQueryFromEbay(options.query, queue);
-    // getItemsByQueryFromOzon(options.query, queue);
-    // getItemsByQueryFromWildberries(options.query, queue);
 
     return true;
 })();

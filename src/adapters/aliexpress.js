@@ -12,6 +12,7 @@ import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import AdblockerPlugin from "puppeteer-extra-plugin-adblocker";
 
 import { getProxy } from "../helpers/proxy-helpers.js";
+import { logMsg, logQueue } from "../helpers/log-msg.js";
 import { updateTags, updateTime, getItems, addReview } from "../helpers/db.js";
 import autoScroll from "../helpers/auto-scroll.js";
 import browserConfig from "../helpers/browser-config.js";
@@ -19,7 +20,6 @@ import createPage from "../helpers/create-page.js";
 import downloadItem from "../helpers/download.js";
 import getHeaders from "../helpers/get-headers.js";
 import goSettings from "../helpers/go-settings.js";
-import log from "../helpers/log.js";
 import options from "../options.js";
 import priorities from "../helpers/priorities.js";
 import sleep from "../helpers/sleep.js";
@@ -51,14 +51,8 @@ puppeteer.use(
 
 puppeteer.use(StealthPlugin());
 
-function logMsg(msg, id) {
-    const query = options.query || "";
-
-    if (id) {
-        return log(`[Aliexpress] ${query}: ${id} - ${msg}`);
-    }
-
-    return log(`[Aliexpress] ${query}: ${msg}`);
+function log(msg, id = false) {
+    return logMsg(msg, id, "Aliexpress");
 }
 
 /**
@@ -86,14 +80,14 @@ export function getUserId(str) {
  * @return  {Array}             Items array with user reviews
  */
 export async function getUserReviews(username, browser) {
-    logMsg(`Get user ${username} items`);
+    log(`Get user ${username} items`);
 
     const page = await createPage(browser);
 
     let items = [];
 
     for (let pageNumber = 1; pageNumber < options.pages; pageNumber++) {
-        logMsg(`Process page ${pageNumber} for user ${username}`);
+        log(`Process page ${pageNumber} for user ${username}`);
 
         try {
             await page.goto(
@@ -128,7 +122,7 @@ export async function getUserReviews(username, browser) {
                 pageNumber = options.pages;
             }
         } catch (error) {
-            logMsg(
+            log(
                 `Process page ${pageNumber} for user ${username} error: ${error.message}`
             );
         }
@@ -136,7 +130,7 @@ export async function getUserReviews(username, browser) {
 
     await page.close();
 
-    logMsg(`Get ${items.length} for user ${username}`);
+    log(`Get ${items.length} for user ${username}`);
 
     return items;
 }
@@ -147,7 +141,7 @@ export async function getUserReviews(username, browser) {
  * @return  {Boolean}  Result
  */
 export async function processCookiesAndSession() {
-    logMsg("Try to save cache");
+    log("Try to save cache");
 
     const puppeteerPath = path.resolve("./puppeteer/");
 
@@ -166,11 +160,11 @@ export async function processCookiesAndSession() {
     try {
         await page.goto("https://aliexpress.ru/", goSettings);
 
-        logMsg("Load start page, wait for 1 min");
+        log("Load start page, wait for 1 min");
 
         await sleep(60000);
     } catch (error) {
-        logMsg(`Go to start page error: ${error.message}`);
+        log(`Go to start page error: ${error.message}`);
     }
 
     await page.close();
@@ -202,7 +196,7 @@ export async function download(review, id, queue) {
     }
 
     if (review?.images?.length) {
-        logMsg(
+        log(
             `Download ${review.evaluationId || review.id} review ${
                 review.images.length
             } images`,
@@ -224,7 +218,7 @@ export async function download(review, id, queue) {
     }
 
     if (review?.additionalReview?.images?.length) {
-        logMsg(
+        log(
             `Download ${review.evaluationId || review.id} additional review ${
                 review.additionalReview.images.length
             } images`,
@@ -259,7 +253,7 @@ export async function download(review, id, queue) {
 export async function getItemReviewsPage(itemId, pageId) {
     let reviewsData = {};
 
-    logMsg(`Process page ${pageId}`, itemId);
+    log(`Process page ${pageId}`, itemId);
 
     try {
         const config = {
@@ -303,11 +297,11 @@ export async function getItemReviewsPage(itemId, pageId) {
 
         const request = await axios(config);
 
-        logMsg(`Get data on page ${pageId}`, itemId);
+        log(`Get data on page ${pageId}`, itemId);
 
         reviewsData = request.data.data;
     } catch (error) {
-        logMsg(`Error get reviews page ${pageId}: ${error.message}`, itemId);
+        log(`Error get reviews page ${pageId}: ${error.message}`, itemId);
     }
 
     return reviewsData;
@@ -323,7 +317,7 @@ export async function getItemReviewsPage(itemId, pageId) {
  */
 export async function scrapeItem(itemId, queue) {
     if (!itemId) {
-        logMsg(`Item not defined`, itemId);
+        log(`Item not defined`, itemId);
         return false;
     }
 
@@ -336,11 +330,11 @@ export async function scrapeItem(itemId, queue) {
         Date.now() - dbReviewItem.time <= time &&
         !options.force
     ) {
-        logMsg(`Already updated by time`, itemId);
+        log(`Already updated by time`, itemId);
         return false;
     }
 
-    logMsg(`Try to get item`, itemId);
+    log(`Try to get item`, itemId);
 
     let found = false;
     let reviews = [];
@@ -357,7 +351,7 @@ export async function scrapeItem(itemId, queue) {
                 reviews.push(...firstPageReviews.evaViewList);
             }
 
-            logMsg(`Set max pages to ${maxPages}`, itemId);
+            log(`Set max pages to ${maxPages}`, itemId);
         }
 
         if (maxPages > 1) {
@@ -385,7 +379,7 @@ export async function scrapeItem(itemId, queue) {
             }
         }
 
-        logMsg(`Reviews length ${reviews.length}`, itemId);
+        log(`Reviews length ${reviews.length}`, itemId);
 
         for (const reviewItem of reviews) {
             addReview(
@@ -411,11 +405,11 @@ export async function scrapeItem(itemId, queue) {
             await download(reviewItem, itemId, queue);
         }
 
-        logMsg(`Reviews length after filter ${reviews.length}`, itemId);
+        log(`Reviews length after filter ${reviews.length}`, itemId);
 
         found = true;
     } catch (error) {
-        logMsg(`Error reviews get: ${error.message}`, itemId);
+        log(`Error reviews get: ${error.message}`, itemId);
         // await sleep(60000);
     }
 
@@ -433,7 +427,7 @@ export async function scrapeItem(itemId, queue) {
  * @return  {Boolean}             Result
  */
 export async function scrapeItemByBrowser(itemId, browser, startPage, queue) {
-    logMsg("Start scrape item", itemId);
+    log("Start scrape item", itemId);
 
     // const page = await createPage(browser, true);
 
@@ -519,7 +513,7 @@ export async function scrapeItemByBrowser(itemId, browser, startPage, queue) {
                 }
 
                 if (ended) {
-                    logMsg("Ended page get", itemId);
+                    log("Ended page get", itemId);
                     return false;
                 }
 
@@ -534,7 +528,7 @@ export async function scrapeItemByBrowser(itemId, browser, startPage, queue) {
                     pageId = maxPages;
                     ended = true;
 
-                    logMsg("Captcha found", itemId);
+                    log("Captcha found", itemId);
 
                     result = false;
 
@@ -554,7 +548,7 @@ export async function scrapeItemByBrowser(itemId, browser, startPage, queue) {
                     return false;
                 }
 
-                logMsg(`Get reviews page ${pageId}`, itemId);
+                log(`Get reviews page ${pageId}`, itemId);
 
                 const data = await startPage.evaluate(
                     async (id, pageNum, pageCount, opt) => {
@@ -583,18 +577,18 @@ export async function scrapeItemByBrowser(itemId, browser, startPage, queue) {
 
                 if (data?.data?.totalAmount) {
                     maxPages = Math.round(data.data.totalAmount / pageSize) + 1;
-                    logMsg(`Set reviews max page to ${maxPages}`, itemId);
+                    log(`Set reviews max page to ${maxPages}`, itemId);
                 }
 
                 if (data?.data?.paginationStatusText) {
-                    logMsg(
+                    log(
                         `Status page ${pageId}: ${data?.data?.paginationStatusText}`,
                         itemId
                     );
                 }
 
                 if (data?.data?.reviews?.length) {
-                    logMsg(
+                    log(
                         `Found ${data.data.reviews.length} from ${data.data.totalAmount} reviews on reviews page ${pageId}`,
                         itemId
                     );
@@ -612,7 +606,7 @@ export async function scrapeItemByBrowser(itemId, browser, startPage, queue) {
 
                     const sleepTime = Math.random() * options.timeout;
 
-                    logMsg(
+                    log(
                         `Wait for ${Math.round(
                             sleepTime / 1000
                         )} sec on reviews page ${pageId}`,
@@ -621,13 +615,13 @@ export async function scrapeItemByBrowser(itemId, browser, startPage, queue) {
 
                     await sleep(sleepTime); // Waif random time, from 0 to 1 min
 
-                    logMsg(`End waiting on reviews page ${pageId}`, itemId);
+                    log(`End waiting on reviews page ${pageId}`, itemId);
 
                     return true;
                 }
 
                 if (data?.ret || data?.url) {
-                    logMsg("Request captcha! Wait for 5 min", itemId);
+                    log("Request captcha! Wait for 5 min", itemId);
                     await sleep(Math.random() * 60 * 1000);
                     result = false;
 
@@ -647,10 +641,24 @@ export async function scrapeItemByBrowser(itemId, browser, startPage, queue) {
                     return false;
                 }
 
-                logMsg("No reviews found", itemId);
+                log("No reviews found", itemId);
 
                 pageId = maxPages;
                 ended = true;
+
+                const sleepTime = Math.random() * options.timeout;
+
+                log(
+                    `Wait for ${Math.round(sleepTime / 1000)} sec after end`,
+                    itemId
+                );
+
+                await sleep(sleepTime); // Waif random time, from 0 to 1 min
+
+                log(
+                    `End waiting for ${Math.round(sleepTime / 1000)} sec`,
+                    itemId
+                );
 
                 return true;
             },
@@ -710,7 +718,7 @@ export async function scrapeItemByBrowser(itemId, browser, startPage, queue) {
 
     // await page.close();
 
-    logMsg("Get all reviews for item", itemId);
+    log(`Get all reviews for item result ${result}`, itemId);
 
     if ("reviews" in aliexpressDb.data[itemId] && result) {
         updateTime(aliexpressDb, itemId);
@@ -735,7 +743,7 @@ export async function scrapeItemByBrowser(itemId, browser, startPage, queue) {
 
 async function processPageByXhr(pageId, queue) {
     if (!pageId) {
-        logMsg("Page ID not defined!");
+        log("Page ID not defined!");
         return false;
     }
 
@@ -745,7 +753,7 @@ async function processPageByXhr(pageId, queue) {
     )}.html?page=${pageId}`;
 
     try {
-        logMsg(`Try to get items for page ${pageId}`);
+        log(`Try to get items for page ${pageId}`);
 
         const request = await axios(pageURL, {
             timeout: options.timeout,
@@ -776,7 +784,7 @@ async function processPageByXhr(pageId, queue) {
             )
             .filter((value, index, array) => array.indexOf(value) == index);
     } catch (error) {
-        logMsg(`Get items from page ${pageId} error: ${error.message}`);
+        log(`Get items from page ${pageId} error: ${error.message}`);
         return false;
     }
 
@@ -801,13 +809,13 @@ export async function processPage(
     queue
 ) {
     if (!pageId) {
-        logMsg("Page ID not defined!");
+        log("Page ID not defined!");
         return false;
     }
 
     aliexpressDb.read();
 
-    logMsg(`Process page ${pageId}`);
+    log(`Process page ${pageId}`);
 
     const page = await createPage(browser, false);
 
@@ -836,7 +844,7 @@ export async function processPage(
     });
 
     if (isCaptcha) {
-        logMsg("CAPTCHA!!!");
+        log("CAPTCHA!!!");
         await sleep(10000);
         // await page.waitFor(60 * 1000);
         await page.close();
@@ -861,7 +869,7 @@ export async function processPage(
             .filter((value, index, array) => array.indexOf(value) == index);
     });
 
-    logMsg(`Found ${items.length} on page ${pageId}`);
+    log(`Found ${items.length} on page ${pageId}`);
 
     for (const item of items) {
         updateTags(aliexpressDb, item, query);
@@ -880,7 +888,7 @@ export async function processPage(
                 (el) => el.textContent
             );
         } catch (error) {
-            logMsg(
+            log(
                 `Total pages not found on page ${pageId} error: ${error.message}`
             );
             pagesCount = 0;
@@ -890,7 +898,7 @@ export async function processPage(
 
         pagesCount = parseInt(pagesRegex.exec(pagesCount), 10);
 
-        logMsg(`Total pages count: ${pagesCount}`);
+        log(`Total pages count: ${pagesCount}`);
     }
 
     await page.close();
@@ -918,13 +926,13 @@ export async function updateItems(queue) {
 
     const items = getItems(aliexpressDb, "Aliexpress");
 
-    logMsg(`Update ${items.length} items`);
+    log(`Update ${items.length} items`);
 
     const startPage = await createPage(browser, false);
 
     await startPage.goto(`https://aliexpress.ru/`, goSettings);
 
-    logMsg("Start page loaded");
+    log("Start page loaded");
 
     // await autoScroll(startPage);
 
@@ -950,9 +958,10 @@ export async function updateItems(queue) {
 
     while (queue.size || queue.pending) {
         await sleep(1000);
+        logQueue(queue);
     }
 
-    logMsg("End items update");
+    log("End items update");
 
     await browser.close();
 
@@ -971,7 +980,7 @@ export async function updateReviews(queue) {
 
     const items = getItems(aliexpressDb, "Aliexpress");
 
-    logMsg(`Update reviews for ${items.length}`);
+    log(`Update reviews for ${items.length}`);
 
     items.forEach((itemId) => {
         const item = aliexpressDb.data[itemId];
@@ -1002,9 +1011,10 @@ export async function updateReviews(queue) {
 
     while (queue.size || queue.pending) {
         await sleep(1000);
+        logQueue(queue);
     }
 
-    logMsg("End reviews update");
+    log("End reviews update");
 
     return true;
 }
@@ -1017,7 +1027,7 @@ export async function updateReviews(queue) {
  * @return  {Boolean}         Result
  */
 export async function getItemsByQuery(queue) {
-    logMsg("Get items call");
+    log("Get items call");
 
     let totalFound = false;
 
@@ -1044,7 +1054,7 @@ export async function getItemsByQuery(queue) {
                 if (!(pagesCount > 0 && pagesCount < options.pages)) {
                     return;
                 }
-                logMsg(`Set total pages to ${pagesCount}`);
+                log(`Set total pages to ${pagesCount}`);
                 totalFound = true;
                 options.pages = pagesCount;
             },
