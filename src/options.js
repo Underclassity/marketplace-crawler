@@ -23,6 +23,11 @@ export const options = yargs(hideBin(process.argv))
         type: "string",
         default: false,
     })
+    .option("brands", {
+        describe: "Update items by brands",
+        type: "boolean",
+        default: false,
+    })
     .option("proxy", {
         describe: "Proxy use flag",
         default: false,

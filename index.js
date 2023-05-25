@@ -1,5 +1,5 @@
-// import path from "node:path";
-// import fs from "node:fs";
+import path from "node:path";
+import fs from "node:fs";
 
 import PQueue from "p-queue";
 
@@ -60,11 +60,11 @@ puppeteer.use(StealthPlugin());
         await updateProxies();
     }
 
-    // const tempPath = path.resolve(options.directory, "temp");
+    const tempPath = path.resolve(options.directory, "temp");
 
-    // if (fs.existsSync(tempPath)) {
-    //     fs.rmSync(tempPath, { recursive: true });
-    // }
+    if (fs.existsSync(tempPath)) {
+        fs.rmSync(tempPath, { recursive: true });
+    }
 
     const ids = getAdaptersIds();
 
@@ -117,19 +117,15 @@ puppeteer.use(StealthPlugin());
         for (const id of ids) {
             const { updateReviews } = await import(`./src/adapters/${id}.js`);
 
-            updateReviews(queue);
+            if (updateReviews) {
+                updateReviews(queue);
+            }
         }
 
         while (queue.size || queue.pending) {
             await sleep(1000);
             logQueue(queue);
         }
-
-        // updateReviewsFromAliexpress(queue);
-        // updateReviewsFromAmazon(queue);
-        // updateReviewsFromEbay(queue);
-        // updateReviewsFromOzon(queue);
-        // updateReviewsFromWildberries(queue);
 
         return true;
     }
@@ -144,19 +140,15 @@ puppeteer.use(StealthPlugin());
         for (const id of ids) {
             const { updateItems } = await import(`./src/adapters/${id}.js`);
 
-            updateItems(queue);
+            if (updateItems) {
+                updateItems(queue);
+            }
         }
 
         while (queue.size || queue.pending) {
             await sleep(1000);
             logQueue(queue);
         }
-
-        // updateItemsFromAliexpress(queue);
-        // updateItemsFromAmazon(queue);
-        // updateItemsFromEbay(queue);
-        // updateItemsFromOzon(queue);
-        // updateItemsFromWildberries(queue);
 
         return true;
     }
@@ -184,6 +176,29 @@ puppeteer.use(StealthPlugin());
         return true;
     }
 
+    if (options.brands) {
+        logMsg("Update all items with brand", false, false);
+
+        if (ids.includes("aliexpress") && options.cookies) {
+            await processCookiesAndSession();
+        }
+
+        for (const id of ids) {
+            const { updateBrands } = await import(`./src/adapters/${id}.js`);
+
+            if (updateBrands) {
+                updateBrands(queue);
+            }
+        }
+
+        while (queue.size || queue.pending) {
+            await sleep(1000);
+            logQueue(queue);
+        }
+
+        return true;
+    }
+
     if (!options.query) {
         logMsg("Query not defined!", false, false);
 
@@ -192,39 +207,40 @@ puppeteer.use(StealthPlugin());
 
     logMsg(`Get items for query: ${options.query}`, false, false);
 
-    // queue.on("completed", () => {
-    //     logMsg("Completed", false, false);
-    //     // logMsg(result);
-    // });
+    queue.on("completed", () => {
+        logMsg("Completed", false, false);
+    });
 
-    // queue.on("idle", () => {
-    //     logMsg(
-    //         `Queue is idle.  Size: ${queue.size}  Pending: ${queue.pending}`,
-    //         false,
-    //         false
-    //     );
-    // });
+    queue.on("idle", () => {
+        logMsg(
+            `Queue is idle.  Size: ${queue.size}  Pending: ${queue.pending}`,
+            false,
+            false
+        );
+    });
 
-    // queue.on("add", () => {
-    //     logMsg(
-    //         `Task is added.  Size: ${queue.size}  Pending: ${queue.pending}`,
-    //         false,
-    //         false
-    //     );
-    // });
+    queue.on("add", () => {
+        logMsg(
+            `Task is added.  Size: ${queue.size}  Pending: ${queue.pending}`,
+            false,
+            false
+        );
+    });
 
-    // queue.on("next", () => {
-    //     logMsg(
-    //         `Task is completed.  Size: ${queue.size}  Pending: ${queue.pending}`,
-    //         false,
-    //         false
-    //     );
-    // });
+    queue.on("next", () => {
+        logMsg(
+            `Task is completed.  Size: ${queue.size}  Pending: ${queue.pending}`,
+            false,
+            false
+        );
+    });
 
     for (const id of ids) {
         const { getItemsByQuery } = await import(`./src/adapters/${id}.js`);
 
-        getItemsByQuery(queue);
+        if (getItemsByQuery) {
+            getItemsByQuery(queue);
+        }
     }
 
     while (queue.size || queue.pending || !queue.isPaused) {

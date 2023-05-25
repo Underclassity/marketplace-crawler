@@ -42,6 +42,27 @@ function log(msg, id = false) {
 }
 
 /**
+ * Get all brands IDs from DB
+ *
+ * @return  {Array}  Brand IDs array
+ */
+export function getBrands() {
+    wildberriesDb.read();
+
+    const brandsIds = [];
+
+    for (const itemId in wildberriesDb.data) {
+        const dbItem = wildberriesDb.data[itemId];
+
+        if (dbItem.brand && !brandsIds.includes(dbItem.brand)) {
+            brandsIds.push(dbItem.brand);
+        }
+    }
+
+    return brandsIds;
+}
+
+/**
  * Get feedback by ID
  *
  * @param   {Number}  id        Item ID
@@ -116,6 +137,8 @@ export async function getItemInfo(id) {
                     skip: 0,
                 },
                 method: "POST",
+
+                headers: getHeaders(),
                 timeout: options.timeout,
             }
         );
@@ -142,7 +165,11 @@ export async function getFeedbackByXhr(id) {
 
     try {
         const request = await axios(
-            `https://feedbacks1.wb.ru/feedbacks/v1/${id}`
+            `https://feedbacks1.wb.ru/feedbacks/v1/${id}`,
+            {
+                headers: getHeaders(),
+                timeout: options.timeout,
+            }
         );
 
         const { feedbacks } = request.data;
@@ -301,6 +328,8 @@ export async function feedbacksRequest(id, skip) {
                     skip,
                 },
                 method: "POST",
+
+                headers: getHeaders(),
                 timeout: options.timeout,
             }
         );
@@ -327,7 +356,6 @@ export async function itemsRequest(page = 1) {
         const getItemsRequest = await axios(
             "https://search.wb.ru/exactmatch/sng/common/v4/search",
             {
-                timeout: options.timeout,
                 params: {
                     query: options.query,
                     resultset: "catalog",
@@ -350,7 +378,9 @@ export async function itemsRequest(page = 1) {
                     onlineBonus: 0,
                     spp: 0,
                 },
+
                 headers: getHeaders(),
+                timeout: options.timeout,
             }
         );
 
@@ -365,24 +395,23 @@ export async function itemsRequest(page = 1) {
 /**
  * Get items for brand
  *
- * @param   {Number}  page    Page number
+ * @param   {String}  brand    Brand ID
+ * @param   {Number}  page     Page number
  *
- * @return  {Object}          Result
+ * @return  {Object}           Result
  */
-export async function brandItemsRequest(page = 1) {
+export async function brandItemsRequest(brand = options.brand, page = 1) {
     log(`Brand items call for page ${page}`);
 
     try {
         const getItemsRequest = await axios(
-            "https://catalog.wb.ru/brands/d/catalog",
+            "https://catalog.wb.ru/brands/s/catalog",
             {
-                timeout: options.timeout,
                 params: {
-                    page: page,
-                    brand: options.brand,
+                    page,
+                    brand,
                     limit: 100,
                     sort: "popular",
-                    page: 1,
                     appType: 128,
                     curr: "byn",
                     locale: "by",
@@ -395,7 +424,9 @@ export async function brandItemsRequest(page = 1) {
                     reg: 1,
                     spp: 16,
                 },
+
                 headers: getHeaders(),
+                timeout: options.timeout,
             }
         );
 
@@ -408,6 +439,89 @@ export async function brandItemsRequest(page = 1) {
 }
 
 /**
+ * Process items array helper
+ *
+ * @param   {Array}    items    Array with items IDs
+ * @param   {String}   brand    Brand ID
+ * @param   {Object}   queue    Queue instance
+ *
+ * @return  {Boolean}          Result
+ */
+export async function processItems(items, brand = options.brand, queue) {
+    const count = items.length;
+
+    // Filter by updated time
+    items = items.filter((item) => {
+        const dbReviewItem = wildberriesDb.data[item];
+        const time = options.time * 60 * 60 * 1000;
+
+        if (
+            dbReviewItem?.time &&
+            Date.now() - dbReviewItem.time <= time &&
+            !options.force
+        ) {
+            return false;
+        }
+
+        return true;
+    });
+
+    log(`Found ${items.length}(${count}) items on all pages`);
+
+    for (const itemId of items) {
+        const dbReviewItem = wildberriesDb.data[itemId];
+
+        if (dbReviewItem) {
+            updateBrand(wildberriesDb, itemId, brand);
+        } else {
+            wildberriesDb.data[itemId] = {
+                brand: options.brand,
+                reviews: {},
+                tags: [],
+            };
+            wildberriesDb.write();
+        }
+
+        queue.add(() => getFeedbacks(itemId, queue), {
+            priority: priorities.item,
+        });
+    }
+
+    return true;
+}
+
+/**
+ * Update items with brands helper
+ *
+ * @param   {Object}  queue  Queue
+ *
+ * @return  {Boolean}        Result
+ */
+export async function updateBrands(queue) {
+    const brandIDs = getBrands();
+
+    for (const brandID of brandIDs) {
+        const brandItems = await queue.add(
+            async () => getBrandItemsByID(brandID, queue),
+            {
+                priority: priorities.item,
+            }
+        );
+
+        if (!brandItems || !brandItems.length) {
+            log(`No items found for ${brandID}`);
+            continue;
+        }
+
+        log(`Found ${brandItems.length || 0} items for brand ${brandID}`);
+
+        processItems(brandItems, brandID, queue);
+    }
+
+    return true;
+}
+
+/**
  * Update items helper
  *
  * @param   {Object}  queue  Queue
@@ -415,11 +529,13 @@ export async function brandItemsRequest(page = 1) {
  * @return  {Boolean}        Result
  */
 export function updateItems(queue) {
-    log("Update items");
-
     wildberriesDb.read();
 
-    getItems(wildberriesDb, "Wildberries").forEach((itemId) =>
+    const items = getItems(wildberriesDb, "Wildberries");
+
+    log(`Update ${items.length} items`);
+
+    items.forEach((itemId) =>
         queue.add(() => getFeedbacks(itemId, queue), {
             priority: priorities.item,
         })
@@ -485,26 +601,29 @@ export function updateReviews(queue) {
 }
 
 /**
- * Get items by brand
+ * Get brand items by brand ID
  *
- * @param   {Object}  queue  Queue
+ * @param   {String}  brandID  Brand ID
+ * @param   {Object}  queue    Queue instance
  *
- * @return  {Boolean}        Result
+ * @return  {Array}            Brand IDs array
  */
-export async function getItemsByBrand(queue) {
-    log("Get items call by brand");
+export async function getBrandItemsByID(brandID, queue) {
+    log(`Get brand ${brandID} items call`);
 
     let items = [];
     let prevResults;
-    let count = 0;
 
     for (let page = 1; page <= options.pages; page++) {
-        const getItemsData = await queue.add(() => brandItemsRequest(page), {
-            priority: priorities.page,
-        });
+        const getItemsData = await queue.add(
+            () => brandItemsRequest(brandID, page),
+            {
+                priority: priorities.page,
+            }
+        );
 
         if (!getItemsData || !getItemsData.data) {
-            log(`No items left`);
+            log(`No items found`);
             page = options.pages;
             continue;
         }
@@ -519,78 +638,58 @@ export async function getItemsByBrand(queue) {
             `Page ${page} found ${getItemsData.data.products.length} items before filter`
         );
 
-        count += getItemsData.data.products.length;
-
         const results = getItemsData.data.products
             .map((item) => item.root)
             .filter((item, index, array) => array.indexOf(item) === index)
             .map((item) => (item = parseInt(item, 10)))
-            .filter((item) => {
-                const dbReviewItem = wildberriesDb.data[item];
-                const time = options.time * 60 * 60 * 1000;
-
-                if (
-                    dbReviewItem?.time &&
-                    Date.now() - dbReviewItem.time <= time &&
-                    !options.force
-                ) {
-                    return false;
-                }
-
-                return true;
-            })
             .sort((a, b) => a - b);
 
         log(`Page ${page} found ${results.length} items`);
 
         items.push(...results);
 
-        if (!prevResults) {
-            prevResults = getItemsData.data.products
-                .map((item) => item.id)
-                .sort()
-                .join("-");
-        } else {
+        if (prevResults) {
             const currentItemsIds = getItemsData.data.products
                 .map((item) => item.id)
                 .sort()
                 .join("-");
 
-            if (currentItemsIds != prevResults) {
+            if (currentItemsIds == prevResults) {
+                log(`Previous data equal to current, end get`);
+                page = options.pages;
+                continue;
+            } else {
                 prevResults = getItemsData.data.products
                     .map((item) => item.id)
                     .sort()
                     .join("-");
-            } else {
-                log(`No items left`);
-                page = options.pages;
-                continue;
             }
+        } else {
+            prevResults = getItemsData.data.products
+                .map((item) => item.id)
+                .sort()
+                .join("-");
         }
     }
 
     items = items.filter((item, index, array) => array.indexOf(item) === index);
 
-    log(`Found ${items.length}(${count}) items on all pages`);
+    return items;
+}
 
-    for (const itemId of items) {
-        const dbReviewItem = wildberriesDb.data[itemId];
+/**
+ * Get items by brand
+ *
+ * @param   {Object}  queue  Queue
+ *
+ * @return  {Boolean}        Result
+ */
+export async function getItemsByBrand(queue) {
+    log("Get items call by brand");
 
-        if (dbReviewItem) {
-            updateBrand(wildberriesDb, itemId);
-        } else {
-            wildberriesDb.data[itemId] = {
-                brand: options.brand,
-                reviews: {},
-                tags: [],
-            };
-            wildberriesDb.write();
-        }
+    const items = await getBrandItemsByID(options.brand, queue);
 
-        queue.add(() => getFeedbacks(itemId, queue), {
-            priority: priorities.item,
-        });
-    }
+    processItems(items, options.brand, queue);
 
     return true;
 }

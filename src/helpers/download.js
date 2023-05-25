@@ -36,10 +36,6 @@ if (!convertDb.data) {
 
 const tempDirPath = path.resolve(options.directory, "temp");
 
-if (!fs.existsSync(tempDirPath)) {
-    fs.mkdirSync(tempDirPath);
-}
-
 const downloadCache = {};
 
 /**
@@ -159,6 +155,10 @@ export async function processFile(filepath, queue, id, prefix) {
     }
 
     const parsed = path.parse(filepath);
+
+    if (!fs.existsSync(tempDirPath)) {
+        fs.mkdirSync(tempDirPath);
+    }
 
     const tempWebpFilepath = path.resolve(tempDirPath, `${parsed.name}.webp`);
     const outputFilename = path.resolve(
@@ -515,6 +515,10 @@ export async function downloadItem(url, filepath, queue, isVideo = false) {
         prefix,
         isVideo
     );
+
+    if (!fs.existsSync(tempDirPath)) {
+        fs.mkdirSync(tempDirPath);
+    }
 
     const tempFilepath = path.resolve(tempDirPath, path.basename(filepath));
     let isDownloaded = false;

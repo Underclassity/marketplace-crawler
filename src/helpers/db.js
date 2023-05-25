@@ -145,19 +145,19 @@ export function updateTags(db, itemId, tag) {
  *
  * @param   {Object}  db      DB instance
  * @param   {String}  itemId  Item ID
+ * @param   {String}  brand   Brand ID
  *
  * @return  {Boolean}         Result
  */
-export function updateBrand(db, itemId) {
+export function updateBrand(db, itemId, brand) {
     if (!dbItemCheck(db, itemId)) {
         return false;
     }
 
-    let brand = options.brand;
-
     if (brand?.length) {
         brand = brand.trim();
     } else {
+        console.trace();
         logMsg("Brand not defined!", false, false);
 
         return false;
