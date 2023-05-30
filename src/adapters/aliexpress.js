@@ -51,6 +51,16 @@ puppeteer.use(
 
 puppeteer.use(StealthPlugin());
 
+let isStartPageReloading = false;
+
+/**
+ * Log message helper
+ *
+ * @param   {String}  msg     Message
+ * @param   {String}  id      Item ID
+ *
+ * @return  {Boolean}         Result
+ */
 function log(msg, id = false) {
     return logMsg(msg, id, "Aliexpress");
 }
@@ -513,8 +523,13 @@ export async function scrapeItemByBrowser(itemId, browser, startPage, queue) {
                 }
 
                 if (ended) {
-                    log("Ended page get", itemId);
+                    // log("Ended page get", itemId);
                     return false;
+                }
+
+                // Wait before page in reloading state after slide check
+                while (isStartPageReloading) {
+                    await sleep(1000);
                 }
 
                 const isCaptcha = await startPage.$("#baxia-punish");
@@ -578,6 +593,22 @@ export async function scrapeItemByBrowser(itemId, browser, startPage, queue) {
                 if (data?.data?.totalAmount) {
                     maxPages = Math.round(data.data.totalAmount / pageSize) + 1;
                     log(`Set reviews max page to ${maxPages}`, itemId);
+
+                    const reviewsCount = aliexpressDb.data[itemId].reviews
+                        ? Object.keys(aliexpressDb.data[itemId].reviews).length
+                        : 0;
+
+                    if (
+                        reviewsCount >= data.data.totalAmount &&
+                        !options.force
+                    ) {
+                        pageId = maxPages;
+                        ended = true;
+
+                        log("All data already downloaded");
+
+                        return true;
+                    }
                 }
 
                 if (data?.data?.paginationStatusText) {
@@ -718,6 +749,10 @@ export async function scrapeItemByBrowser(itemId, browser, startPage, queue) {
 
     // await page.close();
 
+    // while (!ended) {
+    //     await sleep(5000);
+    // }
+
     log(`Get all reviews for item result ${result}`, itemId);
 
     if ("reviews" in aliexpressDb.data[itemId] && result) {
@@ -734,7 +769,7 @@ export async function scrapeItemByBrowser(itemId, browser, startPage, queue) {
             });
 
         for (const reviewItem of reviews) {
-            await download(reviewItem, itemId, queue);
+            download(reviewItem, itemId, queue);
         }
     }
 
@@ -931,6 +966,33 @@ export async function updateItems(queue) {
     const startPage = await createPage(browser, false);
 
     await startPage.goto(`https://aliexpress.ru/`, goSettings);
+
+    await startPage.setRequestInterception(true);
+
+    startPage.on("response", async (response) => {
+        const url = response.url();
+        const method = response.request().method();
+
+        if (!url.includes("slide?slidedata")) {
+            return false;
+        }
+
+        log(`[${method}] ${url}`);
+
+        try {
+            const { success } = await response.json();
+
+            if (success) {
+                log("Reload page after slide");
+                isStartPageReloading = true;
+                await startPage.reload(goSettings);
+                isStartPageReloading = false;
+            }
+        } catch (error) {
+            log(`Get respoonse data error: ${error.message}`);
+            return false;
+        }
+    });
 
     log("Start page loaded");
 

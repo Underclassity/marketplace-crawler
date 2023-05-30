@@ -585,7 +585,7 @@ export async function getItemsByQuery(queue) {
 
     // wait for all pages processed
     while (!ended || !queue.size) {
-        await sleep(100);
+        await sleep(1000);
         logQueue(queue);
     }
 

@@ -31,7 +31,13 @@ export function dbWrite(db, write = true, prefix = false) {
             writeCache[prefix] = true;
         }
 
+        const startTime = Date.now();
+
         db.write();
+
+        const endTime = Date.now();
+
+        logMsg(`Write in DB: ${endTime - startTime}ms`, false, prefix);
 
         if (prefix) {
             writeCache[prefix] = false;
@@ -188,37 +194,32 @@ export function getItems(db, prefix = false) {
 
     const time = options.time * 60 * 60 * 1000;
 
-    return Object.keys(db.data)
-        .filter((id) => {
-            const item = db.data[id];
+    return Object.keys(db.data).filter((id) => {
+        const item = db.data[id];
 
-            if (
-                item?.time &&
-                Date.now() - item.time <= time &&
-                !options.force
-            ) {
-                logMsg(`Already updated by time`, id, prefix);
-                return false;
-            }
+        if (item?.time && Date.now() - item.time <= time && !options.force) {
+            logMsg(`Already updated by time`, id, prefix);
+            return false;
+        }
 
-            if ("deleted" in item && item.deleted) {
-                logMsg(`Deleted item`, id, prefix);
+        if ("deleted" in item && item.deleted) {
+            logMsg(`Deleted item`, id, prefix);
 
-                return false;
-            }
+            return false;
+        }
 
-            if (options.id?.length && id.toString() != options.id) {
-                return false;
-            }
+        if (options.id?.length && id.toString() != options.id) {
+            return false;
+        }
 
-            return true;
-        })
-        .sort((a, b) => {
-            const aReviewsCount = a.reviews ? Object.keys(a.reviews).length : 0;
-            const bReviewsCount = b.reviews ? Object.keys(b.reviews).length : 0;
+        return true;
+    });
+    // .sort((a, b) => {
+    //     const aReviewsCount = a.reviews ? Object.keys(a.reviews).length : 0;
+    //     const bReviewsCount = b.reviews ? Object.keys(b.reviews).length : 0;
 
-            return aReviewsCount - bReviewsCount;
-        });
+    //     return aReviewsCount - bReviewsCount;
+    // });
 }
 
 /**

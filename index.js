@@ -207,33 +207,33 @@ puppeteer.use(StealthPlugin());
 
     logMsg(`Get items for query: ${options.query}`, false, false);
 
-    queue.on("completed", () => {
-        logMsg("Completed", false, false);
-    });
+    // queue.on("completed", () => {
+    //     logMsg("Completed", false, false);
+    // });
 
-    queue.on("idle", () => {
-        logMsg(
-            `Queue is idle.  Size: ${queue.size}  Pending: ${queue.pending}`,
-            false,
-            false
-        );
-    });
+    // queue.on("idle", () => {
+    //     logMsg(
+    //         `Queue is idle.  Size: ${queue.size}  Pending: ${queue.pending}`,
+    //         false,
+    //         false
+    //     );
+    // });
 
-    queue.on("add", () => {
-        logMsg(
-            `Task is added.  Size: ${queue.size}  Pending: ${queue.pending}`,
-            false,
-            false
-        );
-    });
+    // queue.on("add", () => {
+    //     logMsg(
+    //         `Task is added.  Size: ${queue.size}  Pending: ${queue.pending}`,
+    //         false,
+    //         false
+    //     );
+    // });
 
-    queue.on("next", () => {
-        logMsg(
-            `Task is completed.  Size: ${queue.size}  Pending: ${queue.pending}`,
-            false,
-            false
-        );
-    });
+    // queue.on("next", () => {
+    //     logMsg(
+    //         `Task is completed.  Size: ${queue.size}  Pending: ${queue.pending}`,
+    //         false,
+    //         false
+    //     );
+    // });
 
     for (const id of ids) {
         const { getItemsByQuery } = await import(`./src/adapters/${id}.js`);
