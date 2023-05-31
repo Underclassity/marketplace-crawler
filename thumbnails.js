@@ -1,28 +1,26 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import PQueue from "p-queue";
-
-import options from "./src/options.js";
+import createQueue from "./src/helpers/create-queue.js";
 import generateThumbail from "./src/helpers/generate-thumbnail.js";
 import getAdaptersIds from "./src/helpers/get-adapters-ids.js";
+import logMsg from "./src/helpers/log-msg.js";
+
+import options from "./src/options.js";
 
 const downloadPath = path.resolve(options.directory, "download");
 
-const queue = new PQueue({
-    concurrency: options.throat,
-    timeout: options.timeout,
-    autoStart: true,
-    carryoverConcurrencyCount: true,
-});
+// Create queue for process items
+const queue = createQueue();
 
+// Get adapters IDs
 const ids = getAdaptersIds();
 
 if (ids.length) {
-    for (const id of ids) {
-        // console.log(`[${id}] Start process`);
+    for (const adapater of ids) {
+        logMsg(`Start process`, false, adapater);
 
-        const idFolderPath = path.resolve(downloadPath, id);
+        const idFolderPath = path.resolve(downloadPath, adapater);
 
         if (!fs.existsSync(idFolderPath)) {
             continue;
@@ -35,13 +33,13 @@ if (ids.length) {
             );
 
         for (const item of items) {
-            // console.log(`[${id}] Add for process ${item}`);
+            logMsg(`Add for process ${item}`, item, adapater);
 
             queue.add(
                 () =>
                     generateThumbail(
                         path.resolve(idFolderPath, item),
-                        id,
+                        adapater,
                         queue
                     ),
                 { priority: 1 }
@@ -49,5 +47,5 @@ if (ids.length) {
         }
     }
 } else {
-    console.log("No adapters defined");
+    logMsg("No adapters defined", false, false);
 }

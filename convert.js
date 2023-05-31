@@ -1,49 +1,68 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import PQueue from "p-queue";
-
+import { logQueue, logMsg } from "./src/helpers/log-msg.js";
 import { processFile } from "./src/helpers/download.js";
+import createQueue from "./src/helpers/create-queue.js";
+import getAdaptersIds from "./src/helpers/get-adapters-ids.js";
+import sleep from "./src/helpers/sleep.js";
 import walk from "./src/helpers/walk.js";
 
 import options from "./src/options.js";
 
-const queue = new PQueue({
-    concurrency: options.throat,
-    timeout: options.timeout,
-    autoStart: true,
-    carryoverConcurrencyCount: true,
-});
+const queue = createQueue();
 
 (async () => {
-    let files = await walk(path.resolve(options.directory, "download"));
+    const ids = getAdaptersIds();
 
-    files = files
-        .filter((item) => {
-            return path.extname(item) != ".webp";
-        })
-        .filter((item) => {
-            return path.extname(item) != ".heic";
-        })
-        .filter((item) => {
-            return path.extname(item) != ".json";
-        })
-        .filter((item) => {
-            return path.extname(item) != ".mp4";
-        });
+    logMsg(`Process convert for adapter: ${ids.join(", ")}`, false, false);
 
-    for (const filepath of files) {
-        const id = parseInt(path.basename(path.dirname(filepath)), 10);
-        let prefix = path.basename(path.dirname(path.resolve(filepath, "../")));
-        prefix = prefix.charAt(0).toUpperCase() + prefix.slice(1);
+    for (const adapter of ids) {
+        logMsg("Start process images", false, adapter);
 
-        const size = fs.statSync(filepath).size;
+        const adapterFolderPath = path.resolve(
+            options.directory,
+            "download",
+            adapter
+        );
 
-        if (size) {
-            await processFile(filepath, queue, id, prefix);
-        } else {
-            fs.unlinkSync(filepath);
+        if (!fs.existsSync(adapterFolderPath)) {
             continue;
         }
+
+        let files = await walk(adapterFolderPath);
+
+        // filter only jpeg or jpg
+        files = files.filter((item) => {
+            return (
+                path.extname(item) == ".jpeg" || path.extname(item) == ".jpg"
+            );
+        });
+
+        for (const filepath of files) {
+            const id = parseInt(path.basename(path.dirname(filepath)), 10);
+
+            let prefix = path.basename(
+                path.dirname(path.resolve(filepath, "../"))
+            );
+
+            prefix = prefix.charAt(0).toUpperCase() + prefix.slice(1);
+
+            const size = fs.statSync(filepath).size;
+
+            if (size) {
+                processFile(filepath, queue, id, prefix);
+            } else {
+                fs.unlinkSync(filepath);
+                continue;
+            }
+        }
     }
+
+    while (queue.size || queue.pending) {
+        await sleep(1000);
+        logQueue(queue);
+    }
+
+    logMsg("End convert images", false, false);
 })();

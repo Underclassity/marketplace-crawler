@@ -12,10 +12,10 @@ import {
 
 import downloadItem from "../helpers/download.js";
 
-import log from "../helpers/log.js";
+import { logMsg } from "../helpers/log-msg.js";
+import { updateTime, updateTags, getItems } from "../helpers/db.js";
 import options from "../options.js";
 import priorities from "../helpers/priorities.js";
-import { updateTime, updateTags, getItems } from "../helpers/db.js";
 
 const dbPath = path.resolve(options.directory, "db");
 
@@ -36,13 +36,7 @@ if (!amazonDb.data) {
 const downloadDirPath = path.resolve(options.directory, "download", "amazon");
 
 function logMsg(msg, id) {
-    const query = options.query || "";
-
-    if (id) {
-        return log(`[Amazon] ${query}: ${id} - ${msg}`);
-    }
-
-    return log(`[Amazon] ${query}: ${msg}`);
+    return logMsg(msg, id, "Amazon");
 }
 
 /**

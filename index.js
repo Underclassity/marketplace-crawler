@@ -1,18 +1,17 @@
 import path from "node:path";
 import fs from "node:fs";
 
-import PQueue from "p-queue";
-
 import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import AdblockerPlugin from "puppeteer-extra-plugin-adblocker";
 
 import options from "./src/options.js";
 
+import { logQueue, logMsg } from "./src/helpers/log-msg.js";
+import createQueue from "./src/helpers/create-queue.js";
 import getAdaptersIds from "./src/helpers/get-adapters-ids.js";
 import sleep from "./src/helpers/sleep.js";
 import updateProxies from "./src/helpers/proxy-helpers.js";
-import { logQueue, logMsg } from "./src/helpers/log-msg.js";
 
 import { processCookiesAndSession } from "./src/adapters/aliexpress.js";
 
@@ -75,12 +74,7 @@ puppeteer.use(StealthPlugin());
 
     logMsg(`Process with adapters: ${ids.join(",")}`, false, false);
 
-    const queue = new PQueue({
-        concurrency: options.throat,
-        timeout: options.timeout,
-        autoStart: true,
-        carryoverConcurrencyCount: true,
-    });
+    const queue = createQueue();
 
     // if (options.id) {
     //     const browser = await puppeteer.launch({
