@@ -13,11 +13,12 @@ import {
     updateTags,
     updateTime,
 } from "../helpers/db.js";
+
 import downloadItem from "../helpers/download.js";
 import getHeaders from "../helpers/get-headers.js";
+import logMsg from "../helpers/log-msg.js";
 import options from "../options.js";
 import priorities from "../helpers/priorities.js";
-import logMsg from "../helpers/log-msg.js";
 
 const dbPath = path.resolve(options.directory, "db");
 
@@ -179,7 +180,7 @@ export async function getFeedbackByXhr(id) {
         log(`Get all reviews by XHR error: ${error.message}`);
     }
 
-    return [];
+    return false;
 }
 
 /**
@@ -261,25 +262,29 @@ export async function getFeedbacks(id, queue) {
 
     const feedbacks = await getFeedbackByXhr(id);
 
-    log(`Found ${feedbacks.length} feedbacks items`, id);
+    const isResult = Array.isArray(feedbacks);
 
-    for (const feedback of feedbacks) {
-        addReview(
-            wildberriesDb,
-            id,
-            feedback.id,
-            feedback,
-            "Wildberries",
-            false
-        );
-    }
+    if (isResult) {
+        log(`Found ${feedbacks.length} feedbacks items`, id);
 
-    wildberriesDb.write();
+        for (const feedback of feedbacks) {
+            addReview(
+                wildberriesDb,
+                id,
+                feedback.id,
+                feedback,
+                "Wildberries",
+                false
+            );
+        }
 
-    for (const feedback of feedbacks) {
-        queue.add(async () => getFeedback(id, feedback, queue), {
-            priority: priorities.review,
-        });
+        wildberriesDb.write();
+
+        for (const feedback of feedbacks) {
+            queue.add(async () => getFeedback(id, feedback, queue), {
+                priority: priorities.review,
+            });
+        }
     }
 
     const priceInfo = await getPriceInfo(id);
@@ -297,10 +302,18 @@ export async function getFeedbacks(id, queue) {
         }
     }
 
-    updateTime(wildberriesDb, id);
-    updateTags(wildberriesDb, id, options.query);
+    if (isResult) {
+        updateTime(wildberriesDb, id);
+        updateTags(wildberriesDb, id, options.query);
+    }
 
-    log(`End get`, id);
+    log(`End get: result ${isResult}`, id);
+
+    if (!isResult) {
+        queue.add(() => getFeedbacks(id, queue), {
+            priority: priorities.item,
+        });
+    }
 
     return true;
 }
