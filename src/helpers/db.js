@@ -69,13 +69,14 @@ export function dbItemCheck(db, itemId) {
     }
 
     if (!(itemId in db.data)) {
-        db.data[itemId] = {};
+        db.data[itemId] = {
+            id: itemId,
+            reviews: {},
+            tags: [],
+            brand: undefined,
+        };
 
-        try {
-            db.write();
-        } catch (error) {
-            console.log(error);
-        }
+        dbWrite(db);
     }
 
     return true;
@@ -95,13 +96,7 @@ export function updateTime(db, itemId, time = Date.now()) {
         return false;
     }
 
-    if (itemId in db.data) {
-        db.data[itemId].time = time;
-    } else {
-        db.data[itemId] = {
-            time,
-        };
-    }
+    db.data[itemId].time = time;
 
     dbWrite(db, true, false);
 
@@ -127,12 +122,8 @@ export function updateTags(db, itemId, tag) {
     }
 
     if (!tag || !tag.length) {
-        logMsg("Tag not defined!", false, false);
+        // logMsg("Tag not defined!", false, false);
         return false;
-    }
-
-    if (!("tags" in db.data[itemId])) {
-        db.data[itemId].tags = [];
     }
 
     if (!("tags" in db.data[itemId])) {
@@ -248,18 +239,6 @@ export function addReview(
     if (!review || !reviewId) {
         logMsg("Review not defined!", itemId, prefix);
         return false;
-    }
-
-    if (!(itemId in db.data)) {
-        db.data[itemId] = {
-            reviews: {},
-        };
-        dbWrite(db, write, prefix);
-    }
-
-    if (!("reviews" in db.data[itemId])) {
-        db.data[itemId].reviews = {};
-        dbWrite(db, write, prefix);
     }
 
     if (!(reviewId in db.data[itemId].reviews) && !options.force) {
