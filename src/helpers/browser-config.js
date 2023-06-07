@@ -1,6 +1,7 @@
 import path from "node:path";
 
 import { getProxy } from "./proxy-helpers.js";
+import logMsg from "./log-msg.js";
 
 import options from "../options.js";
 
@@ -19,7 +20,7 @@ export const browserConfig = {
 if (options.proxy) {
     const { url: randomProxy } = getProxy(true);
 
-    console.log(`Use random proxy for browser: ${randomProxy}`);
+    logMsg(`Use random proxy for browser: ${randomProxy}`, false, false);
 
     browserConfig.args.push(`--proxy-server =${randomProxy}`);
 }

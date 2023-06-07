@@ -134,6 +134,68 @@ export async function extractVideoFrames(
 }
 
 /**
+ * Convert video file with ffmpeg
+ *
+ * @param   {String}  filepath  Filepath
+ * @param   {String}  itemId    Item ID
+ * @param   {String}  prefix    Prefix
+ *
+ * @return  {Boolean}           Result
+ */
+export async function convertVideoItem(filepath, itemId, prefix) {
+    if (!filepath.includes(".mp4")) {
+        logMsg(`Input filepath ${filepath} is not a video file!`, false, false);
+        return false;
+    }
+
+    const exportFilePath = path.resolve(
+        options.directory,
+        "temp",
+        path.parse(filepath).base
+    );
+
+    if (fs.existsSync(exportFilePath)) {
+        fs.unlinkSync(exportFilePath);
+    }
+
+    const command = `ffmpeg -i ${filepath} -map_metadata -1 -c:v copy -c:a copy -movflags +faststart ${exportFilePath}`;
+
+    let result = false;
+
+    try {
+        result = await commandCall(command);
+    } catch (error) {
+        logMsg(error.message, false, false);
+    }
+
+    if (result) {
+        const sizeBefore = fs.statSync(filepath);
+        const sizeAfter = fs.statSync(exportFilePath);
+
+        logMsg(
+            `Before ${prettyBytes(sizeBefore.size)} - After ${prettyBytes(
+                sizeAfter.size
+            )}`,
+            itemId,
+            prefix
+        );
+
+        if (sizeAfter.size < sizeBefore.size) {
+            fs.renameSync(exportFilePath, filepath);
+
+            logMsg("Update video file", itemId, prefix);
+        }
+    }
+
+    // Delete file if its larger
+    if (fs.existsSync(exportFilePath)) {
+        fs.unlinkSync(exportFilePath);
+    }
+
+    return true;
+}
+
+/**
  * Convert image to webp
  *
  * @param   {String}  filepath  Input filepath

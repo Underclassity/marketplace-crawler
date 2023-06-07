@@ -605,7 +605,7 @@ export async function scrapeItemByBrowser(itemId, browser, startPage, queue) {
                         pageId = maxPages;
                         ended = true;
 
-                        log("All data already downloaded");
+                        log("All data already downloaded", itemId);
 
                         return true;
                     }
@@ -635,18 +635,18 @@ export async function scrapeItemByBrowser(itemId, browser, startPage, queue) {
                         );
                     }
 
-                    const sleepTime = Math.random() * options.timeout;
+                    // const sleepTime = Math.random() * options.timeout;
 
-                    log(
-                        `Wait for ${Math.round(
-                            sleepTime / 1000
-                        )} sec on reviews page ${pageId}`,
-                        itemId
-                    );
+                    // log(
+                    //     `Wait for ${Math.round(
+                    //         sleepTime / 1000
+                    //     )} sec on reviews page ${pageId}`,
+                    //     itemId
+                    // );
 
-                    await sleep(sleepTime); // Waif random time, from 0 to 1 min
+                    // await sleep(sleepTime); // Waif random time, from 0 to 1 min
 
-                    log(`End waiting on reviews page ${pageId}`, itemId);
+                    // log(`End waiting on reviews page ${pageId}`, itemId);
 
                     return true;
                 }
@@ -677,19 +677,19 @@ export async function scrapeItemByBrowser(itemId, browser, startPage, queue) {
                 pageId = maxPages;
                 ended = true;
 
-                const sleepTime = Math.random() * options.timeout;
+                // const sleepTime = Math.random() * options.timeout;
 
-                log(
-                    `Wait for ${Math.round(sleepTime / 1000)} sec after end`,
-                    itemId
-                );
+                // log(
+                //     `Wait for ${Math.round(sleepTime / 1000)} sec after end`,
+                //     itemId
+                // );
 
-                await sleep(sleepTime); // Waif random time, from 0 to 1 min
+                // await sleep(sleepTime); // Waif random time, from 0 to 1 min
 
-                log(
-                    `End waiting for ${Math.round(sleepTime / 1000)} sec`,
-                    itemId
-                );
+                // log(
+                //     `End waiting for ${Math.round(sleepTime / 1000)} sec`,
+                //     itemId
+                // );
 
                 return true;
             },

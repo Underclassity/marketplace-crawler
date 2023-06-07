@@ -7,11 +7,11 @@ import { LowSync } from "lowdb";
 import { JSONFileSync } from "lowdb/node";
 
 import { updateTime, updateTags, addReview, getItems } from "../helpers/db.js";
+import downloadItem from "../helpers/download.js";
 import getHeaders from "../helpers/get-headers.js";
-import log from "../helpers/log.js";
+import logMsg from "../helpers/log-msg.js";
 import options from "../options.js";
 import priorities from "../helpers/priorities.js";
-import downloadItem from "../helpers/download.js";
 
 const dbPath = path.resolve(options.directory, "db");
 
@@ -29,14 +29,8 @@ if (!onlinerDb.data) {
     onlinerDb.write();
 }
 
-function logMsg(msg, id) {
-    const query = options.query || "";
-
-    if (id) {
-        return log(`[Onliner] ${query}: ${id} - ${msg}`);
-    }
-
-    return log(`[Onliner] ${query}: ${msg}`);
+function log(msg, id) {
+    return logMsg(msg, id, "Onliner");
 }
 
 /**
@@ -48,10 +42,10 @@ function logMsg(msg, id) {
  * @return  {Boolean}        Rtsult
  */
 export async function updateItemPrices(id, queue) {
-    logMsg("Try to update item prices", id);
+    log("Try to update item prices", id);
 
     if (!(id in onlinerDb.data)) {
-        logMsg("Not found in DB");
+        log("Not found in DB");
         return false;
     }
 
@@ -60,7 +54,7 @@ export async function updateItemPrices(id, queue) {
     for (const monthFilter of ["2m", "12m"]) {
         await queue.add(
             async () => {
-                logMsg(`Try to update item prices for ${monthFilter}`, id);
+                log(`Try to update item prices for ${monthFilter}`, id);
 
                 try {
                     const priceRequest = await axios(
@@ -97,7 +91,7 @@ export async function updateItemPrices(id, queue) {
 
                     onlinerDb.write();
                 } catch (error) {
-                    logMsg(
+                    log(
                         `Update item prices for ${monthFilter} error: ${error.message}`,
                         id
                     );
@@ -126,10 +120,10 @@ export async function updateItemPrices(id, queue) {
  * @return  {Boolean}        Result
  */
 export async function updateItemReviews(id, queue) {
-    logMsg("Try to update", id);
+    log("Try to update", id);
 
     if (!(id in onlinerDb.data)) {
-        logMsg("Not found in DB");
+        log("Not found in DB");
         return false;
     }
 
@@ -141,7 +135,7 @@ export async function updateItemReviews(id, queue) {
         await queue.add(
             async () => {
                 try {
-                    logMsg("Get item reviews", id);
+                    log("Get item reviews", id);
 
                     const itemRequest = await axios(
                         `https://catalog.onliner.by/sdapi/catalog.api/products/${dbItem.key}/reviews?order=created_at:desc`,
@@ -155,13 +149,13 @@ export async function updateItemReviews(id, queue) {
 
                     totalPages = page.last;
 
-                    logMsg(`${reviews.length} reviews get`, id);
+                    log(`${reviews.length} reviews get`, id);
 
                     for (const review of reviews) {
                         addReview(onlinerDb, id, review.id, review, "Onliner");
                     }
                 } catch (error) {
-                    logMsg(`Get item reviews error: ${error.message}`, id);
+                    log(`Get item reviews error: ${error.message}`, id);
                 }
             },
             { priority: priorities.item }
@@ -183,7 +177,7 @@ export async function updateItems(queue) {
 
     const items = getItems(onlinerDb, "Onliner");
 
-    logMsg(`Update ${items.length} items`);
+    log(`Update ${items.length} items`);
 
     for (const itemId of items) {
         await updateItemReviews(itemId, queue);
@@ -207,7 +201,7 @@ export async function updateReviews(queue) {
 
     const items = getItems(onlinerDb, "Onliner");
 
-    logMsg(`Update ${items.length} items reviews`);
+    log(`Update ${items.length} items reviews`);
 
     for (const itemId of items) {
         const item = onlinerDb.data[itemId];
@@ -254,7 +248,7 @@ export async function updateReviews(queue) {
  * @return  {Boolean}        Result
  */
 export async function getItemsByQuery(queue) {
-    logMsg(`Get items for query: ${options.query}`);
+    log(`Get items for query: ${options.query}`);
 
     let totalPages = options.pages;
 
@@ -264,7 +258,7 @@ export async function getItemsByQuery(queue) {
         await queue.add(
             async () => {
                 try {
-                    logMsg(`Get items on page ${pageId}`);
+                    log(`Get items on page ${pageId}`);
 
                     const request = await axios(
                         `https://www.onliner.by/sdapi/catalog.api/search/products?query=${options.query}&page=${pageId}`,
@@ -285,7 +279,7 @@ export async function getItemsByQuery(queue) {
                                 onlinerDb.write();
                             }
                         } else {
-                            logMsg(`Add new product`, product.id);
+                            log(`Add new product`, product.id);
 
                             onlinerDb.data[product.id] = product;
                             onlinerDb.data[product.id].reviews = {};
@@ -299,7 +293,7 @@ export async function getItemsByQuery(queue) {
                             Date.now() - item.time <= time &&
                             !options.force
                         ) {
-                            logMsg(`Already updated by time`, product.id);
+                            log(`Already updated by time`, product.id);
                             continue;
                         }
 
@@ -314,9 +308,7 @@ export async function getItemsByQuery(queue) {
                         updateTags(onlinerDb, product.id, options.query);
                     }
                 } catch (error) {
-                    logMsg(
-                        `Get items on page ${pageId} error: ${error.message}`
-                    );
+                    log(`Get items on page ${pageId} error: ${error.message}`);
                 }
             },
             { priority: priorities.page }

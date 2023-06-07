@@ -11,6 +11,11 @@ let ids = [
     "wildberries",
 ];
 
+/**
+ * Get adapters IDs array based on choosen options
+ *
+ * @return  {Array}  Array of adapters IDs
+ */
 export function getAdaptersIds() {
     if (!options.include.length && !options.exclude.length) {
         return ids;

@@ -24,18 +24,23 @@ const resultsFolderPath = path.resolve(options.directory, "thumbnails");
  *
  * @return  {Boolean}          Result
  */
-export async function generateThumbail(dir, prefix, queue, force = false) {
+export async function generateThumbail(
+    dir,
+    prefix = false,
+    queue,
+    force = false
+) {
     if (!options.thumbnail) {
         return false;
     }
 
     if (!dir || !fs.existsSync(dir)) {
-        console.log("Directory not defined!");
+        logMsg("Directory not defined!", false, prefix);
         return false;
     }
 
     if (!prefix) {
-        console.log("Prefix not defined!");
+        logMsg("Prefix not defined!", false, prefix);
         return false;
     }
 

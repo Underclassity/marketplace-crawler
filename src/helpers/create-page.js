@@ -1,4 +1,5 @@
 import getUserAgent from "./get-user-agent.js";
+import logMsg from "./log-msg.js";
 
 /**
  * Create page in puppeteer
@@ -15,8 +16,7 @@ export async function createPage(
     types = ["image", "font", "stylesheet"]
 ) {
     if (!browser) {
-        console.log("Browser not defined!");
-        console.trace();
+        logMsg("Browser not defined!", false, false);
         return false;
     }
 

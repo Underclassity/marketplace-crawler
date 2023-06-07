@@ -3,6 +3,9 @@ import log from "./log.js";
 import options from "../options.js";
 import priorities from "./priorities.js";
 
+let prefixLength = 0;
+let idLength = 0;
+
 /**
  * Log message helper
  *
@@ -12,7 +15,7 @@ import priorities from "./priorities.js";
  *
  * @return  {Boolean}         Log result
  */
-export function logMsg(msg, id, prefix) {
+export function logMsg(msg, id, prefix = "Common") {
     if (!msg || !id || !prefix) {
         if (msg == undefined) {
             console.log("Message not defined!");
@@ -33,6 +36,22 @@ export function logMsg(msg, id, prefix) {
     }
 
     const query = options.query || options.brand || "";
+
+    if (prefix && (!prefixLength || prefixLength < prefix.length)) {
+        prefixLength = prefix.length;
+    }
+
+    if (id && (!idLength || idLength < id.length)) {
+        idLength = id.length;
+    }
+
+    if (prefix) {
+        prefix = prefix.padEnd(prefixLength, " ");
+    }
+
+    if (id) {
+        id = id.padEnd(idLength, " ");
+    }
 
     return log(
         `${prefix ? `[${prefix}] ` : ""}${query ? `${query}: ` : ""}${

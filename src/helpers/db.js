@@ -22,7 +22,8 @@ export function dbWrite(db, write = true, prefix = false) {
         return false;
     }
 
-    if (prefix && prefix in writeCache) {
+    if (prefix && prefix in writeCache && writeCache[prefix]) {
+        logMsg(`Already writing in DB`, false, prefix);
         return false;
     }
 
@@ -44,6 +45,10 @@ export function dbWrite(db, write = true, prefix = false) {
         }
     } catch (error) {
         logMsg(`Write DB error: ${error.message}`, false, prefix);
+
+        if (prefix) {
+            writeCache[prefix] = false;
+        }
     }
 
     return true;
@@ -76,6 +81,16 @@ export function dbItemCheck(db, itemId) {
             brand: undefined,
         };
 
+        dbWrite(db);
+    }
+
+    if (!("reviews" in db.data[itemId])) {
+        db.data[itemId].reviews = {};
+        dbWrite(db);
+    }
+
+    if (!("tags" in db.data[itemId])) {
+        db.data[itemId].tags = [];
         dbWrite(db);
     }
 
@@ -185,32 +200,37 @@ export function getItems(db, prefix = false) {
 
     const time = options.time * 60 * 60 * 1000;
 
-    return Object.keys(db.data).filter((id) => {
-        const item = db.data[id];
+    return Object.keys(db.data)
+        .filter((id) => {
+            const item = db.data[id];
 
-        if (item?.time && Date.now() - item.time <= time && !options.force) {
-            logMsg(`Already updated by time`, id, prefix);
-            return false;
-        }
+            if (
+                item?.time &&
+                Date.now() - item.time <= time &&
+                !options.force
+            ) {
+                logMsg(`Already updated by time`, id, prefix);
+                return false;
+            }
 
-        if ("deleted" in item && item.deleted) {
-            logMsg(`Deleted item`, id, prefix);
+            if ("deleted" in item && item.deleted) {
+                logMsg(`Deleted item`, id, prefix);
 
-            return false;
-        }
+                return false;
+            }
 
-        if (options.id?.length && id.toString() != options.id) {
-            return false;
-        }
+            if (options.id?.length && id.toString() != options.id) {
+                return false;
+            }
 
-        return true;
-    });
-    // .sort((a, b) => {
-    //     const aReviewsCount = a.reviews ? Object.keys(a.reviews).length : 0;
-    //     const bReviewsCount = b.reviews ? Object.keys(b.reviews).length : 0;
+            return true;
+        })
+        .sort((a, b) => {
+            const aReviewsCount = a.reviews ? Object.keys(a.reviews).length : 0;
+            const bReviewsCount = b.reviews ? Object.keys(b.reviews).length : 0;
 
-    //     return aReviewsCount - bReviewsCount;
-    // });
+            return aReviewsCount - bReviewsCount;
+        });
 }
 
 /**
