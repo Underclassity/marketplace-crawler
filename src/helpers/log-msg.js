@@ -45,12 +45,12 @@ export function logMsg(msg, id, prefix = "Common") {
         idLength = id.length;
     }
 
-    if (prefix) {
-        prefix = prefix.padEnd(prefixLength, " ");
+    if (prefix && prefixLength) {
+        prefix = prefix.toString().padEnd(prefixLength, " ");
     }
 
-    if (id) {
-        id = id.padEnd(idLength, " ");
+    if (id && idLength) {
+        id = id.toString().padEnd(idLength, " ");
     }
 
     return log(

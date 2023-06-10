@@ -193,6 +193,29 @@ puppeteer.use(StealthPlugin());
         return true;
     }
 
+    if (options.tags) {
+        logMsg("Update all items with tags", false, false);
+
+        if (ids.includes("aliexpress") && options.cookies) {
+            await processCookiesAndSession();
+        }
+
+        for (const id of ids) {
+            const { updateWithTags } = await import(`./src/adapters/${id}.js`);
+
+            if (updateWithTags) {
+                updateWithTags(queue);
+            }
+        }
+
+        while (queue.size || queue.pending) {
+            await sleep(1000);
+            logQueue(queue);
+        }
+
+        return true;
+    }
+
     if (!options.query) {
         logMsg("Query not defined!", false, false);
 
@@ -237,7 +260,7 @@ puppeteer.use(StealthPlugin());
         }
     }
 
-    while (queue.size || queue.pending || !queue.isPaused) {
+    while (queue.size || queue.pending) {
         await sleep(1000);
         logQueue(queue);
     }

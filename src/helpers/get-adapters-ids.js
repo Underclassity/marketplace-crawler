@@ -6,6 +6,7 @@ let ids = [
     "decathlon",
     "ebay",
     "joom",
+    "kufar",
     "onliner",
     "ozon",
     "wildberries",
