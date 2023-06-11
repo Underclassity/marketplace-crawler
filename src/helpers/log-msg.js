@@ -15,24 +15,18 @@ let idLength = 0;
  *
  * @return  {Boolean}         Log result
  */
-export function logMsg(msg, id, prefix = "Common") {
-    if (!msg || !id || !prefix) {
-        if (msg == undefined) {
-            console.log("Message not defined!");
-            console.trace();
-        }
+export function logMsg(msg, id = "Common", prefix = "Common") {
+    if ((!msg || !id || !prefix) && prefix == undefined) {
+        log("Prefix not defined!");
+        console.trace();
+    }
 
-        if (id == undefined) {
-            console.log("ID not defined!");
-            console.trace();
-        }
+    if (!id) {
+        id = "Common";
+    }
 
-        if (prefix == undefined) {
-            console.log("Prefix not defined!");
-            console.trace();
-        }
-
-        // return false;
+    if (!prefix) {
+        prefix = "Common";
     }
 
     const query = options.query || options.brand || "";

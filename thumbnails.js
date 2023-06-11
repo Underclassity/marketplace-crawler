@@ -47,5 +47,5 @@ if (ids.length) {
         }
     }
 } else {
-    logMsg("No adapters defined", false, false);
+    logMsg("No adapters defined");
 }

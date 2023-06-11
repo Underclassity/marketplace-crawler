@@ -29,5 +29,5 @@ app.get("/", (req, res) => {
 });
 
 app.listen(port, () => {
-    logMsg(`Example app listening on port ${port}`, false, false);
+    logMsg(`Example app listening on port ${port}`);
 });

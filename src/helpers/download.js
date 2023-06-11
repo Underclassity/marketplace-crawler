@@ -144,7 +144,7 @@ export async function extractVideoFrames(
  */
 export async function convertVideoItem(filepath, itemId, prefix) {
     if (!filepath.includes(".mp4")) {
-        logMsg(`Input filepath ${filepath} is not a video file!`, false, false);
+        logMsg(`Input filepath ${filepath} is not a video file!`);
         return false;
     }
 
@@ -165,7 +165,7 @@ export async function convertVideoItem(filepath, itemId, prefix) {
     try {
         result = await commandCall(command);
     } catch (error) {
-        logMsg(error.message, false, false);
+        logMsg(error.message);
     }
 
     if (result) {

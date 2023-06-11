@@ -70,5 +70,5 @@ for (const id of ids) {
         logMsg(`Add ${count} new items in ${id} adapter`, false, id);
     }
 
-    logMsg("End processing add existing items", false, false);
+    logMsg("End processing add existing items");
 })();

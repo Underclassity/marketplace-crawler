@@ -16,7 +16,7 @@ export async function createPage(
     types = ["image", "font", "stylesheet"]
 ) {
     if (!browser) {
-        logMsg("Browser not defined!", false, false);
+        logMsg("Browser not defined!");
         return false;
     }
 

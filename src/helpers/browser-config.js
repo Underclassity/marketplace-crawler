@@ -11,16 +11,17 @@ import options from "../options.js";
  * @var {Object}
  */
 export const browserConfig = {
-    headless: options.headless,
-    devtools: options.headless ? false : true,
     args: ["--disable-notifications"],
+    defaultViewport: { width: 1920, height: 1080 },
+    devtools: options.headless ? false : true,
+    headless: options.headless,
     userDataDir: path.resolve(options.directory, "puppeteer"),
 };
 
 if (options.proxy) {
     const { url: randomProxy } = getProxy(true);
 
-    logMsg(`Use random proxy for browser: ${randomProxy}`, false, false);
+    logMsg(`Use random proxy for browser: ${randomProxy}`);
 
     browserConfig.args.push(`--proxy-server =${randomProxy}`);
 }

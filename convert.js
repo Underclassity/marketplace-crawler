@@ -15,7 +15,7 @@ const queue = createQueue();
 (async () => {
     const ids = getAdaptersIds();
 
-    logMsg(`Process convert for adapter: ${ids.join(", ")}`, false, false);
+    logMsg(`Process convert for adapter: ${ids.join(", ")}`);
 
     for (const adapter of ids) {
         logMsg("Start process images", false, adapter);
@@ -64,5 +64,5 @@ const queue = createQueue();
         logQueue(queue);
     }
 
-    logMsg("End convert images", false, false);
+    logMsg("End convert images");
 })();

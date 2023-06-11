@@ -13,7 +13,7 @@ import options from "./src/options.js";
 const ids = getAdaptersIds();
 
 if (ids.length > 1) {
-    logMsg("Define 1 adapter to add item", false, false);
+    logMsg("Define 1 adapter to add item");
     process.exit();
 }
 

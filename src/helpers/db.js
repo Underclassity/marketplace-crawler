@@ -14,7 +14,7 @@ const writeCache = {};
  */
 export function dbWrite(db, write = true, prefix = false) {
     if (!db || !db.write) {
-        logMsg("DB not defined!", false, false);
+        logMsg("DB not defined!");
         return false;
     }
 
@@ -64,12 +64,12 @@ export function dbWrite(db, write = true, prefix = false) {
  */
 export function dbItemCheck(db, itemId) {
     if (!db || !db.write) {
-        logMsg("DB not defined!", false, false);
+        logMsg("DB not defined!");
         return false;
     }
 
     if (!itemId) {
-        logMsg("Item ID not defined!", false, false);
+        logMsg("Item ID not defined!");
         return false;
     }
 
@@ -137,7 +137,7 @@ export function updateTags(db, itemId, tag) {
     }
 
     if (!tag || !tag.length) {
-        // logMsg("Tag not defined!", false, false);
+        // logMsg("Tag not defined!");
         return false;
     }
 
@@ -170,7 +170,7 @@ export function updateBrand(db, itemId, brand) {
         brand = brand.trim();
     } else {
         console.trace();
-        logMsg("Brand not defined!", false, false);
+        logMsg("Brand not defined!");
 
         return false;
     }

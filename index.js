@@ -68,11 +68,11 @@ puppeteer.use(StealthPlugin());
     const ids = getAdaptersIds();
 
     if (!ids.length) {
-        logMsg("No adapters defined", false, false);
+        logMsg("No adapters defined");
         return false;
     }
 
-    logMsg(`Process with adapters: ${ids.join(",")}`, false, false);
+    logMsg(`Process with adapters: ${ids.join(",")}`);
 
     const queue = createQueue();
 
@@ -82,7 +82,7 @@ puppeteer.use(StealthPlugin());
     //         devtools: options.headless ? false : true,
     //     });
 
-    //     logMsg(`Update item ${options.id}`, false, false);
+    //     logMsg(`Update item ${options.id}`);
 
     //     queue.add(
     //         () =>
@@ -102,7 +102,7 @@ puppeteer.use(StealthPlugin());
     // }
 
     if (options.reviews) {
-        logMsg("Update items reviews", false, false);
+        logMsg("Update items reviews");
 
         if (ids.includes("aliexpress") && options.cookies) {
             await processCookiesAndSession();
@@ -125,7 +125,7 @@ puppeteer.use(StealthPlugin());
     }
 
     if (options.update) {
-        logMsg("Update items", false, false);
+        logMsg("Update items");
 
         if (ids.includes("aliexpress") && options.cookies) {
             await processCookiesAndSession();
@@ -148,7 +148,7 @@ puppeteer.use(StealthPlugin());
     }
 
     if (options.brand) {
-        logMsg("Get all brand items", false, false);
+        logMsg("Get all brand items");
 
         if (ids.includes("aliexpress") && options.cookies) {
             await processCookiesAndSession();
@@ -171,7 +171,7 @@ puppeteer.use(StealthPlugin());
     }
 
     if (options.brands) {
-        logMsg("Update all items with brand", false, false);
+        logMsg("Update all items with brand");
 
         if (ids.includes("aliexpress") && options.cookies) {
             await processCookiesAndSession();
@@ -194,7 +194,7 @@ puppeteer.use(StealthPlugin());
     }
 
     if (options.tags) {
-        logMsg("Update all items with tags", false, false);
+        logMsg("Update all items with tags");
 
         if (ids.includes("aliexpress") && options.cookies) {
             await processCookiesAndSession();
@@ -217,15 +217,15 @@ puppeteer.use(StealthPlugin());
     }
 
     if (!options.query) {
-        logMsg("Query not defined!", false, false);
+        logMsg("Query not defined!");
 
         return false;
     }
 
-    logMsg(`Get items for query: ${options.query}`, false, false);
+    logMsg(`Get items for query: ${options.query}`);
 
     // queue.on("completed", () => {
-    //     logMsg("Completed", false, false);
+    //     logMsg("Completed");
     // });
 
     // queue.on("idle", () => {
