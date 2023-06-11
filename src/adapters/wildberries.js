@@ -9,6 +9,7 @@ import { JSONFileSync } from "lowdb/node";
 import {
     addReview,
     getItems,
+    getTags,
     updateBrand,
     updateTags,
     updateTime,
@@ -287,7 +288,7 @@ export async function getFeedbacks(id, queue) {
         }
     }
 
-    const priceInfo = await getPriceInfo(id);
+    const priceInfo = isResult ? await getPriceInfo(id) : false;
 
     if (priceInfo) {
         if (!("prices" in wildberriesDb.data[id])) {
@@ -358,11 +359,12 @@ export async function feedbacksRequest(id, skip) {
 /**
  * Get items from page by query
  *
- * @param   {Number}  page    Page number
+ * @param   {Number}  page     Page number
+ * @param   {String}  query    Query
  *
- * @return  {Object}          Result
+ * @return  {Object}           Result
  */
-export async function itemsRequest(page = 1) {
+export async function itemsRequest(page = 1, query = options.query) {
     log(`Page ${page} items get`);
 
     try {
@@ -370,7 +372,7 @@ export async function itemsRequest(page = 1) {
             "https://search.wb.ru/exactmatch/sng/common/v4/search",
             {
                 params: {
-                    query: options.query,
+                    query,
                     resultset: "catalog",
                     limit: 100,
                     sort: "popular",
@@ -529,6 +531,23 @@ export async function updateBrands(queue) {
         log(`Found ${brandItems.length || 0} items for brand ${brandID}`);
 
         processItems(brandItems, brandID, queue);
+    }
+
+    return true;
+}
+
+/**
+ * Update items with tags
+ *
+ * @param   {Object}  queue  Queue instance
+ *
+ * @return  {Boolean}        Result
+ */
+export async function updateWithTags(queue) {
+    const tags = await getTags(wildberriesDb, "Wildberries");
+
+    for (const tag of tags) {
+        await getItemsByQuery(queue, tag);
     }
 
     return true;
@@ -711,17 +730,18 @@ export async function getItemsByBrand(queue) {
  * Get items by query
  *
  * @param   {Object}  queue  Queue
+ * @param   {String}  query  Query
  *
  * @return  {Boolean}        Result
  */
-export async function getItemsByQuery(queue) {
+export async function getItemsByQuery(queue, query = options.query) {
     log("Get items call");
 
     const items = [];
     let count = 0;
 
     for (let page = 1; page <= options.pages; page++) {
-        const getItemsData = await queue.add(() => itemsRequest(page), {
+        const getItemsData = await queue.add(() => itemsRequest(page, query), {
             priority: priorities.page,
         });
 

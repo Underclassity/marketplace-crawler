@@ -234,6 +234,80 @@ export function getItems(db, prefix = false) {
 }
 
 /**
+ * Get items brands from DB
+ *
+ * @param   {Object}  db      Items DB
+ * @param   {String}  prefix  Log prefix
+ *
+ * @return  {Array}           Array of brands
+ */
+export function getBrands(db, prefix) {
+    if (!db || !db.write) {
+        logMsg("DB not defined!", false, prefix);
+        return false;
+    }
+
+    db.read();
+
+    let brands = [];
+
+    for (const itemId in db.data) {
+        const item = db.data[itemId];
+
+        if (item?.brand.length && !brands.includes(item.brand)) {
+            brands.push(item.brand);
+        }
+    }
+
+    // fitler brands
+    brands = brands
+        .filter((item) => item)
+        .map((item) => item.trim())
+        .filter((item, index, array) => array.indexOf(item) === index);
+
+    return brands;
+}
+
+/**
+ * Get items tags from DB
+ *
+ * @param   {Object}  db      Items DB
+ * @param   {String}  prefix  Log prefix
+ *
+ * @return  {Array}           Array of tags
+ */
+export function getTags(db, prefix = false) {
+    if (!db || !db.write) {
+        logMsg("DB not defined!", false, prefix);
+        return false;
+    }
+
+    db.read();
+
+    let tags = [];
+
+    for (const itemId in db.data) {
+        const item = db.data[itemId];
+
+        if (item?.tags.length) {
+            item.tags.forEach((tag) => {
+                if (!tags.includes(tag)) {
+                    tags.push(tag);
+                }
+            });
+        }
+    }
+
+    // fitler tags
+    tags = tags
+        .filter((item) => item)
+        .map((item) => item.toLowerCase().trim())
+        .filter((item, index, array) => array.indexOf(item) === index);
+
+    return tags;
+}
+
+/**
  * Add review to DB
  *
  * @param   {Object}   db           Items DB

@@ -1,6 +1,5 @@
 import fs from "node:fs";
 import path from "node:path";
-import url from "node:url";
 
 import axios from "axios";
 
@@ -10,10 +9,10 @@ import { JSONFileSync } from "lowdb/node";
 import downloadItem from "../helpers/download.js";
 
 import { logMsg } from "../helpers/log-msg.js";
-import { updateTime, updateTags, getItems } from "../helpers/db.js";
+import { updateTime, updateTags, getItems, getTags } from "../helpers/db.js";
+import getHeaders from "../helpers/get-headers.js";
 import options from "../options.js";
 import priorities from "../helpers/priorities.js";
-import getHeaders from "../helpers/get-headers.js";
 
 const dbPath = path.resolve(options.directory, "db");
 
@@ -73,37 +72,6 @@ export function processItem(itemId, queue) {
 }
 
 /**
- * Get all tags from items
- *
- * @return  {Array}  Tags array
- */
-export function getTags() {
-    kufarDb.read();
-
-    let tags = [];
-
-    for (const itemId in kufarDb.data) {
-        const item = kufarDb.data[itemId];
-
-        if (item?.tags.length) {
-            item.tags.forEach((tag) => {
-                if (!tags.includes(tag)) {
-                    tags.push(tag);
-                }
-            });
-        }
-    }
-
-    // fitler tags
-    tags = tags
-        .filter((item) => item)
-        .map((item) => item.toLowerCase().trim())
-        .filter((item, index, array) => array.indexOf(item) === index);
-
-    return tags;
-}
-
-/**
  * Update all items with tags
  *
  * @param   {Object}  queue  Queue instance
@@ -111,7 +79,7 @@ export function getTags() {
  * @return  {Boolean}        Result
  */
 export async function updateWithTags(queue) {
-    const tags = getTags();
+    const tags = getTags(kufarDb, "Kufar");
 
     log(`Update items with tags: ${tags.join(", ")}`);
 
@@ -132,7 +100,7 @@ export async function updateWithTags(queue) {
 export async function updateItems(queue) {
     kufarDb.read();
 
-    const items = getItems(kufarDb, "kufar");
+    const items = getItems(kufarDb, "Kufar");
 
     log(`Update ${items.length} items`);
 
@@ -188,9 +156,10 @@ export async function getItemsByQuery(queue, query = options.query) {
                                 cursor: cursor || "",
                             },
 
-                            timeout: options.timeout,
-                            headers: getHeaders(),
                             method: "GET",
+
+                            headers: getHeaders(),
+                            timeout: options.timeout,
                         }
                     );
 
