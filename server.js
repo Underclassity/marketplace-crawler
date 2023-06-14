@@ -32,13 +32,21 @@ app.use(cors());
 app.use(express.static(downloadFolderPath));
 app.use(morgan("combined"));
 
+const adapters = getAdaptersIds();
+
+for (const adapter of adapters) {
+    app.use(
+        `/static/${adapter}`,
+        express.static(path.resolve(options.directory, "download", adapter))
+    );
+}
+
 app.get("/adapters", (req, res) => {
     return res.json({ adapters: getAdaptersIds() });
 });
 
 app.get("/adapters/:id", (req, res) => {
     const { id } = req.params;
-    const adapters = getAdaptersIds();
 
     const page = parseInt(req.query.page || 1, 10);
     const limit = parseInt(req.query.limit || 100, 10);
@@ -88,6 +96,46 @@ app.get("/adapters/:id", (req, res) => {
     );
 
     return res.json({ items, count: allItemsIDs.length, error: false });
+});
+
+app.get("/files/:id/:itemId", (req, res) => {
+    const { id, itemId } = req.params;
+
+    if (!adapters.includes(id)) {
+        return res.json({
+            files: [],
+            count: 0,
+            error: `${id} not found in adapters`,
+        });
+    }
+
+    const dbPrefix = `${id}-files`;
+
+    if (!(dbPrefix in dbCache)) {
+        dbCache[dbPrefix] = new LowSync(
+            new JSONFileSync(path.resolve(dbPath, `${dbPrefix}.json`))
+        );
+    }
+
+    dbCache[dbPrefix].read();
+
+    if (!(itemId in dbCache[dbPrefix].data)) {
+        return res.json({
+            files: {},
+            count: 0,
+            error: `${itemId} not found in database`,
+        });
+    }
+
+    const files = dbCache[dbPrefix].data[itemId].map(
+        (filepath) => path.parse(filepath).base
+    );
+
+    return res.json({
+        files,
+        count: files.length,
+        error: false,
+    });
 });
 
 app.listen(port, () => {

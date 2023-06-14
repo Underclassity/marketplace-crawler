@@ -1,11 +1,13 @@
 import axios from "axios";
 
+import ItemBlock from "../../components/ItemBlock/ItemBlock.vue";
 import PaginationBlock from "../../components/PaginationBlock/PaginationBlock.vue";
 
 export default {
     name: "AdapterView",
 
     components: {
+        ItemBlock,
         PaginationBlock,
     },
 
@@ -42,6 +44,18 @@ export default {
             } catch (error) {
                 console.log(error.message);
             }
+        },
+
+        changeRoute() {
+            let { page, limit, isPhotos } = this;
+
+            this.$router.push({
+                query: {
+                    page,
+                    limit,
+                    photos: isPhotos,
+                },
+            });
         },
 
         getRouterParams() {

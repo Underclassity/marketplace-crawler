@@ -335,12 +335,24 @@ export function addReview(
         return false;
     }
 
-    if (!(reviewId in db.data[itemId].reviews) && !options.force) {
+    if (options.force) {
         db.data[itemId].reviews[reviewId] = review;
         dbWrite(db, write, prefix);
 
-        logMsg(`Add new review ${reviewId} in DB`, itemId, prefix);
-    } else if (db.data[itemId].reviews[reviewId] != review || options.force) {
+        logMsg(`Update review ${reviewId} in DB`, itemId, prefix);
+
+        return true;
+    }
+
+    if (!(reviewId in db.data[itemId].reviews)) {
+        db.data[itemId].reviews[reviewId] = review;
+        dbWrite(db, write, prefix);
+
+        logMsg(`Force add/update review ${reviewId} in DB`, itemId, prefix);
+    } else if (
+        JSON.stringify(db.data[itemId].reviews[reviewId]) !=
+        JSON.stringify(review)
+    ) {
         db.data[itemId].reviews[reviewId] = review;
         dbWrite(db, write, prefix);
 

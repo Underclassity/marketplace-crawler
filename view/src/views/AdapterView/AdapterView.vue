@@ -1,12 +1,23 @@
 <template lang="pug">
-.title Adapter - {{ adapter }} - {{ count }} items
-.filters
-    input.filter-item(type="checkbox" id="photos" v-model="isPhotos" v-on:change="getItems")
-    label(for="photos") With photos
-.items(v-if="items")
-    .item(v-for="(item, itemId) in items" :key="itemId") ID:{{ itemId }} - {{ item.reviews }} reviews
+.main
+    .title Adapter - {{ adapter }} - {{ count }} items
+    .filters
+        .filter-item
+            input(type="checkbox" id="photos" v-model="isPhotos" v-on:change="changeRoute")
+            label(for="photos") With photos
 
-PaginationBlock(:count="count")
+        .filter-item
+            label(for="limit-select") Items per page
+            select(v-model="limit" v-on:change="changeRoute" id="limit-select")
+                option(value=10) 10
+                option(value=20) 20
+                option(value=50) 50
+                option(value=100) 100
+
+    .items(v-if="items")
+        ItemBlock(v-for="(item, itemId) in items" :key="itemId" :item="item" :itemId="itemId" :adapter="adapter")
+
+    PaginationBlock(:count="count")
 </template>
 
 <script src="./AdapterView.js"></script>
