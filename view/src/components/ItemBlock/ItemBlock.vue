@@ -1,9 +1,9 @@
 <template lang="pug">
-.item
-    .item-images(v-if="count")
+router-link.item(:to='{ name:"ItemView", params: { itemId: itemId } }')
+    .item-images
         .item-image(v-for="image of images" :key="image")
-            img(:src=`getImageSrc(image)`)
-        .item-image(v-if="count && count < 9" v-for="index in (9 - count)" :key="index")
+            img(v-lazy=`{ src: getImageSrc(image) }`)
+        .item-image(v-if="!count || count < 9" v-for="index in (9 - count)" :key="index")
 
     .item-info
         span ID:{{ itemId }}

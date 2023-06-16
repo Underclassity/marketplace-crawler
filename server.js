@@ -7,6 +7,7 @@ import { JSONFileSync } from "lowdb/node";
 import "dotenv/config";
 
 // Express.js and modules
+import { expressSharp, FsAdapter } from "express-sharp";
 import bodyParser from "body-parser";
 import compression from "compression";
 import cors from "cors";
@@ -38,7 +39,11 @@ const adapters = getAdaptersIds();
 for (const adapter of adapters) {
     app.use(
         `/static/${adapter}`,
-        express.static(path.resolve(options.directory, "download", adapter))
+        expressSharp({
+            imageAdapter: new FsAdapter(
+                path.resolve(options.directory, "download", adapter)
+            ),
+        })
     );
 }
 
@@ -102,6 +107,8 @@ app.get("/adapters/:id", (req, res) => {
     dbCache[dbPrefix].read();
     dbCache[dbFilesPrefix].read();
 
+    const count = Object.keys(dbCache[dbPrefix].data).length;
+
     let allItemsIDs = Object.keys(dbCache[dbPrefix].data).filter((itemId) => {
         if (!isPhotos) {
             return true;
@@ -150,7 +157,7 @@ app.get("/adapters/:id", (req, res) => {
         });
     }
 
-    // cut items
+    // Cut items
     const resultItemsIDs = allItemsIDs.slice(
         (page - 1) * limit,
         (page - 1) * limit + limit
@@ -169,24 +176,26 @@ app.get("/adapters/:id", (req, res) => {
     }
 
     logMsg(
-        `Get page ${page} for adapter ${id} with limit ${limit}: ${resultItemsIDs.length} items`
+        `Get page ${page} for adapter ${id} with limit ${limit}: ${resultItemsIDs.length} items from ${count}`
     );
 
     return res.json({ items, count: allItemsIDs.length, error: false });
 });
 
-app.get("/files/:id/:itemId", (req, res) => {
+app.get("/adapters/:id/:itemId", (req, res) => {
     const { id, itemId } = req.params;
 
     if (!adapters.includes(id)) {
         return res.json({
+            info: {},
             files: [],
             count: 0,
             error: `${id} not found in adapters`,
         });
     }
 
-    const dbPrefix = `${id}-files`;
+    const dbPrefix = `${id}-products`;
+    const dbFilesPrefix = `${id}-files`;
 
     if (!(dbPrefix in dbCache)) {
         dbCache[dbPrefix] = new LowSync(
@@ -194,9 +203,55 @@ app.get("/files/:id/:itemId", (req, res) => {
         );
     }
 
-    dbCache[dbPrefix].read();
+    if (!(dbFilesPrefix in dbCache)) {
+        dbCache[dbFilesPrefix] = new LowSync(
+            new JSONFileSync(path.resolve(dbPath, `${dbFilesPrefix}.json`))
+        );
+    }
 
-    if (!(itemId in dbCache[dbPrefix].data)) {
+    dbCache[dbPrefix].read();
+    dbCache[dbFilesPrefix].read();
+
+    const info = dbCache[dbPrefix].data[itemId];
+
+    const files =
+        itemId in dbCache[dbFilesPrefix].data
+            ? dbCache[dbFilesPrefix].data[itemId].map(
+                  (filepath) => path.parse(filepath).base
+              )
+            : [];
+
+    return res.json({
+        info,
+        files,
+        count: files.length,
+        error: false,
+    });
+});
+
+app.get("/files/:id/:itemId", (req, res) => {
+    const { id, itemId } = req.params;
+
+    if (!adapters.includes(id)) {
+        return res.json({
+            info: {},
+            files: [],
+            count: 0,
+            error: `${id} not found in adapters`,
+        });
+    }
+
+    const dbFilesPrefix = `${id}-files`;
+
+    if (!(dbFilesPrefix in dbCache)) {
+        dbCache[dbFilesPrefix] = new LowSync(
+            new JSONFileSync(path.resolve(dbPath, `${dbFilesPrefix}.json`))
+        );
+    }
+
+    dbCache[dbFilesPrefix].read();
+
+    if (!(itemId in dbCache[dbFilesPrefix].data)) {
         return res.json({
             files: {},
             count: 0,
@@ -204,7 +259,7 @@ app.get("/files/:id/:itemId", (req, res) => {
         });
     }
 
-    const files = dbCache[dbPrefix].data[itemId].map(
+    const files = dbCache[dbFilesPrefix].data[itemId].map(
         (filepath) => path.parse(filepath).base
     );
 

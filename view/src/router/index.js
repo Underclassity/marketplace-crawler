@@ -25,6 +25,15 @@ const routes = [
                 /* webpackChunkName: "adapters" */ "../views/AdapterView/AdapterView.vue"
             ),
     },
+
+    {
+        path: "/adapter/:id/:itemId",
+        name: "ItemView",
+        component: () =>
+            import(
+                /* webpackChunkName: "adapters" */ "../views/ItemView/ItemView.vue"
+            ),
+    },
 ];
 
 const router = createRouter({

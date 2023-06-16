@@ -64,7 +64,7 @@ export default {
         getImageSrc(image) {
             const { adapter, itemId } = this;
 
-            return `http://localhost:3000/static/${adapter}/${itemId}/${image}`;
+            return `http://localhost:3000/static/${adapter}/${itemId}/${image}?w=100&h=100&c=true`;
         },
     },
 
