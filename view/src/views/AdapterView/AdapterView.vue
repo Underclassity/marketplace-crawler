@@ -14,6 +14,15 @@
                 option(value=50) 50
                 option(value=100) 100
 
+        .filter-item
+            label(for="sort-select") Sort items
+            select(v-model="sortId" id="sort-select" v-on:change="changeRoute")
+                option(value=false) None
+                option(value="reviewsAsc") Reviews ASC
+                option(value="reviewsDesc") Reviews DESC
+                option(value="filesAsc") Files ASC
+                option(value="filesDesc") Files DESC
+
     .items(v-if="items")
         ItemBlock(v-for="(item, itemId) in items" :key="itemId" :item="item" :itemId="itemId" :adapter="adapter")
 

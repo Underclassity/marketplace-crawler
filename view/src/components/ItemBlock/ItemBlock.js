@@ -1,6 +1,6 @@
-import axios from "axios";
+// import axios from "axios";
 
-import getRandom from "../../../../src/helpers/random.js";
+// import getRandom from "../../../../src/helpers/random.js";
 
 export default {
     name: "ItemBlock",
@@ -22,36 +22,44 @@ export default {
         },
     },
 
-    data() {
-        return {
-            files: [],
-            count: 0,
-        };
-    },
+    // data() {
+    //     return {
+    //         files: [],
+    //         count: 0,
+    //     };
+    // },
 
     computed: {
-        images() {
-            let { files, count } = this;
+        // images() {
+        //     let { files, count } = this;
 
-            return count >= 9 ? getRandom(files, 9) : files;
+        //     return count >= 9 ? getRandom(files, 9) : files;
+        // },
+
+        images() {
+            return this.item.images;
+        },
+
+        count() {
+            return this.images.length;
         },
     },
 
     methods: {
-        async getImages() {
-            let { adapter, itemId } = this;
+        // async getImages() {
+        //     let { adapter, itemId } = this;
 
-            try {
-                const request = await axios(`/files/${adapter}/${itemId}`);
+        //     try {
+        //         const request = await axios(`/files/${adapter}/${itemId}`);
 
-                let { files, count } = request.data;
+        //         let { files, count } = request.data;
 
-                this.files = files;
-                this.count = count;
-            } catch (error) {
-                console.log(error.message);
-            }
-        },
+        //         this.files = files;
+        //         this.count = count;
+        //     } catch (error) {
+        //         console.log(error.message);
+        //     }
+        // },
 
         getImageSrc(image) {
             const { adapter, itemId } = this;
@@ -60,7 +68,7 @@ export default {
         },
     },
 
-    async mounted() {
-        this.getImages();
-    },
+    // async mounted() {
+    //     this.getImages();
+    // },
 };

@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import net from "node:net";
 import path from "node:path";
 
@@ -11,6 +12,10 @@ import log from "./log.js";
 import options from "../options.js";
 
 const dbPath = path.resolve(options.directory, "db");
+
+if (!fs.existsSync(dbPath)) {
+    fs.mkdirSync(dbPath);
+}
 
 const proxyAdapter = new JSONFileSync(path.resolve(dbPath, "proxy.json"));
 const proxyDb = new LowSync(proxyAdapter);
