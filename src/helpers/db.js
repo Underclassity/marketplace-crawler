@@ -26,11 +26,13 @@ export function loadDB(dbPrefix) {
             new JSONFileSync(path.resolve(dbPath, `${dbPrefix}.json`))
         );
 
-        dbCache[dbPrefix].read();
+        const db = dbCache[dbPrefix];
 
-        if (!dbCache[dbPrefix].data) {
-            dbCache[dbPrefix].data = {};
-            dbCache[dbPrefix].write();
+        db.read();
+
+        if (!db.data) {
+            db.data = {};
+            db.write();
         }
     }
 
@@ -166,12 +168,14 @@ export function addItem(prefix, itemId, data) {
 
     loadDB(dbPrefix);
 
-    if (itemId in dbCache[dbPrefix].data && !options.force) {
+    const db = dbCache[dbPrefix];
+
+    if (itemId in db.data && !options.force) {
         logMsg("Item already in DB", itemId, prefix);
     } else {
         logMsg("Add new item", itemId, prefix);
 
-        dbCache[dbPrefix].data[itemId] = {
+        db.data[itemId] = {
             id: itemId,
             reviews: {},
             tags: options.query ? [options.query] : [],
@@ -276,6 +280,8 @@ export function updateTags(prefix, itemId, tag) {
 
     loadDB(dbPrefix);
 
+    const db = dbCache[dbPrefix];
+
     if (!dbItemCheck(dbPrefix, itemId, prefix)) {
         return false;
     }
@@ -289,13 +295,13 @@ export function updateTags(prefix, itemId, tag) {
         return false;
     }
 
-    if (!("tags" in dbCache[dbPrefix].data[itemId])) {
-        dbCache[dbPrefix].data[itemId].tags = [tag];
-    } else if (!dbCache[dbPrefix].data[itemId].tags.includes(tag)) {
-        dbCache[dbPrefix].data[itemId].tags.push(tag);
+    if (!("tags" in db.data[itemId])) {
+        db.data[itemId].tags = [tag];
+        dbWrite(dbPrefix, true, prefix);
+    } else if (!db.data[itemId].tags.includes(tag)) {
+        db.data[itemId].tags.push(tag);
+        dbWrite(dbPrefix, true, prefix);
     }
-
-    dbWrite(dbPrefix, true, prefix);
 
     return true;
 }
@@ -314,6 +320,8 @@ export function updateBrand(prefix, itemId, brand) {
 
     loadDB(dbPrefix);
 
+    const db = dbCache[dbPrefix];
+
     if (!dbItemCheck(dbPrefix, itemId, prefix)) {
         return false;
     }
@@ -328,8 +336,8 @@ export function updateBrand(prefix, itemId, brand) {
     }
 
     // Add brand id if not defined
-    if (!("brand" in dbCache[dbPrefix].data[itemId])) {
-        dbCache[dbPrefix].data[itemId].brand = brand;
+    if (!("brand" in db.data[itemId])) {
+        db.data[itemId].brand = brand;
         dbWrite(dbPrefix, true, prefix);
     }
 
@@ -348,16 +356,18 @@ export function getItems(prefix = false) {
 
     loadDB(dbPrefix);
 
-    if (!dbCache[dbPrefix] || !dbCache[dbPrefix].write) {
+    const db = dbCache[dbPrefix];
+
+    if (!db || !db.write) {
         logMsg("DB not defined!", false, prefix);
         return false;
     }
 
     const time = options.time * 60 * 60 * 1000;
 
-    return Object.keys(dbCache[dbPrefix].data)
+    return Object.keys(db.data)
         .filter((id) => {
-            const item = dbCache[dbPrefix].data[id];
+            const item = db.data[id];
 
             if (
                 item?.time &&
@@ -400,17 +410,19 @@ export function getBrands(prefix) {
 
     loadDB(dbPrefix);
 
-    if (!dbCache[dbPrefix] || !dbCache[dbPrefix].write) {
+    const db = dbCache[dbPrefix];
+
+    if (!db || !db.write) {
         logMsg("DB not defined!", false, prefix);
         return false;
     }
 
-    dbCache[dbPrefix].read();
+    db.read();
 
     let brands = [];
 
-    for (const itemId in dbCache[dbPrefix].data) {
-        const item = dbCache[dbPrefix].data[itemId];
+    for (const itemId in db.data) {
+        const item = db.data[itemId];
 
         if (item?.brand?.length && !brands.includes(item.brand)) {
             brands.push(item.brand);
@@ -438,17 +450,19 @@ export function getTags(prefix = false) {
 
     loadDB(dbPrefix);
 
-    if (!dbCache[dbPrefix] || !dbCache[dbPrefix].write) {
+    const db = dbCache[dbPrefix];
+
+    if (!db || !db.write) {
         logMsg("DB not defined!", false, prefix);
         return false;
     }
 
-    dbCache[dbPrefix].read();
+    db.read();
 
     let tags = [];
 
-    for (const itemId in dbCache[dbPrefix].data) {
-        const item = dbCache[dbPrefix].data[itemId];
+    for (const itemId in db.data) {
+        const item = db.data[itemId];
 
         if (item?.tags.length) {
             item.tags.forEach((tag) => {
@@ -485,8 +499,6 @@ export function getReview(prefix, itemId, reviewId) {
     }
 
     if (!item.reviews.includes(reviewId)) {
-        console.log(item.reviews, reviewId, item.reviews.includes(reviewId));
-
         return false;
     }
 
@@ -532,23 +544,25 @@ export function addReview(prefix, itemId, reviewId, review, write = true) {
         return true;
     }
 
-    if (!dbCache[dbProductsPrefix].data[itemId]?.reviews?.includes(reviewId)) {
-        dbCache[dbProductsPrefix].data[itemId].reviews.push(reviewId);
+    const reviewsDB = dbCache[dbReviewsPrefix];
+    const productsDB = dbCache[dbProductsPrefix];
+
+    if (!productsDB.data[itemId]?.reviews?.includes(reviewId)) {
+        productsDB.data[itemId].reviews.push(reviewId);
         dbWrite(dbProductsPrefix, true, prefix);
     }
 
-    if (!(reviewId in dbCache[dbReviewsPrefix].data)) {
-        dbCache[dbReviewsPrefix].data[reviewId] = review;
+    if (!(reviewId in reviewsDB.data)) {
+        reviewsDB.data[reviewId] = review;
         dbWrite(dbReviewsPrefix, write, prefix);
 
         logMsg(`Force add/update review ${reviewId} in DB`, itemId, prefix);
     } else if (
-        JSON.stringify(dbCache[dbReviewsPrefix].data[reviewId]) ==
-        JSON.stringify(review)
+        JSON.stringify(reviewsDB.data[reviewId]) == JSON.stringify(review)
     ) {
         logMsg(`Review ${reviewId} already saved in DB`, itemId, prefix);
     } else {
-        dbCache[dbReviewsPrefix].data[reviewId] = review;
+        reviewsDB.data[reviewId] = review;
         dbWrite(dbReviewsPrefix, write, prefix);
 
         logMsg(`Update review ${reviewId} in DB`, itemId, prefix);
@@ -581,15 +595,14 @@ export function updateFiles(prefix, itemId) {
 
     loadDB(dbPrefix);
 
+    const db = dbCache[dbPrefix];
+
     const folderFiles = getFiles(folderPath)
         .map((filepath) => path.basename(filepath))
         .sort();
 
-    if (
-        !(itemId in dbCache[dbPrefix].data) ||
-        dbCache[dbPrefix].data[itemId] != folderFiles
-    ) {
-        dbCache[dbPrefix].data[itemId] = folderFiles;
+    if (!(itemId in db.data) || db.data[itemId] != folderFiles) {
+        db.data[itemId] = folderFiles;
         dbWrite(dbPrefix, true, prefix);
     }
 
