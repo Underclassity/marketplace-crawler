@@ -59,9 +59,7 @@ function getRandomFilesIds(adapter, itemId) {
     dbCache[dbPrefix].read();
 
     if (itemId in dbCache[dbPrefix].data) {
-        const files = dbCache[dbPrefix].data[itemId].map(
-            (filepath) => path.parse(filepath).base
-        );
+        const files = dbCache[dbPrefix].data[itemId];
 
         return files.length >= 9 ? getRandom(files, 9) : files;
     } else {
@@ -216,9 +214,7 @@ app.get("/adapters/:id/:itemId", (req, res) => {
 
     const files =
         itemId in dbCache[dbFilesPrefix].data
-            ? dbCache[dbFilesPrefix].data[itemId].map(
-                  (filepath) => path.parse(filepath).base
-              )
+            ? dbCache[dbFilesPrefix].data[itemId]
             : [];
 
     return res.json({
@@ -259,9 +255,7 @@ app.get("/files/:id/:itemId", (req, res) => {
         });
     }
 
-    const files = dbCache[dbFilesPrefix].data[itemId].map(
-        (filepath) => path.parse(filepath).base
-    );
+    const files = dbCache[dbFilesPrefix].data[itemId];
 
     return res.json({
         files,
