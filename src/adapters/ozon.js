@@ -1,40 +1,31 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { LowSync } from "lowdb";
-import { JSONFileSync } from "lowdb/node";
-
 import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import AdblockerPlugin from "puppeteer-extra-plugin-adblocker";
 
 // import browserClose from "../helpers/browser-close.js";
 import { logQueue } from "../helpers/log-msg.js";
-import { updateTime, updateTags, getItems, addReview } from "../helpers/db.js";
+import {
+    addItem,
+    addReview,
+    getItem,
+    getItems,
+    updateTags,
+    updateTime,
+} from "../helpers/db.js";
 import autoScroll from "../helpers/auto-scroll.js";
 import createPage from "../helpers/create-page.js";
 import downloadItem from "../helpers/download.js";
 import goSettings from "../helpers/go-settings.js";
-import log from "../helpers/log.js";
-import options from "../options.js";
-import priorities from "../helpers/priorities.js";
+import logMsg from "../helpers/log-msg.js";
 import sleep from "../helpers/sleep.js";
 
-const dbPath = path.resolve(options.directory, "db");
+import options from "../options.js";
+import priorities from "../helpers/priorities.js";
 
-if (!fs.existsSync(dbPath)) {
-    fs.mkdirSync(dbPath);
-}
-
-const ozonAdapter = new JSONFileSync(path.resolve(dbPath, "ozon.json"));
-const ozonDb = new LowSync(ozonAdapter);
-
-ozonDb.read();
-
-if (!ozonDb.data) {
-    ozonDb.data = {};
-    ozonDb.write();
-}
+const prefix = "ozon";
 
 // Configure puppeteer
 puppeteer.use(
@@ -45,14 +36,8 @@ puppeteer.use(
 
 puppeteer.use(StealthPlugin());
 
-function logMsg(msg, id) {
-    const query = options.query || "";
-
-    if (id) {
-        return log(`[Ozon] ${query}: ${id} - ${msg}`);
-    }
-
-    return log(`[Ozon] ${query}: ${msg}`);
+function log(msg, id) {
+    return logMsg(msg, id, prefix);
 }
 
 /**
@@ -101,20 +86,22 @@ async function download(id, queue, url, type = "photo", uuid) {
  * @return  {Boolean}          Result
  */
 export async function getOzonItem(link, id, queue, browser) {
-    logMsg("Try to get reviews", id);
+    log("Try to get reviews", id);
 
     if (!link) {
-        if (id in ozonDb.data) {
-            link = ozonDb.data[id].link;
-            logMsg("Link found in DB", id);
+        const dbItem = getItem(prefix, id);
+
+        if (dbItem?.link) {
+            link = dbItem.link;
+            log("Link found in DB", id);
         } else {
-            logMsg(`${id} not found in db`);
+            log(`${id} not found in db`);
             return false;
         }
     }
 
     if (!browser) {
-        logMsg("Browser not defined!");
+        log("Browser not defined!");
         return false;
     }
 
@@ -141,7 +128,7 @@ export async function getOzonItem(link, id, queue, browser) {
 
         reviewsTimeout = setTimeout(() => {
             if (!isReviews) {
-                logMsg(`No reviews found by timeout`, id);
+                log(`No reviews found by timeout`, id);
                 isReviews = true;
             }
         }, options.timeout);
@@ -166,7 +153,7 @@ export async function getOzonItem(link, id, queue, browser) {
         try {
             data = await response.json();
         } catch (error) {
-            console.log(error.message);
+            log(error.message, id);
             return false;
         }
 
@@ -185,11 +172,11 @@ export async function getOzonItem(link, id, queue, browser) {
 
             resultReviews[reviewId] = reviewItem;
 
-            addReview(ozonDb, id, reviewId, reviewItem, "Ozon", false);
+            addReview(prefix, id, reviewId, reviewItem, true);
         }
 
         if (Object.keys(resultReviews).length == reviews.length) {
-            logMsg(`All reviews found`, id);
+            log(`All reviews found`, id);
             isReviews = true;
         }
 
@@ -212,24 +199,9 @@ export async function getOzonItem(link, id, queue, browser) {
                 .map((element) => element.getAttribute("data-review-uuid"));
         });
 
-        logMsg(`Found ${reviews.length} reviews`, id);
+        log(`Found ${reviews.length} reviews`, id);
 
-        if (!reviews.length) {
-            logMsg("Ended", id);
-
-            isReviews = true;
-
-            if (page?.close) {
-                await page.close();
-                page = undefined;
-            }
-
-            updateTime(ozonDb, id);
-            updateTags(ozonDb, id, options.query);
-
-            // await browserClose(browser);
-            // return false;
-        } else {
+        if (reviews.length) {
             const reviewsPageLink = `${link}/reviews?reviewPuuid=${reviews[0]}&itemId=${id}&reviewsVariantMode=2&page=1`;
 
             await page.goto(reviewsPageLink, goSettings);
@@ -244,6 +216,21 @@ export async function getOzonItem(link, id, queue, browser) {
 
                 return links.length;
             }, `${link}/reviews`);
+        } else {
+            log("Ended", id);
+
+            isReviews = true;
+
+            if (page?.close) {
+                await page.close();
+                page = undefined;
+            }
+
+            updateTime(prefix, id);
+            updateTags(prefix, id, options.query);
+
+            // await browserClose(browser);
+            // return false;
         }
 
         clearReviewsTimeout();
@@ -252,10 +239,10 @@ export async function getOzonItem(link, id, queue, browser) {
         let emptyDiffCount = 0;
 
         if (isLinksNavigation > 1) {
-            logMsg(`Process ${isLinksNavigation} reviews pages`, id);
+            log(`Process ${isLinksNavigation} reviews pages`, id);
 
             for (let pageId = 2; pageId <= isLinksNavigation; pageId++) {
-                logMsg(`Go to reviews page ${pageId}`, id);
+                log(`Go to reviews page ${pageId}`, id);
 
                 const reviewsPageLink = `${link}/reviews?reviewPuuid=${reviews[0]}&itemId=${id}&reviewsVariantMode=2&page=${pageId}`;
 
@@ -287,7 +274,7 @@ export async function getOzonItem(link, id, queue, browser) {
                         }
 
                         if (emptyDiffCount > 50) {
-                            logMsg("End by count", id);
+                            log("End by count", id);
 
                             isReviews = true;
                         }
@@ -300,13 +287,13 @@ export async function getOzonItem(link, id, queue, browser) {
             }
         }
 
-        logMsg(`Process ${Object.keys(resultReviews).length} reviews`, id);
+        log(`Process ${Object.keys(resultReviews).length} reviews`, id);
 
         if (Object.keys(resultReviews).length) {
             for (const reviewId in resultReviews) {
                 const reviewItem = resultReviews[reviewId];
 
-                addReview(ozonDb, id, reviewId, reviewItem, "Ozon", false);
+                addReview(prefix, id, reviewId, reviewItem, true);
 
                 if (reviewItem.content.photos.length) {
                     for (const photoItem of reviewItem.content.photos) {
@@ -332,17 +319,15 @@ export async function getOzonItem(link, id, queue, browser) {
                     }
                 }
             }
-
-            ozonDb.write();
         }
 
-        updateTime(ozonDb, id);
-        updateTags(ozonDb, id, options.query);
+        updateTime(prefix, id);
+        updateTags(prefix, id, options.query);
 
         // await page.close();
         // await browserClose(browser);
     } catch (error) {
-        logMsg(`Error: ${error.message}`, id);
+        log(`Error: ${error.message}`, id);
 
         // await page.close();
         // await browserClose(browser);
@@ -353,7 +338,7 @@ export async function getOzonItem(link, id, queue, browser) {
         page = undefined;
     }
 
-    logMsg("Ended", id);
+    log("Ended", id);
 
     return true;
 }
@@ -366,19 +351,17 @@ export async function getOzonItem(link, id, queue, browser) {
  * @return  {Boolean}        Result
  */
 export async function updateItems(queue) {
-    ozonDb.read();
-
     const browser = await puppeteer.launch({
         headless: options.headless,
         devtools: options.headless ? false : true,
     });
 
-    const items = getItems(ozonDb, "Ozon");
+    const items = getItems(prefix);
 
-    logMsg(`Update ${items.length} items`);
+    log(`Update ${items.length} items`);
 
     items.forEach((itemId) => {
-        const item = ozonDb.data[itemId];
+        const item = getItem(prefix, itemId);
 
         queue.add(() => getOzonItem(item.link, itemId, queue, browser), {
             priority: priorities.item,
@@ -396,17 +379,15 @@ export async function updateItems(queue) {
  * @return  {Boolean}        Result
  */
 export async function updateReviews(queue) {
-    ozonDb.read();
+    const items = getItems(prefix);
 
-    const items = getItems(ozonDb, "Ozon");
-
-    logMsg(`Update ${items.length} items reviews`);
+    log(`Update ${items.length} items reviews`);
 
     items.forEach((itemId) => {
-        const item = ozonDb.data[itemId];
+        const item = getItem(prefix, itemId);
 
-        if (!("reviews" in item) || !Object.keys(item.reviews).length) {
-            return;
+        if (!item?.reviews?.length) {
+            return false;
         }
 
         for (const reviewId in item.reviews) {
@@ -463,7 +444,7 @@ export async function getItemsByQuery(queue) {
                     return true;
                 }
 
-                logMsg(`Try to get page ${pageId}`);
+                log(`Try to get page ${pageId}`);
 
                 let page;
 
@@ -492,9 +473,7 @@ export async function getItemsByQuery(queue) {
                         });
                     });
 
-                    logMsg(
-                        `Page ${pageId} items ${items.length} before filter`
-                    );
+                    log(`Page ${pageId} items ${items.length} before filter`);
 
                     items = items
                         .filter((item) => item)
@@ -522,24 +501,24 @@ export async function getItemsByQuery(queue) {
 
                         const time = options.time * 60 * 60 * 1000;
 
-                        const dbReviewItem = ozonDb.data[id];
+                        const dbReviewItem = getItem(prefix, id);
 
                         if (
                             dbReviewItem?.time &&
                             Date.now() - dbReviewItem.time <= time &&
                             !options.force
                         ) {
-                            logMsg(`Already updated by time`, id);
+                            log(`Already updated by time`, id);
                             return false;
                         }
 
                         return true;
                     });
 
-                    logMsg(`Page ${pageId} items ${items.length} after filter`);
+                    log(`Page ${pageId} items ${items.length} after filter`);
 
                     if (!beforeFilterCount) {
-                        logMsg(`Page ${pageId} items not found`);
+                        log(`Page ${pageId} items not found`);
 
                         pageId = options.pages + 1;
                         ended = true;
@@ -552,13 +531,11 @@ export async function getItemsByQuery(queue) {
                             10
                         );
 
-                        if (!(id in ozonDb.data)) {
-                            ozonDb.data[id] = {
-                                link: result,
-                            };
-                        }
+                        addItem(prefix, id, {
+                            link: result,
+                        });
 
-                        logMsg(`Add item ${id} on page ${pageId} for process`);
+                        log(`Add item ${id} on page ${pageId} for process`);
 
                         queue.add(
                             () => getOzonItem(result, id, queue, browser),
@@ -568,10 +545,9 @@ export async function getItemsByQuery(queue) {
                         );
                     }
 
-                    logMsg(`Found ${items.length} items on page ${pageId}`);
+                    log(`Found ${items.length} items on page ${pageId}`);
                 } catch (error) {
-                    logMsg(`Page ${pageId} failed`);
-                    console.log(error.message);
+                    log(`Page ${pageId} failed: ${error.message}`);
                 }
 
                 if (page) {

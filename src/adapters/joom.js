@@ -1,39 +1,29 @@
-import fs from "node:fs";
 import path from "node:path";
 
 import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import AdblockerPlugin from "puppeteer-extra-plugin-adblocker";
 
-import { LowSync } from "lowdb";
-import { JSONFileSync } from "lowdb/node";
-
 import { scrollTick, autoScroll } from "../helpers/auto-scroll.js";
-import { updateTime, updateTags, getItems } from "../helpers/db.js";
+import {
+    addItem,
+    addReview,
+    getItem,
+    getItems,
+    updateTags,
+    updateTime,
+} from "../helpers/db.js";
 import browserConfig from "../helpers/browser-config.js";
 import createPage from "../helpers/create-page.js";
 import downloadItem from "../helpers/download.js";
 import goSettings from "../helpers/go-settings.js";
-import log from "../helpers/log.js";
-import options from "../options.js";
-import priorities from "../helpers/priorities.js";
+import logMsg from "../helpers/log-msg.js";
 import sleep from "../helpers/sleep.js";
 
-const dbPath = path.resolve(options.directory, "db");
+import options from "../options.js";
+import priorities from "../helpers/priorities.js";
 
-if (!fs.existsSync(dbPath)) {
-    fs.mkdirSync(dbPath);
-}
-
-const joomAdapter = new JSONFileSync(path.resolve(dbPath, "joom.json"));
-const joomDb = new LowSync(joomAdapter);
-
-joomDb.read();
-
-if (!joomDb.data) {
-    joomDb.data = {};
-    joomDb.write();
-}
+const prefix = "joom";
 
 // Configure puppeteer
 puppeteer.use(
@@ -44,14 +34,8 @@ puppeteer.use(
 
 puppeteer.use(StealthPlugin());
 
-function logMsg(msg, id) {
-    const query = options.query || "";
-
-    if (id) {
-        return log(`[Joom] ${query}: ${id} - ${msg}`);
-    }
-
-    return log(`[Joom] ${query}: ${msg}`);
+function log(msg, id) {
+    return logMsg(msg, id, prefix);
 }
 
 /**
@@ -59,31 +43,21 @@ function logMsg(msg, id) {
  *
  * @param   {Number}  id        Item ID
  * @param   {Object}  feedback  Feedback object
- * @param   {Object}  queue     Queue
  *
  * @return  {Boolean}           Result
  */
-export async function getFeedback(id, feedback, queue) {
+export async function getFeedback(id, feedback) {
     if (!id) {
-        logMsg("ID not defined!");
+        log("ID not defined!");
         return false;
     }
 
     if (!feedback) {
-        logMsg("Feedback not defined!", id);
+        log("Feedback not defined!", id);
         return false;
     }
 
-    if (!("reviews" in joomDb.data[id])) {
-        joomDb.data[id].reviews = {};
-        joomDb.write();
-    }
-
-    if (!(feedback.id in joomDb.data[id].reviews)) {
-        logMsg(`Add new review ${feedback.id}`, id);
-        joomDb.data[id].reviews[feedback.id] = feedback;
-        joomDb.write();
-    }
+    addReview(prefix, id, feedback.id, feedback, true);
 
     if (!options.download) {
         return true;
@@ -92,12 +66,20 @@ export async function getFeedback(id, feedback, queue) {
     return true;
 }
 
-export async function getItem(id, browser, queue) {
+/**
+ * Get item by ID
+ *
+ * @param   {String}  id       Item ID
+ * @param   {Object}  browser  Puppeteer browser instance
+ *
+ * @return  {Boolean}          Result
+ */
+export async function getItemById(id, browser) {
     if (!id) {
         return false;
     }
 
-    logMsg(`Try to get item`, id);
+    log(`Try to get item`, id);
 
     const page = await createPage(browser, false);
 
@@ -122,13 +104,9 @@ export async function getItem(id, browser, queue) {
         try {
             let { payload } = await response.json();
 
-            logMsg("Reviews data get", id);
+            log("Reviews data get", id);
 
             if (payload?.items?.length) {
-                if (!("reviews" in joomDb.data[id])) {
-                    joomDb.data[id].reviews = {};
-                }
-
                 for (const reviewItem of payload.items) {
                     if (
                         [
@@ -145,13 +123,8 @@ export async function getItem(id, browser, queue) {
                         continue;
                     }
 
-                    if (!(reviewItem.id in joomDb.data[id].reviews)) {
-                        logMsg(`Add new review ${reviewItem.id}`, id);
-                        joomDb.data[id].reviews[reviewItem.id] = reviewItem;
-                    }
+                    addReview(prefix, id, reviewItem.id, reviewItem, true);
                 }
-
-                joomDb.write();
             }
 
             if (payload.nextPageToken) {
@@ -162,20 +135,19 @@ export async function getItem(id, browser, queue) {
 
                 clearTimeout(getReviewsTimeout);
                 getReviewsTimeout = setTimeout(() => {
-                    if (
-                        Object.keys(joomDb.data[id].reviews).length ==
-                        reviewsCount
-                    ) {
+                    const item = getItem(prefix, id);
+
+                    if (item.reviews.length == reviewsCount) {
                         isReviewsData = false;
-                        logMsg("Clear reviews data timeout", id);
+                        log("Clear reviews data timeout", id);
                     }
                 }, options.timeout);
             } else {
                 isReviewsData = false;
-                logMsg("Get all data", id);
+                log("Get all data", id);
             }
         } catch (error) {
-            logMsg(`Get reviews error: ${error.message}`, id);
+            log(`Get reviews error: ${error.message}`, id);
             return false;
         }
     });
@@ -197,19 +169,21 @@ export async function getItem(id, browser, queue) {
                 : 0;
         });
 
-        const dbReviewsCount = Object.keys(joomDb.data[id].reviews).length;
+        const dbItem = getItem(prefix, id);
+
+        const dbReviewsCount = dbItem.reviews.length;
 
         if (reviewsCount && dbReviewsCount == reviewsCount) {
             clearTimeout(getReviewsTimeout);
             isReviewsData = false;
-            logMsg(
+            log(
                 `Saved DB reviews ${dbReviewsCount} equal to parsed ${reviewsCount}`,
                 id
             );
         } else if (!reviewsCount) {
             clearTimeout(getReviewsTimeout);
             isReviewsData = false;
-            logMsg("Reviews not found", id);
+            log("Reviews not found", id);
         }
 
         while (isReviewsData) {
@@ -238,13 +212,13 @@ export async function getItem(id, browser, queue) {
             // }
         }
     } catch (error) {
-        logMsg(`Get item error: ${error.message}`, id);
+        log(`Get item error: ${error.message}`, id);
     }
 
-    updateTime(joomDb, id);
-    updateTags(joomDb, id, options.query);
+    updateTime(prefix, id);
+    updateTags(prefix, id, options.query);
 
-    logMsg("Close page", id);
+    log("Close page", id);
 
     await page.close();
 
@@ -259,16 +233,14 @@ export async function getItem(id, browser, queue) {
  * @return  {Boolean}        Result
  */
 export async function updateItems(queue) {
-    joomDb.read();
-
     const browser = await puppeteer.launch(browserConfig);
 
-    const items = getItems(joomDb, "Joom");
+    const items = getItems(prefix);
 
-    logMsg(`Update ${items.length} items`);
+    log(`Update ${items.length} items`);
 
-    getItems(joomDb, "Joom").forEach((itemId) => {
-        queue.add(() => getItem(itemId, browser, queue), {
+    items.forEach((itemId) => {
+        queue.add(() => getItemById(itemId, browser, queue), {
             priority: priorities.item,
         });
     });
@@ -279,7 +251,7 @@ export async function updateItems(queue) {
 
     console.dir(queue.isPaused);
 
-    logMsg("Close browser");
+    log("Close browser");
 
     await browser.close();
 
@@ -294,14 +266,14 @@ export async function updateItems(queue) {
  * @return  {Boolean}        Result
  */
 export function updateReviews(queue) {
-    logMsg("Update reviews");
+    const items = getItems(prefix);
 
-    joomDb.read();
+    log(`Update ${items.length} items reviews`);
 
-    getItems(joomDb, "Joom").forEach((itemId) => {
-        const item = joomDb.data[itemId];
+    items.forEach((itemId) => {
+        const item = getItem(prefix, itemId);
 
-        if (!("reviews" in item) || !Object.keys(item.reviews).length) {
+        if (!item?.reviews?.length) {
             return false;
         }
 
@@ -367,8 +339,8 @@ export function updateReviews(queue) {
  *
  * @return  {Boolean}        Result
  */
-export async function getItemsByQuery(queue) {
-    logMsg(`Get items call`);
+export async function getItemsByQuery() {
+    log(`Get items call`);
 
     const browser = await puppeteer.launch(browserConfig);
 
@@ -397,33 +369,33 @@ export async function getItemsByQuery(queue) {
             data = await response.json();
 
             for (const item of data.payload.items) {
-                if (item.id in joomDb.data) {
-                    continue;
+                const data = item.content.product;
+
+                if (data?.eventParams) {
+                    delete data.eventParams;
                 }
 
-                joomDb.data[item.id] = item.content.product;
-
-                if (joomDb.data[item.id]?.eventParams) {
-                    delete joomDb.data[item.id].eventParams;
+                if (data?.patch?.eventParams) {
+                    delete data.patch.eventParams;
                 }
 
-                if (joomDb.data[item.id]?.patch?.eventParams) {
-                    delete joomDb.data[item.id].patch.eventParams;
-                }
+                log(`Add new item ${item.id}`);
 
-                logMsg(`Add new item ${item.id}`);
+                addItem(prefix, item.id, {
+                    ...data,
+                });
 
-                updateTime(joomDb, item.id);
-                updateTags(joomDb, item.id, options.query);
+                updateTime(prefix, item.id);
+                updateTags(prefix, item.id, options.query);
             }
 
             clearTimeout(getDataTimeout);
             getDataTimeout = setTimeout(() => {
                 isData = false;
-                logMsg("Clear data timeout");
+                log("Clear data timeout");
             }, options.timeout);
         } catch (error) {
-            logMsg(`Get data error: ${error.message}`);
+            log(`Get data error: ${error.message}`);
             return false;
         }
     });
@@ -448,14 +420,12 @@ export async function getItemsByQuery(queue) {
         );
 
         for (const id of productIds) {
-            if (id in joomDb.data) {
-                continue;
-            }
+            log(`Add new item ${id}`);
 
-            logMsg(`Add new item ${id}`);
+            addItem(prefix, id);
 
-            updateTime(joomDb, id);
-            updateTags(joomDb, id, options.query);
+            updateTime(prefix, id);
+            updateTags(prefix, id, options.query);
         }
 
         const isNext = await page.evaluate(() => {
@@ -472,24 +442,24 @@ export async function getItemsByQuery(queue) {
         });
 
         if (isNext) {
-            logMsg("Try load next pages");
+            log("Try load next pages");
 
             while (isData) {
                 await scrollTick(page);
                 await sleep(1000);
 
-                logMsg("Scroll tick");
+                log("Scroll tick");
             }
         } else {
-            logMsg("No pages found");
+            log("No pages found");
         }
     } catch (error) {
-        logMsg(`Page error: ${error.message}`);
+        log(`Page error: ${error.message}`);
     }
 
     // await sleep(600000);
 
-    logMsg("Close browser");
+    log("Close browser");
 
     await page.close();
     await browser.close();

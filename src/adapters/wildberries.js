@@ -3,14 +3,16 @@ import path from "node:path";
 
 import axios from "axios";
 
-import { LowSync } from "lowdb";
-import { JSONFileSync } from "lowdb/node";
-
 import {
+    // addItem,
+    // getReview,
     addReview,
+    getBrands,
+    getItem,
     getItems,
     getTags,
     updateBrand,
+    updateItem,
     updateTags,
     updateTime,
 } from "../helpers/db.js";
@@ -21,47 +23,10 @@ import logMsg from "../helpers/log-msg.js";
 import options from "../options.js";
 import priorities from "../helpers/priorities.js";
 
-const dbPath = path.resolve(options.directory, "db");
-
-if (!fs.existsSync(dbPath)) {
-    fs.mkdirSync(dbPath);
-}
-
-const wildberriesAdapter = new JSONFileSync(
-    path.resolve(dbPath, "wildberries.json")
-);
-const wildberriesDb = new LowSync(wildberriesAdapter);
-
-wildberriesDb.read();
-
-if (!wildberriesDb.data) {
-    wildberriesDb.data = {};
-    wildberriesDb.write();
-}
+const prefix = "wildberries";
 
 function log(msg, id = false) {
-    return logMsg(msg, id, "Wildberries");
-}
-
-/**
- * Get all brands IDs from DB
- *
- * @return  {Array}  Brand IDs array
- */
-export function getBrands() {
-    wildberriesDb.read();
-
-    const brandsIds = [];
-
-    for (const itemId in wildberriesDb.data) {
-        const dbItem = wildberriesDb.data[itemId];
-
-        if (dbItem.brand && !brandsIds.includes(dbItem.brand)) {
-            brandsIds.push(dbItem.brand);
-        }
-    }
-
-    return brandsIds;
+    return logMsg(msg, id, prefix);
 }
 
 /**
@@ -84,7 +49,7 @@ export async function getFeedback(id, feedback, queue) {
         return false;
     }
 
-    addReview(wildberriesDb, id, feedback.id, feedback, "wildberries");
+    addReview(prefix, id, feedback.id, feedback, true);
 
     if (!options.download) {
         return true;
@@ -234,16 +199,6 @@ export async function getPriceInfo(id) {
 export async function getFeedbacks(id, queue) {
     log("Feedbacks get", id);
 
-    if (!wildberriesDb.data[id]) {
-        wildberriesDb.data[id] = {};
-        wildberriesDb.write();
-    }
-
-    if (!("reviews" in wildberriesDb.data[id])) {
-        wildberriesDb.data[id].reviews = {};
-        wildberriesDb.write();
-    }
-
     // const feedbacks = [];
 
     // let stoped = false;
@@ -269,17 +224,8 @@ export async function getFeedbacks(id, queue) {
         log(`Found ${feedbacks.length} feedbacks items`, id);
 
         for (const feedback of feedbacks) {
-            addReview(
-                wildberriesDb,
-                id,
-                feedback.id,
-                feedback,
-                "Wildberries",
-                false
-            );
+            addReview(prefix, id, feedback.id, feedback, true);
         }
-
-        wildberriesDb.write();
 
         for (const feedback of feedbacks) {
             queue.add(async () => getFeedback(id, feedback, queue), {
@@ -291,21 +237,26 @@ export async function getFeedbacks(id, queue) {
     const priceInfo = isResult ? await getPriceInfo(id) : false;
 
     if (priceInfo) {
-        if (!("prices" in wildberriesDb.data[id])) {
-            wildberriesDb.data[id].prices = [];
+        const item = getItem(prefix, id);
+
+        if (!("prices" in item)) {
+            updateItem(prefix, id, {
+                prices: [],
+            });
         }
 
         for (const price of priceInfo) {
-            if (!wildberriesDb.data[id].prices.includes(price)) {
-                wildberriesDb.data[id].prices.push(price);
-                wildberriesDb.write();
+            if (!item.prices.includes(price)) {
+                updateItem(prefix, id, {
+                    prices: item.prices.concat(price),
+                });
             }
         }
     }
 
     if (isResult) {
-        updateTime(wildberriesDb, id);
-        updateTags(wildberriesDb, id, options.query);
+        updateTime(prefix, id);
+        updateTags(prefix, id, options.query);
     }
 
     log(`End get: result ${isResult}`, id);
@@ -467,7 +418,7 @@ export async function processItems(items, brand = options.brand, queue) {
 
     // Filter by updated time
     items = items.filter((item) => {
-        const dbReviewItem = wildberriesDb.data[item];
+        const dbReviewItem = getItem(prefix, item);
         const time = options.time * 60 * 60 * 1000;
 
         if (
@@ -484,17 +435,14 @@ export async function processItems(items, brand = options.brand, queue) {
     log(`Found ${items.length}(${count}) items on all pages`);
 
     for (const itemId of items) {
-        const dbReviewItem = wildberriesDb.data[itemId];
+        const dbReviewItem = getItem(prefix, itemId);
 
         if (dbReviewItem) {
-            updateBrand(wildberriesDb, itemId, brand);
+            updateBrand(prefix, itemId, brand);
         } else {
-            wildberriesDb.data[itemId] = {
+            updateItem(prefix, itemId, {
                 brand: options.brand,
-                reviews: {},
-                tags: [],
-            };
-            wildberriesDb.write();
+            });
         }
 
         queue.add(() => getFeedbacks(itemId, queue), {
@@ -513,7 +461,7 @@ export async function processItems(items, brand = options.brand, queue) {
  * @return  {Boolean}        Result
  */
 export async function updateBrands(queue) {
-    const brandIDs = getBrands();
+    const brandIDs = getBrands(prefix);
 
     for (const brandID of brandIDs) {
         const brandItems = await queue.add(
@@ -544,7 +492,7 @@ export async function updateBrands(queue) {
  * @return  {Boolean}        Result
  */
 export async function updateWithTags(queue) {
-    const tags = await getTags(wildberriesDb, "Wildberries");
+    const tags = await getTags(prefix);
 
     for (const tag of tags) {
         await getItemsByQuery(queue, tag);
@@ -561,9 +509,7 @@ export async function updateWithTags(queue) {
  * @return  {Boolean}        Result
  */
 export function updateItems(queue) {
-    wildberriesDb.read();
-
-    const items = getItems(wildberriesDb, "Wildberries");
+    const items = getItems(prefix);
 
     log(`Update ${items.length} items`);
 
@@ -584,14 +530,12 @@ export function updateItems(queue) {
  * @return  {Boolean}        Result
  */
 export function updateReviews(queue) {
-    wildberriesDb.read();
-
-    const items = getItems(wildberriesDb, "Wildberries");
+    const items = getItems(prefix);
 
     log(`Update ${items.length} items reviews`);
 
     items.forEach((itemId) => {
-        const item = wildberriesDb.data[itemId];
+        const item = getItem(prefix, itemId);
 
         if (!("reviews" in item) || !Object.keys(item.reviews).length) {
             return false;
@@ -768,7 +712,7 @@ export async function getItemsByQuery(queue, query = options.query) {
             .filter((item, index, array) => array.indexOf(item) === index)
             .map((item) => (item = parseInt(item, 10)))
             .filter((item) => {
-                const dbReviewItem = wildberriesDb.data[item];
+                const dbReviewItem = getItem(prefix, item);
                 const time = options.time * 60 * 60 * 1000;
 
                 if (
@@ -791,30 +735,6 @@ export async function getItemsByQuery(queue, query = options.query) {
     log(`Found ${items.length}(${count}) items on all pages`);
 
     for (const itemId of items) {
-        if (options.query?.length) {
-            const dbReviewItem = wildberriesDb.data[itemId];
-
-            if (dbReviewItem) {
-                if (
-                    dbReviewItem.tags &&
-                    !dbReviewItem.tags.includes(options.query)
-                ) {
-                    dbReviewItem.tags = [options.query].concat(
-                        dbReviewItem.tags
-                    );
-                    wildberriesDb.write();
-                } else if (!dbReviewItem.tags) {
-                    dbReviewItem.tags = [options.query];
-                    wildberriesDb.write();
-                }
-            } else {
-                wildberriesDb.data[itemId] = {
-                    tags: [options.query],
-                };
-                wildberriesDb.write();
-            }
-        }
-
         queue.add(() => getFeedbacks(itemId, queue), {
             priority: priorities.item,
         });

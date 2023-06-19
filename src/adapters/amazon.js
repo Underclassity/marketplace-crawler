@@ -2,9 +2,6 @@ import fs from "node:fs";
 import path from "node:path";
 import url from "node:url";
 
-import { LowSync } from "lowdb";
-import { JSONFileSync } from "lowdb/node";
-
 import {
     products as amazonProducts,
     reviews as amazonReviews,
@@ -12,31 +9,23 @@ import {
 
 import downloadItem from "../helpers/download.js";
 
+import {
+    addItem,
+    addReview,
+    getItem,
+    getItems,
+    updateTags,
+    updateTime,
+} from "../helpers/db.js";
 import { logMsg } from "../helpers/log-msg.js";
-import { updateTime, updateTags, getItems } from "../helpers/db.js";
+
 import options from "../options.js";
 import priorities from "../helpers/priorities.js";
 
-const dbPath = path.resolve(options.directory, "db");
+const prefix = "amazon";
 
-if (!fs.existsSync(dbPath)) {
-    fs.mkdirSync(dbPath);
-}
-
-const amazonAdapter = new JSONFileSync(path.resolve(dbPath, "amazon.json"));
-const amazonDb = new LowSync(amazonAdapter);
-
-amazonDb.read();
-
-if (!amazonDb.data) {
-    amazonDb.data = {};
-    amazonDb.write();
-}
-
-const downloadDirPath = path.resolve(options.directory, "download", "amazon");
-
-function logMsg(msg, id) {
-    return logMsg(msg, id, "Amazon");
+function log(msg, id) {
+    return logMsg(msg, id, prefix);
 }
 
 /**
@@ -49,13 +38,13 @@ function logMsg(msg, id) {
  * @return  {Boolean}         Result
  */
 async function downloadImages(asin, review, queue) {
-    const dirPath = path.resolve(downloadDirPath, asin);
+    const dirPath = path.resolve(options.directory, "download", prefix, asin);
 
     if (!fs.existsSync(dirPath)) {
         fs.mkdirSync(dirPath, { recursive: true });
     }
 
-    logMsg(`Process ${review.id}`, asin);
+    log(`Process ${review.id}`, asin);
 
     for (const photo of review.photos) {
         const filename = path.basename(url.parse(photo).pathname);
@@ -76,28 +65,24 @@ async function downloadImages(asin, review, queue) {
  * @return  {Boolean}          Result
  */
 export async function processItem(product, queue) {
-    if (!(product.asin in amazonDb.data)) {
-        amazonDb.data[product.asin] = product;
-        amazonDb.data[product.asin].reviews = {};
-        amazonDb.write();
-    }
+    addItem(prefix, product.asin, product);
 
     const time = options.time * 60 * 60 * 1000;
 
-    const dbReviewItem = amazonDb.data[product.asin];
+    const dbReviewItem = getItem(prefix, product.asin);
 
     if (
         dbReviewItem?.time &&
         Date.now() - dbReviewItem.time <= time &&
         !options.force
     ) {
-        logMsg(`Already updated by time`, product.asin);
+        log(`Already updated by time`, product.asin);
         return false;
     }
 
     await queue.add(
         async () => {
-            logMsg("Try to get reviews", product.asin);
+            log("Try to get reviews", product.asin);
 
             let reviews;
 
@@ -109,38 +94,34 @@ export async function processItem(product, queue) {
                 });
             } catch (error) {
                 reviews = false;
-                logMsg(`Error get reviews: ${error.message}`, product.asin);
+                log(`Error get reviews: ${error.message}`, product.asin);
             }
 
             if (!reviews) {
-                logMsg("Reviews not found", product.asin);
-                updateTime(amazonDb, product.asin);
-                updateTags(amazonDb, product.asin, options.query);
+                log("Reviews not found", product.asin);
+                updateTime(prefix, product.asin);
+                updateTags(prefix, product.asin, options.query);
                 return false;
             }
 
-            logMsg(`Found ${reviews.result.length}`, product.asin);
+            log(`Found ${reviews.result.length}`, product.asin);
 
             for (const reviewItem of reviews.result) {
-                if (!amazonDb.data[product.asin].reviews) {
-                    amazonDb.data[product.asin].reviews = {};
-                }
-
-                if (!(reviewItem.id in amazonDb.data[product.asin].reviews)) {
-                    logMsg(`Add new review ${reviewItem.id}`, product.asin);
-
-                    amazonDb.data[product.asin].reviews[reviewItem.id] =
-                        reviewItem;
-                    amazonDb.write();
-                }
+                addReview(
+                    prefix,
+                    product.asin,
+                    reviewItem.id,
+                    reviewItem,
+                    true
+                );
 
                 if (reviewItem?.photos?.length) {
                     downloadImages(product.asin, reviewItem, queue);
                 }
             }
 
-            updateTime(amazonDb, product.asin);
-            updateTags(amazonDb, product.asin, options.query);
+            updateTime(prefix, product.asin);
+            updateTags(prefix, product.asin, options.query);
         },
         { priority: priorities.item }
     );
@@ -170,14 +151,12 @@ export async function processItems(products, queue) {
  * @return  {Boolean}        Result
  */
 export async function updateItems(queue) {
-    amazonDb.read();
+    const items = getItems(prefix);
 
-    const items = getItems(amazonDb, "Amazon");
-
-    logMsg(`Update ${items.length} items`);
+    log(`Update ${items.length} items`);
 
     items.forEach((itemId) => {
-        const item = amazonDb.data[itemId];
+        const item = getItem(prefix, itemId);
         processItem(item, queue);
     });
 
@@ -192,16 +171,14 @@ export async function updateItems(queue) {
  * @return  {Boolean}        Result
  */
 export async function updateReviews(queue) {
-    amazonDb.read();
+    const items = getItems(prefix);
 
-    const items = getItems(amazonDb, "Amazon");
-
-    logMsg(`Update ${items.length} items reviews`);
+    log(`Update ${items.length} items reviews`);
 
     items.forEach((itemId) => {
-        const item = amazonDb.data[itemId];
+        const item = getItem(prefix, itemId);
 
-        if (!("reviews" in item) || !Object.keys(item.reviews)) {
+        if (!item || !item?.reviews?.length) {
             return false;
         }
 
@@ -221,7 +198,7 @@ export async function updateReviews(queue) {
  * @return  {Boolean}         Result
  */
 export async function getItemsByQuery(queue) {
-    logMsg("Get items call");
+    log("Get items call");
 
     for (let page = options.start; page < options.pages; page++) {
         let results;
@@ -238,7 +215,7 @@ export async function getItemsByQuery(queue) {
                     });
                 } catch (error) {
                     results = false;
-                    logMsg(`Error get from page ${page}: ${error.message}`);
+                    log(`Error get from page ${page}: ${error.message}`);
                 }
             },
             { priority: priorities.item }
@@ -256,7 +233,7 @@ export async function getItemsByQuery(queue) {
             continue;
         }
 
-        logMsg(`Total products found ${total} on page ${page}`);
+        log(`Total products found ${total} on page ${page}`);
 
         await processItems(products, queue);
     }

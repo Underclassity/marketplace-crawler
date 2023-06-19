@@ -1,41 +1,31 @@
-import fs from "node:fs";
 import path from "node:path";
 
 import axios from "axios";
 import cheerio from "cheerio";
 
-import { LowSync } from "lowdb";
-import { JSONFileSync } from "lowdb/node";
-
 import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import AdblockerPlugin from "puppeteer-extra-plugin-adblocker";
 
+import {
+    addItem,
+    addReview,
+    getItem,
+    getItems,
+    updateTags,
+    updateTime,
+} from "../helpers/db.js";
 import autoScroll from "../helpers/auto-scroll.js";
 import createPage from "../helpers/create-page.js";
 import downloadItem from "../helpers/download.js";
 import getHeaders from "../helpers/get-headers.js";
 import goSettings from "../helpers/go-settings.js";
-import log from "../helpers/log.js";
+import logMsg from "../helpers/log-msg.js";
+
 import options from "../options.js";
 import priorities from "../helpers/priorities.js";
-import updateTime from "../helpers/db.js";
 
-const dbPath = path.resolve(options.directory, "db");
-
-if (!fs.existsSync(dbPath)) {
-    fs.mkdirSync(dbPath);
-}
-
-const ebayAdapter = new JSONFileSync(path.resolve(dbPath, "ebay.json"));
-const ebayDb = new LowSync(ebayAdapter);
-
-ebayDb.read();
-
-if (!ebayDb.data) {
-    ebayDb.data = {};
-    ebayDb.write();
-}
+const prefix = "ebay";
 
 // Configure puppeteer
 puppeteer.use(
@@ -46,14 +36,8 @@ puppeteer.use(
 
 puppeteer.use(StealthPlugin());
 
-function logMsg(msg, id) {
-    const query = options.query || "";
-
-    if (id) {
-        return log(`[Ebay] ${query}: ${id} - ${msg}`);
-    }
-
-    return log(`[Ebay] ${query}: ${msg}`);
+function log(msg, id) {
+    return logMsg(msg, id, prefix);
 }
 
 /**
@@ -128,28 +112,17 @@ async function getPhotosURLs(itemId) {
  * @return  {Boolean}        Result
  */
 export function updateItems(queue) {
-    logMsg("Update items");
+    const items = getItems(prefix);
 
-    ebayDb.read();
+    log(`Update ${items.length} items`);
 
-    const time = options.time * 60 * 60 * 1000;
-
-    for (const itemId in ebayDb.data) {
-        const item = ebayDb.data[itemId];
-
-        if (item?.time && Date.now() - item.time <= time && !options.force) {
-            logMsg(`Already updated by time`, item);
-            continue;
-        }
-
-        if ("deleted" in item && item.deleted) {
-            continue;
-        }
-
+    items.forEach((itemId) => {
         queue.add(() => getItem(itemId, queue), {
             priority: priorities.item,
         });
-    }
+
+        return true;
+    });
 
     return true;
 }
@@ -162,26 +135,15 @@ export function updateItems(queue) {
  * @return  {Boolean}         Rtsult
  */
 export function updateReviews(queue) {
-    logMsg("Update reviews");
+    const items = getItems(prefix);
 
-    ebayDb.read();
+    log(`Update ${items.length} items reviews`);
 
-    const time = options.time * 60 * 60 * 1000;
+    items.forEach((itemId) => {
+        const item = getItem(prefix, itemId);
 
-    for (const itemId in ebayDb.data) {
-        const item = ebayDb.data[itemId];
-
-        if (item?.time && Date.now() - item.time <= time && !options.force) {
-            logMsg(`Already updated by time`, item);
-            continue;
-        }
-
-        if (!("reviews" in item) || !Object.keys(item.reviews).length) {
-            continue;
-        }
-
-        if ("deleted" in item && item.deleted) {
-            continue;
+        if (!item || !item?.reviews?.length) {
+            return false;
         }
 
         const folderPath = path.resolve(
@@ -203,7 +165,7 @@ export function updateReviews(queue) {
 
             downloadItem(photoURL, imagePath, queue);
         }
-    }
+    });
 
     return true;
 }
@@ -216,22 +178,17 @@ export function updateReviews(queue) {
  *
  * @return  {Boolean}         Result
  */
-export async function getItem(id, queue) {
-    logMsg(`Get photos`, id);
+export async function getItemById(id, queue) {
+    log(`Get photos`, id);
 
     const folderPath = path.resolve(options.directory, "download", "ebay", id);
 
     const photos = await getPhotosURLs(id);
 
-    updateTime(ebayDb, id);
+    updateTime(prefix, id);
 
     for (const photoObject of photos) {
-        if (!(photoObject.id in ebayDb.data[id].reviews)) {
-            logMsg(`Add new review ${photoObject.id}`, id);
-
-            ebayDb.data[id].reviews[photoObject.id] = photoObject;
-            ebayDb.write();
-        }
+        addReview(prefix, id, photoObject.id, photoObject, true);
 
         const photoURL = `https://i.ebayimg.com/images/g/${photoObject.id}/s-l1600.${photoObject.ext}`;
 
@@ -262,7 +219,7 @@ export async function getItemsByQuery(queue) {
     const itemsPerPage = 200; // 200, 100, 50, 25
 
     for (let pageId = 1; pageId <= pagesCount; pageId++) {
-        logMsg(`Get page ${pageId}`);
+        log(`Get page ${pageId}`);
 
         const page = await createPage(browser, true);
 
@@ -289,7 +246,9 @@ export async function getItemsByQuery(queue) {
             itemsLinks = await page.$$eval(".s-item a", (items) =>
                 Array.from(items).map((item) => item.href)
             );
-        } catch (error) {}
+        } catch (error) {
+            log(error.message);
+        }
 
         await page.close();
 
@@ -304,14 +263,14 @@ export async function getItemsByQuery(queue) {
             .filter((item) => {
                 const time = options.time * 60 * 60 * 1000;
 
-                const dbReviewItem = ebayDb.data[item];
+                const dbReviewItem = getItem(prefix, item);
 
                 if (
                     dbReviewItem?.time &&
                     Date.now() - dbReviewItem.time <= time &&
                     !options.force
                 ) {
-                    logMsg(`Already updated by time`, item);
+                    log(`Already updated by time`, item);
                     return false;
                 }
 
@@ -320,22 +279,18 @@ export async function getItemsByQuery(queue) {
 
         if (!ids.length) {
             pageId = pagesCount;
-            logMsg(`Items not found on page ${pageId}`);
+            log(`Items not found on page ${pageId}`);
 
             continue;
         }
 
-        logMsg(`Found ${ids.length} on page ${pageId}`);
+        log(`Found ${ids.length} on page ${pageId}`);
 
         for (const id of ids) {
-            if (!(id in ebayDb.data)) {
-                ebayDb.data[id] = {
-                    reviews: {},
-                };
-                ebayDb.write();
-            }
+            addItem(prefix, id);
+            updateTags(prefix, id, options.query);
 
-            queue.add(() => getItem(id, queue), {
+            queue.add(() => getItemById(id, queue), {
                 priority: priorities.item,
             });
         }

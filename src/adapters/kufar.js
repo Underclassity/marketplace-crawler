@@ -3,16 +3,22 @@ import path from "node:path";
 
 import axios from "axios";
 
-import { LowSync } from "lowdb";
-import { JSONFileSync } from "lowdb/node";
-
 import downloadItem from "../helpers/download.js";
 
 import { logMsg } from "../helpers/log-msg.js";
-import { updateTime, updateTags, getItems, getTags } from "../helpers/db.js";
+import {
+    addItem,
+    getItem,
+    getItems,
+    getTags,
+    // updateTags,
+    // updateTime,
+} from "../helpers/db.js";
 import getHeaders from "../helpers/get-headers.js";
 import options from "../options.js";
 import priorities from "../helpers/priorities.js";
+
+const prefix = "kufar";
 
 const dbPath = path.resolve(options.directory, "db");
 
@@ -20,20 +26,10 @@ if (!fs.existsSync(dbPath)) {
     fs.mkdirSync(dbPath);
 }
 
-const kufarAdapter = new JSONFileSync(path.resolve(dbPath, "kufar.json"));
-const kufarDb = new LowSync(kufarAdapter);
-
-kufarDb.read();
-
-if (!kufarDb.data) {
-    kufarDb.data = {};
-    kufarDb.write();
-}
-
-const downloadDirPath = path.resolve(options.directory, "download", "kufar");
+const downloadDirPath = path.resolve(options.directory, "download", prefix);
 
 function log(msg, id = false) {
-    return logMsg(msg, id, "Kufar");
+    return logMsg(msg, id, prefix);
 }
 
 /**
@@ -47,7 +43,11 @@ function log(msg, id = false) {
 export function processItem(itemId, queue) {
     log("Update item", itemId);
 
-    const item = kufarDb.data[itemId];
+    const item = getItem(prefix, itemId);
+
+    if (!item?.images) {
+        return false;
+    }
 
     for (const imageItem of item.images) {
         if (!imageItem?.path) {
@@ -79,7 +79,7 @@ export function processItem(itemId, queue) {
  * @return  {Boolean}        Result
  */
 export async function updateWithTags(queue) {
-    const tags = getTags(kufarDb, "Kufar");
+    const tags = getTags(prefix);
 
     log(`Update items with tags: ${tags.join(", ")}`);
 
@@ -98,9 +98,7 @@ export async function updateWithTags(queue) {
  * @return  {Boolean}        Result
  */
 export async function updateItems(queue) {
-    kufarDb.read();
-
-    const items = getItems(kufarDb, "Kufar");
+    const items = getItems(prefix);
 
     log(`Update ${items.length} items`);
 
@@ -151,7 +149,7 @@ export async function getItemsByQuery(queue, query = options.query) {
                         {
                             params: {
                                 lang: "ru",
-                                query: query,
+                                query,
                                 size: 43,
                                 cursor: cursor || "",
                             },
@@ -167,17 +165,10 @@ export async function getItemsByQuery(queue, query = options.query) {
 
                     if (data?.ads?.length) {
                         data.ads.forEach((ad) => {
-                            if (ad.ad_id in kufarDb.data) {
-                                return false;
-                            }
+                            addItem(prefix, ad.ad_id, ad);
 
-                            log(`Add new item`, ad.ad_id);
-
-                            kufarDb.data[ad.ad_id] = ad;
-                            kufarDb.data[ad.ad_id].tags = [options.query];
-
-                            updateTime(kufarDb, ad.ad_id, Date.now());
-                            updateTags(kufarDb, ad.ad_id, options.query);
+                            // updateTime(prefix, ad.ad_id, Date.now());
+                            // updateTags(prefix, ad.ad_id, options.query);
 
                             processItem(ad.ad_id, queue);
                         });
@@ -185,8 +176,6 @@ export async function getItemsByQuery(queue, query = options.query) {
                         count += data.ads.length;
 
                         total = data.total;
-
-                        kufarDb.write();
 
                         // save cursor for next page
                         const nextPagePagination = data.pagination.pages.find(

@@ -1,17 +1,17 @@
-import fs from "node:fs";
-import path from "node:path";
-
 import axios from "axios";
-// import cheerio from "cheerio";
-
-import { LowSync } from "lowdb";
-import { JSONFileSync } from "lowdb/node";
 
 import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import AdblockerPlugin from "puppeteer-extra-plugin-adblocker";
 
-import { updateTime, updateTags, addReview, getItems } from "../helpers/db.js";
+import {
+    addItem,
+    addReview,
+    getItem,
+    getItems,
+    updateTags,
+    updateTime,
+} from "../helpers/db.js";
 import autoScroll from "../helpers/auto-scroll.js";
 import createPage from "../helpers/create-page.js";
 import goSettings from "../helpers/go-settings.js";
@@ -21,23 +21,7 @@ import sleep from "../helpers/sleep.js";
 import options from "../options.js";
 import priorities from "../helpers/priorities.js";
 
-const dbPath = path.resolve(options.directory, "db");
-
-if (!fs.existsSync(dbPath)) {
-    fs.mkdirSync(dbPath);
-}
-
-const decathlonAdapter = new JSONFileSync(
-    path.resolve(dbPath, "decathlon.json")
-);
-const decathlonDb = new LowSync(decathlonAdapter);
-
-decathlonDb.read();
-
-if (!decathlonDb.data) {
-    decathlonDb.data = {};
-    decathlonDb.write();
-}
+const prefix = "decathlon";
 
 // Configure puppeteer
 puppeteer.use(
@@ -72,7 +56,7 @@ export async function getReviews(id, queue) {
         return false;
     }
 
-    const dbItem = decathlonDb.data[id];
+    const dbItem = getItem(prefix, id);
 
     if (!dbItem) {
         logMsg("Item not found in DB", id);
@@ -80,11 +64,6 @@ export async function getReviews(id, queue) {
     }
 
     const itemsPerPage = 20;
-
-    if (!("reviews" in decathlonDb.data[id])) {
-        decathlonDb.data[id].reviews = {};
-        decathlonDb.write();
-    }
 
     for (const configuration of dbItem.configurations) {
         const { model_id } = configuration;
@@ -150,14 +129,14 @@ export async function getReviews(id, queue) {
         }
 
         for (const item of reviews) {
-            addReview(decathlonDb, id, item.id, item, "Decathlon");
+            addReview(prefix, id, item.id, item, true);
         }
 
         logMsg(`All reviews get for model ${model_id}`, id);
     }
 
-    updateTime(decathlonDb, id);
-    updateTags(decathlonDb, id, options.query);
+    updateTime(prefix, id);
+    updateTags(prefix, id, options.query);
 
     logMsg(`All models get`, id);
 
@@ -209,11 +188,7 @@ export async function getItemsOnPages(queue) {
                 logMsg(`Found ${products.length}`);
 
                 for (const product of products) {
-                    if (!(product.shopify_product_id in decathlonDb.data)) {
-                        logMsg(`Add new product ${product.shopify_product_id}`);
-                        decathlonDb.data[product.shopify_product_id] = product;
-                        decathlonDb.write();
-                    }
+                    addItem(prefix, product.shopify_product_id, product);
                 }
             });
 
@@ -325,14 +300,14 @@ export async function getItemsOnPages(queue) {
  * @return  {Boolean}        Result
  */
 export async function updateReviews(queue) {
-    decathlonDb.read();
-
-    const items = getItems(decathlonDb, "Decathlon");
+    const items = getItems(prefix);
 
     logMsg(`Update ${items.length} items reviews`);
 
     items.forEach((itemId) => {
-        if (!("reviews" in item) || !Object.keys(item.reviews).length) {
+        const item = getItem(prefix, itemId);
+
+        if (!item || !item?.reviews?.length) {
             return false;
         }
 
@@ -360,9 +335,7 @@ export async function updateReviews(queue) {
  * @return  {Boolean}        Result
  */
 export async function updateItems(queue) {
-    decathlonDb.read();
-
-    const items = getItems(decathlonDb, "Decathlon");
+    const items = getItems(prefix);
 
     logMsg(`Update ${items.length} items`);
 

@@ -1,36 +1,28 @@
-import fs from "node:fs";
 import path from "node:path";
 
 import axios from "axios";
 
-import { LowSync } from "lowdb";
-import { JSONFileSync } from "lowdb/node";
-
-import { updateTime, updateTags, addReview, getItems } from "../helpers/db.js";
+import {
+    addItem,
+    addReview,
+    getItem,
+    getItems,
+    getReview,
+    updateItem,
+    updateTags,
+    updateTime,
+} from "../helpers/db.js";
 import downloadItem from "../helpers/download.js";
 import getHeaders from "../helpers/get-headers.js";
 import logMsg from "../helpers/log-msg.js";
+
 import options from "../options.js";
 import priorities from "../helpers/priorities.js";
 
-const dbPath = path.resolve(options.directory, "db");
-
-if (!fs.existsSync(dbPath)) {
-    fs.mkdirSync(dbPath);
-}
-
-const onlinerAdapter = new JSONFileSync(path.resolve(dbPath, "onliner.json"));
-const onlinerDb = new LowSync(onlinerAdapter);
-
-onlinerDb.read();
-
-if (!onlinerDb.data) {
-    onlinerDb.data = {};
-    onlinerDb.write();
-}
+const prefix = "onliner";
 
 function log(msg, id) {
-    return logMsg(msg, id, "Onliner");
+    return logMsg(msg, id, prefix);
 }
 
 /**
@@ -44,12 +36,12 @@ function log(msg, id) {
 export async function updateItemPrices(id, queue) {
     log("Try to update item prices", id);
 
-    if (!(id in onlinerDb.data)) {
+    const dbItem = getItem(prefix, id);
+
+    if (!dbItem) {
         log("Not found in DB");
         return false;
     }
-
-    const dbItem = onlinerDb.data[id];
 
     for (const monthFilter of ["2m", "12m"]) {
         await queue.add(
@@ -65,31 +57,35 @@ export async function updateItemPrices(id, queue) {
                         }
                     );
 
-                    const { chart_data, sale } = priceRequest.data;
+                    // const { chart_data, sale } = priceRequest.data;
 
-                    if (
-                        !("prices" in onlinerDb.data[id]) ||
-                        !onlinerDb.data[id].prices
-                    ) {
-                        onlinerDb.data[id].prices = priceRequest.data;
-                    } else {
-                        if (onlinerDb.data[id].prices.chart_data) {
-                            onlinerDb.data[id].prices.chart_data.items.push(
-                                ...chart_data.items
-                            );
-                        } else {
-                            onlinerDb.data[id].prices.chart_data = chart_data;
-                        }
+                    updateItem(prefix, id, {
+                        prices: priceRequest.data,
+                    });
 
-                        if (onlinerDb.data[id].prices.sale) {
-                            onlinerDb.data[id].prices.sale.min_prices_median =
-                                sale.min_prices_median;
-                        } else {
-                            onlinerDb.data[id].prices.sale = sale;
-                        }
-                    }
+                    // if (
+                    //     !("prices" in onlinerDb.data[id]) ||
+                    //     !onlinerDb.data[id].prices
+                    // ) {
+                    //     onlinerDb.data[id].prices = priceRequest.data;
+                    // } else {
+                    //     if (onlinerDb.data[id].prices.chart_data) {
+                    //         onlinerDb.data[id].prices.chart_data.items.push(
+                    //             ...chart_data.items
+                    //         );
+                    //     } else {
+                    //         onlinerDb.data[id].prices.chart_data = chart_data;
+                    //     }
 
-                    onlinerDb.write();
+                    //     if (onlinerDb.data[id].prices.sale) {
+                    //         onlinerDb.data[id].prices.sale.min_prices_median =
+                    //             sale.min_prices_median;
+                    //     } else {
+                    //         onlinerDb.data[id].prices.sale = sale;
+                    //     }
+                    // }
+
+                    // onlinerDb.write();
                 } catch (error) {
                     log(
                         `Update item prices for ${monthFilter} error: ${error.message}`,
@@ -101,12 +97,12 @@ export async function updateItemPrices(id, queue) {
         );
     }
 
-    onlinerDb.data[id].prices.chart_data.items = onlinerDb.data[
-        id
-    ].prices.chart_data.items.filter(
-        (item, index, array) => array.indexOf(item) === index
-    );
-    onlinerDb.write();
+    // onlinerDb.data[id].prices.chart_data.items = onlinerDb.data[
+    //     id
+    // ].prices.chart_data.items.filter(
+    //     (item, index, array) => array.indexOf(item) === index
+    // );
+    // onlinerDb.write();
 
     return false;
 }
@@ -122,12 +118,12 @@ export async function updateItemPrices(id, queue) {
 export async function updateItemReviews(id, queue) {
     log("Try to update", id);
 
-    if (!(id in onlinerDb.data)) {
+    const dbItem = getItem(prefix, id);
+
+    if (!dbItem) {
         log("Not found in DB");
         return false;
     }
-
-    const dbItem = onlinerDb.data[id];
 
     let totalPages = options.pages;
 
@@ -152,7 +148,7 @@ export async function updateItemReviews(id, queue) {
                     log(`${reviews.length} reviews get`, id);
 
                     for (const review of reviews) {
-                        addReview(onlinerDb, id, review.id, review, "Onliner");
+                        addReview(prefix, id, review.id, review, true);
                     }
                 } catch (error) {
                     log(`Get item reviews error: ${error.message}`, id);
@@ -173,9 +169,7 @@ export async function updateItemReviews(id, queue) {
  * @return  {Boolean}        Result
  */
 export async function updateItems(queue) {
-    onlinerDb.read();
-
-    const items = getItems(onlinerDb, "Onliner");
+    const items = getItems(prefix);
 
     log(`Update ${items.length} items`);
 
@@ -183,7 +177,7 @@ export async function updateItems(queue) {
         await updateItemReviews(itemId, queue);
         await updateItemPrices(itemId, queue);
 
-        updateTime(onlinerDb, itemId);
+        updateTime(prefix, itemId);
     }
 
     return true;
@@ -197,25 +191,19 @@ export async function updateItems(queue) {
  * @return  {Boolean}        Result
  */
 export async function updateReviews(queue) {
-    onlinerDb.read();
-
-    const items = getItems(onlinerDb, "Onliner");
+    const items = getItems(prefix);
 
     log(`Update ${items.length} items reviews`);
 
     for (const itemId of items) {
-        const item = onlinerDb.data[itemId];
+        const item = getItem(prefix, itemId);
 
-        if (!("reviews" in item)) {
-            continue;
-        }
-
-        if (!Object.keys(item.reviews).length) {
+        if (!item?.reviews?.length) {
             continue;
         }
 
         for (const reviewId in item.reviews) {
-            const review = item.reviews[reviewId];
+            const review = getReview(prefix, itemId, reviewId);
 
             if (!review.images || !review.images.length) {
                 continue;
@@ -273,20 +261,9 @@ export async function getItemsByQuery(queue) {
                     totalPages = page.last;
 
                     for (const product of products) {
-                        if (product.id in onlinerDb.data) {
-                            if (!("reviews" in onlinerDb.data[product.id])) {
-                                onlinerDb.data[product.id].reviews = {};
-                                onlinerDb.write();
-                            }
-                        } else {
-                            log(`Add new product`, product.id);
+                        addItem(prefix, product.id, product);
 
-                            onlinerDb.data[product.id] = product;
-                            onlinerDb.data[product.id].reviews = {};
-                            onlinerDb.write();
-                        }
-
-                        const item = onlinerDb.data[product.id];
+                        const item = getItem(prefix, product.id);
 
                         if (
                             item?.time &&
@@ -304,8 +281,8 @@ export async function getItemsByQuery(queue) {
                         await updateItemReviews(product.id, queue);
                         await updateItemPrices(product.id, queue);
 
-                        updateTime(onlinerDb, product.id);
-                        updateTags(onlinerDb, product.id, options.query);
+                        updateTime(prefix, product.id);
+                        updateTags(prefix, product.id, options.query);
                     }
                 } catch (error) {
                     log(`Get items on page ${pageId} error: ${error.message}`);
