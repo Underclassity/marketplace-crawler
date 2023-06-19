@@ -202,10 +202,10 @@ export async function updateReviews(queue) {
             continue;
         }
 
-        for (const reviewId in item.reviews) {
+        for (const reviewId of item.reviews) {
             const review = getReview(prefix, itemId, reviewId);
 
-            if (!review.images || !review.images.length) {
+            if (!review?.images?.length) {
                 continue;
             }
 

@@ -12,6 +12,7 @@ import {
     addReview,
     getItem,
     getItems,
+    getReview,
     updateTags,
     updateTime,
 } from "../helpers/db.js";
@@ -153,8 +154,12 @@ export function updateReviews(queue) {
             itemId
         );
 
-        for (const reviewId in item.reviews) {
-            const photoObject = item.reviews[reviewId];
+        for (const reviewId of item.reviews) {
+            const photoObject = getReview(prefix, itemId, reviewId);
+
+            if (!photoObject?.id) {
+                continue;
+            }
 
             const photoURL = `https://i.ebayimg.com/images/g/${photoObject.id}/s-l1600.${photoObject.ext}`;
 

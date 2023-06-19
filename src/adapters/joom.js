@@ -10,6 +10,7 @@ import {
     addReview,
     getItem,
     getItems,
+    getReview,
     updateTags,
     updateTime,
 } from "../helpers/db.js";
@@ -284,8 +285,8 @@ export function updateReviews(queue) {
             itemId
         );
 
-        for (const reviewId in item.reviews) {
-            const feedback = item.reviews[reviewId];
+        for (const reviewId of item.reviews) {
+            const feedback = getReview(prefix, itemId, reviewId);
 
             if (!feedback?.media?.length) {
                 continue;

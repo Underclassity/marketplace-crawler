@@ -73,6 +73,9 @@ for (const dbId of getAdaptersIds()) {
 
         if (fs.existsSync(itemFolderPath)) {
             filesDB.data[itemId] = await walk(itemFolderPath);
+            filesDB.data[itemId] = filesDB.data[itemId]
+                .map((filepath) => path.basename(filepath))
+                .sort();
         }
     }
 

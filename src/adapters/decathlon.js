@@ -9,6 +9,7 @@ import {
     addReview,
     getItem,
     getItems,
+    getReview,
     updateTags,
     updateTime,
 } from "../helpers/db.js";
@@ -311,10 +312,10 @@ export async function updateReviews(queue) {
             return false;
         }
 
-        for (const reviewId in item.reviews) {
-            const review = item.reviews[reviewId];
+        for (const reviewId of item.reviews) {
+            const review = getReview(prefix, itemId, reviewId);
 
-            if (review.body_html.includes("img")) {
+            if (review?.body_html?.includes("img")) {
                 console.log(review.body_html);
             }
         }

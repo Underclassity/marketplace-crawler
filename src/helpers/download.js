@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import process from "node:process";
 
 import axios from "axios";
 import prettyBytes from "pretty-bytes";
@@ -7,6 +8,7 @@ import prettyBytes from "pretty-bytes";
 import { LowSync } from "lowdb";
 import { JSONFileSync } from "lowdb/node";
 
+import { updateFiles } from "./db.js";
 import commandCall from "./command-call.js";
 import generateThumbail from "./generate-thumbnail.js";
 import getHeaders from "./get-headers.js";
@@ -228,7 +230,9 @@ export async function processFile(filepath, queue, id, prefix) {
         `${parsed.name}.webp`
     );
 
-    const command = `cwebp.exe -quiet -preset photo -q 80 -mt -m 6 -preset photo ${filepath} -o ${tempWebpFilepath}`;
+    const command = `cwebp${
+        isWin ? ".exe" : ""
+    } -quiet -preset photo -q 80 -mt -m 6 -preset photo ${filepath} -o ${tempWebpFilepath}`;
 
     logMsg(`Convert to webp ${path.basename(filepath)}`, id, prefix);
 
@@ -517,17 +521,17 @@ export async function downloadItem(url, filepath, queue, isVideo = false) {
     }
 
     if (!url) {
-        console.error("Url not defined!");
+        logMsg("Url not defined!");
         return false;
     }
 
     if (!filepath) {
-        console.log("Filepath not defined!");
+        logMsg("Filepath not defined!");
         return false;
     }
 
     if (!queue) {
-        console.log("Queue not defined!");
+        logMsg("Queue not defined!");
         return false;
     }
 
@@ -634,6 +638,8 @@ export async function downloadItem(url, filepath, queue, isVideo = false) {
     if (url in downloadCache) {
         delete downloadCache[url];
     }
+
+    updateFiles(prefix, id);
 
     return true;
 }

@@ -14,6 +14,7 @@ import {
     addReview,
     getItem,
     getItems,
+    getReview,
     updateTags,
     updateTime,
 } from "../helpers/db.js";
@@ -182,8 +183,12 @@ export async function updateReviews(queue) {
             return false;
         }
 
-        for (const reviewId in item.reviews) {
-            downloadImages(itemId, item.reviews[reviewId], queue);
+        for (const reviewId of item.reviews) {
+            const reviewItem = getReview(prefix, itemId, reviewId);
+
+            if (reviewItem) {
+                downloadImages(itemId, reviewItem, queue);
+            }
         }
     });
 

@@ -1034,14 +1034,14 @@ export async function updateReviews(queue) {
             return false;
         }
 
-        for (const reviewId in item.reviews) {
-            const reviewItem = item.reviews[reviewId];
+        for (const reviewId of item.reviews) {
+            const reviewItem = getReview(prefix, itemId, reviewId);
 
             // if ("video" in reviewItem || "videos" in reviewItem) {
             //     console.log(reviewItem);
             // }
 
-            if (!reviewItem.images || !reviewItem.images.length) {
+            if (!reviewItem?.images?.length) {
                 continue;
             }
 

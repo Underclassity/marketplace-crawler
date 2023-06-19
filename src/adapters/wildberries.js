@@ -4,12 +4,13 @@ import path from "node:path";
 import axios from "axios";
 
 import {
-    // addItem,
-    // getReview,
+    addItem,
     addReview,
+    dbWrite,
     getBrands,
     getItem,
     getItems,
+    getReview,
     getTags,
     updateBrand,
     updateItem,
@@ -224,8 +225,10 @@ export async function getFeedbacks(id, queue) {
         log(`Found ${feedbacks.length} feedbacks items`, id);
 
         for (const feedback of feedbacks) {
-            addReview(prefix, id, feedback.id, feedback, true);
+            addReview(prefix, id, feedback.id, feedback, false);
         }
+
+        dbWrite(`${prefix}-reviews`, true, prefix);
 
         for (const feedback of feedbacks) {
             queue.add(async () => getFeedback(id, feedback, queue), {
@@ -246,7 +249,7 @@ export async function getFeedbacks(id, queue) {
         }
 
         for (const price of priceInfo) {
-            if (!item.prices.includes(price)) {
+            if (item?.prices && !item.prices.includes(price)) {
                 updateItem(prefix, id, {
                     prices: item.prices.concat(price),
                 });
@@ -367,7 +370,7 @@ export async function itemsRequest(page = 1, query = options.query) {
  * @return  {Object}           Result
  */
 export async function brandItemsRequest(brand = options.brand, page = 1) {
-    log(`Brand items call for page ${page}`);
+    log(`Brand ${brand} items call for page ${page}`);
 
     try {
         const getItemsRequest = await axios(
@@ -398,7 +401,7 @@ export async function brandItemsRequest(brand = options.brand, page = 1) {
 
         return getItemsRequest.data;
     } catch (error) {
-        log(`Error: ${error.message}`);
+        log(`Brand ${brand} items call error: ${error.message}`);
     }
 
     return false;
@@ -416,9 +419,18 @@ export async function brandItemsRequest(brand = options.brand, page = 1) {
 export async function processItems(items, brand = options.brand, queue) {
     const count = items.length;
 
+    // Add items if not exist
+    items.forEach((itemId) => {
+        const dbReviewItem = getItem(prefix, itemId);
+
+        if (!dbReviewItem) {
+            addItem(prefix, itemId);
+        }
+    });
+
     // Filter by updated time
-    items = items.filter((item) => {
-        const dbReviewItem = getItem(prefix, item);
+    items = items.filter((itemId) => {
+        const dbReviewItem = getItem(prefix, itemId);
         const time = options.time * 60 * 60 * 1000;
 
         if (
@@ -537,12 +549,12 @@ export function updateReviews(queue) {
     items.forEach((itemId) => {
         const item = getItem(prefix, itemId);
 
-        if (!("reviews" in item) || !Object.keys(item.reviews).length) {
+        if (!item?.reviews?.length) {
             return false;
         }
 
-        for (const reviewId in item.reviews) {
-            const feedback = item.reviews[reviewId];
+        for (const reviewId of item.reviews) {
+            const feedback = getReview(prefix, itemId, reviewId);
 
             if (!feedback?.photos?.length) {
                 continue;
@@ -610,9 +622,7 @@ export async function getBrandItemsByID(brandID, queue) {
             continue;
         }
 
-        log(
-            `Page ${page} found ${getItemsData.data.products.length} items before filter`
-        );
+        const beforeFilterCount = getItemsData.data.products.length;
 
         const results = getItemsData.data.products
             .map((item) => item.root)
@@ -620,7 +630,7 @@ export async function getBrandItemsByID(brandID, queue) {
             .map((item) => (item = parseInt(item, 10)))
             .sort((a, b) => a - b);
 
-        log(`Page ${page} found ${results.length} items`);
+        log(`Page ${page} found ${results.length}(${beforeFilterCount}) items`);
 
         items.push(...results);
 

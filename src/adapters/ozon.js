@@ -12,6 +12,7 @@ import {
     addReview,
     getItem,
     getItems,
+    getReview,
     updateTags,
     updateTime,
 } from "../helpers/db.js";
@@ -390,10 +391,10 @@ export async function updateReviews(queue) {
             return false;
         }
 
-        for (const reviewId in item.reviews) {
-            const reviewItem = item.reviews[reviewId];
+        for (const reviewId of item.reviews) {
+            const reviewItem = getReview(prefix, itemId, reviewId);
 
-            if (reviewItem.content.photos.length) {
+            if (reviewItem?.content?.photos?.length) {
                 for (const photoItem of reviewItem.content.photos) {
                     download(
                         reviewItem.itemId,
@@ -405,7 +406,7 @@ export async function updateReviews(queue) {
                 }
             }
 
-            if (reviewItem.content.videos.length) {
+            if (reviewItem?.content?.videos?.length) {
                 for (const videoItem of reviewItem.content.videos) {
                     download(
                         reviewItem.itemId,
