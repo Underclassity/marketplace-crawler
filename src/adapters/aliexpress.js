@@ -8,8 +8,6 @@ import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import AdblockerPlugin from "puppeteer-extra-plugin-adblocker";
 
-import { getProxy } from "../helpers/proxy-helpers.js";
-import { logMsg, logQueue } from "../helpers/log-msg.js";
 import {
     addItem,
     addReview,
@@ -19,6 +17,8 @@ import {
     updateTags,
     updateTime,
 } from "../helpers/db.js";
+import { getProxy } from "../helpers/proxy-helpers.js";
+import { logMsg, logQueue } from "../helpers/log-msg.js";
 import autoScroll from "../helpers/auto-scroll.js";
 import browserConfig from "../helpers/browser-config.js";
 import createPage from "../helpers/create-page.js";
@@ -52,6 +52,38 @@ let isStartPageReloading = false;
  */
 function log(msg, id = false) {
     return logMsg(msg, id, prefix);
+}
+
+/**
+ * Sleep helper after end item process
+ *
+ * @param   {String}  itemId  Item ID
+ * @param   {Number}  pageId  Optional page number
+ *
+ * @return  {Boolean}         Result
+ */
+async function sleepAfterEnd(itemId, pageId = false) {
+    const sleepTime = Math.random() * options.timeout;
+
+    let startMsg = `Wait for ${Math.round(sleepTime / 1000)} sec after end`;
+    let endMsg = `End waiting for ${Math.round(sleepTime / 1000)} sec`;
+
+    if (pageId) {
+        startMsg = `Wait for ${Math.round(
+            sleepTime / 1000
+        )} sec on reviews page ${pageId}`;
+        endMsg = `End waiting for ${Math.round(
+            sleepTime / 1000
+        )} sec on reviews page ${pageId}`;
+    }
+
+    log(startMsg, itemId);
+
+    await sleep(sleepTime); // Waif random time, from 0 to 1 min
+
+    log(endMsg, itemId);
+
+    return true;
 }
 
 /**
@@ -229,10 +261,7 @@ export async function download(review, id, queue) {
                 url = url.url;
             }
 
-            const parsePath = path.parse(url);
-            const name = parsePath.base;
-
-            const itemPath = path.resolve(dirPath, name);
+            const itemPath = path.resolve(dirPath, path.basename(url));
 
             downloadItem(url, itemPath, queue);
         }
@@ -595,6 +624,8 @@ export async function scrapeItemByBrowser(itemId, browser, startPage, queue) {
 
                         log("All data already downloaded", itemId);
 
+                        await sleepAfterEnd(itemId);
+
                         return true;
                     }
                 }
@@ -622,18 +653,7 @@ export async function scrapeItemByBrowser(itemId, browser, startPage, queue) {
                         );
                     }
 
-                    // const sleepTime = Math.random() * options.timeout;
-
-                    // log(
-                    //     `Wait for ${Math.round(
-                    //         sleepTime / 1000
-                    //     )} sec on reviews page ${pageId}`,
-                    //     itemId
-                    // );
-
-                    // await sleep(sleepTime); // Waif random time, from 0 to 1 min
-
-                    // log(`End waiting on reviews page ${pageId}`, itemId);
+                    await sleepAfterEnd(itemId, pageId);
 
                     return true;
                 }
@@ -664,19 +684,7 @@ export async function scrapeItemByBrowser(itemId, browser, startPage, queue) {
                 pageId = maxPages;
                 ended = true;
 
-                // const sleepTime = Math.random() * options.timeout;
-
-                // log(
-                //     `Wait for ${Math.round(sleepTime / 1000)} sec after end`,
-                //     itemId
-                // );
-
-                // await sleep(sleepTime); // Waif random time, from 0 to 1 min
-
-                // log(
-                //     `End waiting for ${Math.round(sleepTime / 1000)} sec`,
-                //     itemId
-                // );
+                await sleepAfterEnd(itemId);
 
                 return true;
             },

@@ -177,7 +177,7 @@ export function addItem(prefix, itemId, data) {
 
         db.data[itemId] = {
             id: itemId,
-            reviews: {},
+            reviews: [],
             tags: options.query ? [options.query] : [],
             time: 0,
             brand: undefined,
@@ -547,7 +547,21 @@ export function addReview(prefix, itemId, reviewId, review, write = true) {
     const reviewsDB = dbCache[dbReviewsPrefix];
     const productsDB = dbCache[dbProductsPrefix];
 
-    if (!productsDB.data[itemId]?.reviews?.includes(reviewId)) {
+    // Add item if not defined
+    if (!(itemId in productsDB.data)) {
+        addItem(prefix, itemId);
+    }
+
+    // Convert old object reviews to new array type
+    if (!Array.isArray(productsDB.data[itemId].reviews)) {
+        productsDB.data[itemId].reviews = Object.keys(
+            productsDB.data[itemId].reviews
+        );
+        dbWrite(dbProductsPrefix, true, prefix);
+    }
+
+    // Check is review in product item
+    if (!productsDB.data[itemId].reviews.includes(reviewId)) {
         productsDB.data[itemId].reviews.push(reviewId);
         dbWrite(dbProductsPrefix, true, prefix);
     }
