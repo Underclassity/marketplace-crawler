@@ -4,7 +4,7 @@ import path from "node:path";
 import { LowSync } from "lowdb";
 import { JSONFileSync } from "lowdb/node";
 
-import { convertVideoItem } from "./src/helpers/download.js";
+import { convertVideoItem } from "./src/helpers/image-process.js";
 import createQueue from "./src/helpers/create-queue.js";
 import getAdaptersIds from "./src/helpers/get-adapters-ids.js";
 import logMsg from "./src/helpers/log-msg.js";

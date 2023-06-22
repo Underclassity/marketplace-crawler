@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { logQueue, logMsg } from "./src/helpers/log-msg.js";
-import { processFile } from "./src/helpers/download.js";
+import { processFile } from "./src/helpers/image-process.js";
 import createQueue from "./src/helpers/create-queue.js";
 import getAdaptersIds from "./src/helpers/get-adapters-ids.js";
 import sleep from "./src/helpers/sleep.js";

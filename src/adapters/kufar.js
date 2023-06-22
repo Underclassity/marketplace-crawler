@@ -3,7 +3,7 @@ import path from "node:path";
 
 import axios from "axios";
 
-import downloadItem from "../helpers/download.js";
+import downloadItem from "../helpers/image-process.js";
 
 import { logMsg } from "../helpers/log-msg.js";
 import {

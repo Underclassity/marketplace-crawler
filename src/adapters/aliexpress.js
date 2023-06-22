@@ -22,7 +22,7 @@ import { logMsg, logQueue } from "../helpers/log-msg.js";
 import autoScroll from "../helpers/auto-scroll.js";
 import browserConfig from "../helpers/browser-config.js";
 import createPage from "../helpers/create-page.js";
-import downloadItem from "../helpers/download.js";
+import downloadItem from "../helpers/image-process.js";
 import getHeaders from "../helpers/get-headers.js";
 import goSettings from "../helpers/go-settings.js";
 import options from "../options.js";

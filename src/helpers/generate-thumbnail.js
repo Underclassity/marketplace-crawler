@@ -3,7 +3,7 @@ import fs from "node:fs";
 
 import sizeOf from "image-size";
 
-import { processFile, extractVideoFrames } from "./download.js";
+import { processFile, extractVideoFrames } from "./image-process.js";
 import commandCall from "./command-call.js";
 import priorities from "./priorities.js";
 import logMsg from "./log-msg.js";

@@ -12,7 +12,7 @@ import {
     updateTags,
     updateTime,
 } from "../helpers/db.js";
-import downloadItem from "../helpers/download.js";
+import downloadItem from "../helpers/image-process.js";
 import getHeaders from "../helpers/get-headers.js";
 import logMsg from "../helpers/log-msg.js";
 

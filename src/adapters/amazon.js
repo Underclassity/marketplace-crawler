@@ -7,7 +7,7 @@ import {
     reviews as amazonReviews,
 } from "../libs/amazon-buddy/index.js";
 
-import downloadItem from "../helpers/download.js";
+import downloadItem from "../helpers/image-process.js";
 
 import {
     addItem,

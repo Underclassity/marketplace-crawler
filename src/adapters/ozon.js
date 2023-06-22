@@ -18,7 +18,7 @@ import {
 } from "../helpers/db.js";
 import autoScroll from "../helpers/auto-scroll.js";
 import createPage from "../helpers/create-page.js";
-import downloadItem from "../helpers/download.js";
+import downloadItem from "../helpers/image-process.js";
 import goSettings from "../helpers/go-settings.js";
 import logMsg from "../helpers/log-msg.js";
 import sleep from "../helpers/sleep.js";
