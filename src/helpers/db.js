@@ -4,9 +4,10 @@ import path from "node:path";
 import { LowSync } from "lowdb";
 import { JSONFileSync } from "lowdb/node";
 
-import options from "../options.js";
 import logMsg from "./log-msg.js";
-import { getFiles } from "./get-files.js";
+import { getFiles as getFilesFromFolder } from "./get-files.js";
+
+import options from "../options.js";
 
 const dbPath = path.resolve(options.directory, "db");
 
@@ -80,17 +81,17 @@ export function dbWrite(dbPrefix, write = true, prefix = false) {
             writeCache[dbPrefix] = true;
         }
 
-        const startTime = Date.now();
+        // const startTime = Date.now();
 
         db.write();
 
-        const endTime = Date.now();
+        // const endTime = Date.now();
 
-        logMsg(
-            `Write in DB ${dbPrefix}: ${endTime - startTime}ms`,
-            false,
-            prefix
-        );
+        // logMsg(
+        //     `Write in DB ${dbPrefix}: ${endTime - startTime}ms`,
+        //     false,
+        //     prefix
+        // );
 
         if (dbPrefix) {
             writeCache[dbPrefix] = false;
@@ -186,6 +187,34 @@ export function addItem(prefix, itemId, data) {
 
         dbWrite(dbPrefix, true, prefix);
     }
+
+    return true;
+}
+
+/**
+ * Delete item from database
+ *
+ * @param   {String}  prefix   Prefix
+ * @param   {String}  itemId   Item ID
+ *
+ * @return  {Boolean}          Result
+ */
+export function deleteItem(prefix, itemId) {
+    const dbItem = getItem(prefix, itemId);
+
+    if (!dbItem) {
+        logMsg(`Item ${itemId} not found in adapter ${prefix}`);
+        return false;
+    }
+
+    const dbPrefix = `${prefix}-products`;
+
+    loadDB(dbPrefix);
+
+    const db = dbCache[dbPrefix];
+
+    db.data[itemId].deleted = true;
+    dbWrite(dbPrefix, true, prefix);
 
     return true;
 }
@@ -347,11 +376,12 @@ export function updateBrand(prefix, itemId, brand) {
 /**
  * Get items from DB
  *
- * @param   {String}  prefix  Log prefix
+ * @param   {String}   prefix  Log prefix
+ * @param   {Boolean}  force   Force get all flag
  *
- * @return  {Array}           Items IDs array
+ * @return  {Array}            Items IDs array
  */
-export function getItems(prefix = false) {
+export function getItems(prefix = false, force = options.force) {
     const dbPrefix = `${prefix}-products`;
 
     loadDB(dbPrefix);
@@ -369,11 +399,7 @@ export function getItems(prefix = false) {
         .filter((id) => {
             const item = db.data[id];
 
-            if (
-                item?.time &&
-                Date.now() - item.time <= time &&
-                !options.force
-            ) {
+            if (item?.time && Date.now() - item.time <= time && !force) {
                 logMsg(`Already updated by time`, id, prefix);
                 return false;
             }
@@ -611,7 +637,7 @@ export function updateFiles(prefix, itemId) {
 
     const db = dbCache[dbPrefix];
 
-    const folderFiles = getFiles(folderPath)
+    const folderFiles = getFilesFromFolder(folderPath)
         .map((filepath) => path.basename(filepath))
         .sort();
 
@@ -621,6 +647,102 @@ export function updateFiles(prefix, itemId) {
     }
 
     return true;
+}
+
+/**
+ * Get filenames array from DB by item ID
+ *
+ * @param   {String}  prefix  Prefix
+ * @param   {String}  itemId  Item ID
+ *
+ * @return  {Array}           Array of filenames
+ */
+export function getFiles(prefix, itemId) {
+    const dbPrefix = `${prefix}-files`;
+
+    loadDB(dbPrefix);
+
+    if (!(itemId in dbCache[dbPrefix].data)) {
+        return false;
+    }
+
+    return dbCache[dbPrefix].data[itemId];
+}
+
+/**
+ * Add predictions to DB
+ *
+ * @param   {String}  prefix       Prefix
+ * @param   {String}  itemId       Item ID
+ * @param   {String}  filename     Filename
+ * @param   {Array}   predictions  Array with predictions
+ *
+ * @return  {Boolean}              Result
+ */
+export function addPrediction(prefix, itemId, filename, predictions) {
+    if (!filename) {
+        logMsg("Filename not defined!", itemId, prefix);
+        return false;
+    }
+
+    if (!predictions || !Array.isArray(predictions)) {
+        logMsg(
+            `Input predictions ${predictions} is not an array!`,
+            itemId,
+            prefix
+        );
+        return false;
+    }
+
+    const dbPrefix = `${prefix}-predictions`;
+
+    loadDB(dbPrefix);
+
+    const db = dbCache[dbPrefix];
+
+    if (!(itemId in db.data)) {
+        db.data[itemId] = {};
+        dbWrite(dbPrefix, true, prefix);
+    }
+
+    if (!(filename in db.data[itemId])) {
+        db.data[itemId][filename] = predictions;
+        dbWrite(dbPrefix, true, prefix);
+    }
+
+    return true;
+}
+
+/**
+ * Get predictions for given filename and item ID
+ *
+ * @param   {String}  prefix    Prefix
+ * @param   {String}  itemId    Item ID
+ * @param   {String}  filename  Filename
+ *
+ * @return  {Array}             Predictions
+ */
+export function getPredictions(prefix, itemId, filename) {
+    if (!filename) {
+        logMsg("Filename not defined!", itemId, prefix);
+        return false;
+    }
+
+    const dbPrefix = `${prefix}-predictions`;
+
+    loadDB(dbPrefix);
+
+    const db = dbCache[dbPrefix];
+
+    if (!(itemId in db.data)) {
+        return false;
+    }
+
+    if (!(filename in db.data[itemId])) {
+        return false;
+    }
+
+    return db.data[itemId][filename];
 }
 
 export default updateTime;

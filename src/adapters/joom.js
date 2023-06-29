@@ -10,6 +10,7 @@ import {
     addReview,
     getItem,
     getItems,
+    getTags,
     getReview,
     updateTags,
     updateTime,
@@ -334,13 +335,30 @@ export function updateReviews(queue) {
 }
 
 /**
- * Get items by query
+ * Update items with tags
  *
- * @param   {Object}  queue  Queue
+ * @param   {Object}  queue  Queue instance
  *
  * @return  {Boolean}        Result
  */
-export async function getItemsByQuery() {
+export async function updateWithTags(queue) {
+    const tags = await getTags(prefix);
+
+    for (const tag of tags) {
+        await getItemsByQuery(queue, tag);
+    }
+
+    return true;
+}
+
+/**
+ * Get items by query
+ *
+ * @param   {String}  query  Query
+ *
+ * @return  {Boolean}        Result
+ */
+export async function getItemsByQuery(query = options.query) {
     log(`Get items call`);
 
     const browser = await puppeteer.launch(browserConfig);
@@ -387,7 +405,7 @@ export async function getItemsByQuery() {
                 });
 
                 updateTime(prefix, item.id);
-                updateTags(prefix, item.id, options.query);
+                updateTags(prefix, item.id, query);
             }
 
             clearTimeout(getDataTimeout);
@@ -403,7 +421,7 @@ export async function getItemsByQuery() {
 
     try {
         await page.goto(
-            `https://www.joom.com/ru/search/q.${options.query}`,
+            `https://www.joom.com/ru/search/q.${query}`,
             goSettings
         );
 

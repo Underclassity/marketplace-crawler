@@ -544,8 +544,7 @@ export async function downloadItem(url, filepath, queue, isVideo = false) {
         fs.mkdirSync(path.dirname(filepath), { recursive: true });
     }
 
-    let prefix = path.basename(path.dirname(path.resolve(filepath, "../")));
-    prefix = prefix.charAt(0).toUpperCase() + prefix.slice(1);
+    const prefix = path.basename(path.dirname(path.resolve(filepath, "../")));
 
     const webpFilepath = path.resolve(
         path.dirname(filepath),

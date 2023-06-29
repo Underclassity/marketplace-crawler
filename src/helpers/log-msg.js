@@ -3,8 +3,18 @@ import log from "./log.js";
 import options from "../options.js";
 import priorities from "./priorities.js";
 
+import getAdaptersIds from "./get-adapters-ids.js";
+
 let prefixLength = 0;
 let idLength = 0;
+
+const ids = getAdaptersIds();
+
+for (const id of ids) {
+    if (id.length >= idLength) {
+        idLength = id.length;
+    }
+}
 
 /**
  * Log message helper

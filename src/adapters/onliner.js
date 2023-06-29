@@ -7,6 +7,7 @@ import {
     addReview,
     getItem,
     getItems,
+    getTags,
     getReview,
     updateItem,
     updateTags,
@@ -229,13 +230,31 @@ export async function updateReviews(queue) {
 }
 
 /**
- * Get items by query
+ * Update items with tags
  *
  * @param   {Object}  queue  Queue instance
  *
  * @return  {Boolean}        Result
  */
-export async function getItemsByQuery(queue) {
+export async function updateWithTags(queue) {
+    const tags = await getTags(prefix);
+
+    for (const tag of tags) {
+        await getItemsByQuery(queue, tag);
+    }
+
+    return true;
+}
+
+/**
+ * Get items by query
+ *
+ * @param   {Object}  queue  Queue instance
+ * @param   {String}  query  Query
+ *
+ * @return  {Boolean}        Result
+ */
+export async function getItemsByQuery(queue, query = options.query) {
     log(`Get items for query: ${options.query}`);
 
     let totalPages = options.pages;
@@ -249,7 +268,7 @@ export async function getItemsByQuery(queue) {
                     log(`Get items on page ${pageId}`);
 
                     const request = await axios(
-                        `https://www.onliner.by/sdapi/catalog.api/search/products?query=${options.query}&page=${pageId}`,
+                        `https://www.onliner.by/sdapi/catalog.api/search/products?query=${query}&page=${pageId}`,
                         {
                             headers: getHeaders(),
                             timeout: options.timeout,

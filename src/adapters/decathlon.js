@@ -9,6 +9,7 @@ import {
     addReview,
     getItem,
     getItems,
+    getTags,
     getReview,
     updateTags,
     updateTime,
@@ -148,10 +149,11 @@ export async function getReviews(id, queue) {
  * Get all items from pages
  *
  * @param   {Object}  queue  Queue instance
+ * @param   {String}  query  Query
  *
  * @return  {Boolean}        Result
  */
-export async function getItemsOnPages(queue) {
+export async function getItemsOnPages(queue, query = options.query) {
     logMsg(`Get items for ${options.query}`);
 
     const browser = await puppeteer.launch({
@@ -195,7 +197,7 @@ export async function getItemsOnPages(queue) {
 
             try {
                 await page.goto(
-                    `https://www.decathlon.com/search?q=${options.query}`,
+                    `https://www.decathlon.com/search?q=${query}`,
                     goSettings
                 );
 
@@ -352,16 +354,34 @@ export async function updateItems(queue) {
 }
 
 /**
- * Get items from pages
+ * Update items with tags
  *
- * @param   {Object}  queue  Queue
+ * @param   {Object}  queue  Queue instance
  *
  * @return  {Boolean}        Result
  */
-export async function getItemsByQuery(queue) {
+export async function updateWithTags(queue) {
+    const tags = await getTags(prefix);
+
+    for (const tag of tags) {
+        await getItemsByQuery(queue, tag);
+    }
+
+    return true;
+}
+
+/**
+ * Get items from pages
+ *
+ * @param   {Object}  queue  Queue
+ * @param   {String}  query  Query
+ *
+ * @return  {Boolean}        Result
+ */
+export async function getItemsByQuery(queue, query = options.query) {
     logMsg("Get items");
 
-    await getItemsOnPages(queue);
+    await getItemsOnPages(queue, query);
 
     return true;
 }

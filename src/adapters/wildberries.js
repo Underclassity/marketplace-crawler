@@ -242,7 +242,13 @@ export async function getFeedbacks(id, queue) {
     if (priceInfo) {
         const item = getItem(prefix, id);
 
-        if (!("prices" in item)) {
+        if (!item) {
+            addItem(prefix, id, {
+                prices: [],
+            });
+        }
+
+        if (item && !("prices" in item)) {
             updateItem(prefix, id, {
                 prices: [],
             });
@@ -335,7 +341,8 @@ export async function itemsRequest(page = 1, query = options.query) {
                     curr: "byn",
                     locale: "by",
                     lang: "ru",
-                    dest: [12358386, 12358404, 3, -59208],
+                    // dest: [12358386, 12358404, 3, -59208],
+                    dest: -59208,
                     regions: [
                         1, 4, 22, 30, 31, 33, 40, 48, 66, 68, 69, 70, 80, 83,
                         114, 115,
@@ -689,7 +696,7 @@ export async function getItemsByBrand(queue) {
  * @return  {Boolean}        Result
  */
 export async function getItemsByQuery(queue, query = options.query) {
-    log("Get items call");
+    log(`Get items call for ${query}`);
 
     const items = [];
     let count = 0;

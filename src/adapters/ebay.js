@@ -12,6 +12,7 @@ import {
     addReview,
     getItem,
     getItems,
+    getTags,
     getReview,
     updateTags,
     updateTime,
@@ -176,6 +177,23 @@ export function updateReviews(queue) {
 }
 
 /**
+ * Update items with tags
+ *
+ * @param   {Object}  queue  Queue instance
+ *
+ * @return  {Boolean}        Result
+ */
+export async function updateWithTags(queue) {
+    const tags = await getTags(prefix);
+
+    for (const tag of tags) {
+        await getItemsByQuery(queue, tag);
+    }
+
+    return true;
+}
+
+/**
  * Get item by ID
  *
  * @param   {String}  id      Item ID
@@ -212,10 +230,11 @@ export async function getItemById(id, queue) {
  * Get items by query
  *
  * @param   {Object}  queue   Queue instance
+ * @param   {String}  query   Query
  *
  * @return  {Boolean}         Result
  */
-export async function getItemsByQuery(queue) {
+export async function getItemsByQuery(queue, query = options.query) {
     const browser = await puppeteer.launch({
         headless: options.headless,
     });
@@ -229,7 +248,7 @@ export async function getItemsByQuery(queue) {
         const page = await createPage(browser, true);
 
         await page.goto(
-            `https://www.ebay.com/sch/i.html?_fsrp=1&_sop=12&_nkw=${options.query.replace(
+            `https://www.ebay.com/sch/i.html?_fsrp=1&_sop=12&_nkw=${query.replace(
                 /\s/g,
                 "+"
             )}&LH_ItemCondition=1500%7C1750%7C3000&rt=nc&_ipg=${itemsPerPage}&_pgn=${pageId}`,

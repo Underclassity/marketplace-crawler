@@ -1,10 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { LowSync } from "lowdb";
-import { JSONFileSync } from "lowdb/node";
-
 import { convertVideoItem } from "./src/helpers/image-process.js";
+import { getItems } from "./src/helpers/db.js";
 import createQueue from "./src/helpers/create-queue.js";
 import getAdaptersIds from "./src/helpers/get-adapters-ids.js";
 import logMsg from "./src/helpers/log-msg.js";
@@ -16,22 +14,11 @@ import options from "./src/options.js";
 
 const ids = getAdaptersIds();
 
-const dbs = {};
-
-for (const id of ids) {
-    const dbAdapter = new JSONFileSync(
-        path.resolve(path.resolve("./db/"), `${id}.json`)
-    );
-
-    dbs[id] = new LowSync(dbAdapter);
-    dbs[id].read();
-}
-
 const queue = createQueue();
 
 (async () => {
-    for (const dbId in dbs) {
-        const dbIds = Object.keys(dbs[dbId].data);
+    for (const dbId of ids) {
+        const dbIds = getItems(dbId, true);
 
         for (const itemId of dbIds) {
             const itemFolderPath = path.resolve(

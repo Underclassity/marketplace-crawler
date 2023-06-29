@@ -3,26 +3,13 @@ import path from "node:path";
 
 import inquirer from "inquirer";
 
-import { LowSync } from "lowdb";
-import { JSONFileSync } from "lowdb/node";
-
+import { getItem, deleteItem } from "./src/helpers/db.js";
 import getAdaptersIds from "./src/helpers/get-adapters-ids.js";
 import logMsg from "./src/helpers/log-msg.js";
 
 import options from "./src/options.js";
 
 const ids = getAdaptersIds();
-
-const dbs = {};
-
-for (const id of ids) {
-    const dbAdapter = new JSONFileSync(
-        path.resolve(path.resolve("./db/"), `${id}.json`)
-    );
-
-    dbs[id] = new LowSync(dbAdapter);
-    dbs[id].read();
-}
 
 /**
  * Delete item by ID
@@ -31,7 +18,7 @@ for (const id of ids) {
  *
  * @return  {Boolean}      Result
  */
-async function deleteItem(id) {
+async function deleteItemFromDBs(id) {
     logMsg("Try to delete", id, false);
 
     // convert id to string
@@ -39,10 +26,10 @@ async function deleteItem(id) {
 
     const foundInIds = [];
 
-    for (const dbId in dbs) {
-        const dbIds = Object.keys(dbs[dbId].data);
+    for (const dbId in ids) {
+        const item = getItem(dbId, id);
 
-        if (dbIds.includes(id)) {
+        if (item) {
             foundInIds.push(dbId);
             continue;
         }
@@ -99,10 +86,7 @@ async function deleteItem(id) {
     );
 
     // found db item and set delete param to true
-    if (id in dbs[dbId].data) {
-        dbs[dbId].data[id].deleted = true;
-        dbs[dbId].write();
-    }
+    deleteItem(dbId, id);
 
     // delete thumbnail
     if (fs.existsSync(thumbnailFilePath)) {
@@ -119,7 +103,7 @@ async function deleteItem(id) {
 
 (async () => {
     if (options.id) {
-        await deleteItem(options.id);
+        await deleteItemFromDBs(options.id);
         return false;
     }
 
@@ -138,7 +122,7 @@ async function deleteItem(id) {
         if (answer.itemId == 0) {
             stoped = true;
         } else {
-            await deleteItem(answer.itemId);
+            await deleteItemFromDBs(answer.itemId);
         }
     }
 })();

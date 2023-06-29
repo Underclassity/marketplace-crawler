@@ -14,6 +14,7 @@ import {
     getItem,
     getItems,
     getReview,
+    getTags,
     updateTags,
     updateTime,
 } from "../helpers/db.js";
@@ -1068,13 +1069,31 @@ export async function updateReviews(queue) {
 }
 
 /**
+ * Update items with tags
+ *
+ * @param   {Object}  queue  Queue instance
+ *
+ * @return  {Boolean}        Result
+ */
+export async function updateWithTags(queue) {
+    const tags = await getTags(prefix);
+
+    for (const tag of tags) {
+        await getItemsByQuery(queue, tag);
+    }
+
+    return true;
+}
+
+/**
  * Get items by query helper
  *
  * @param   {Object}  queue   Queue instance
+ * @param   {String}  query   Query
  *
  * @return  {Boolean}         Result
  */
-export async function getItemsByQuery(queue) {
+export async function getItemsByQuery(queue, query = options.query) {
     log("Get items call");
 
     let totalFound = false;
@@ -1093,7 +1112,7 @@ export async function getItemsByQuery(queue) {
             async () => {
                 const pagesCount = await processPage(
                     page,
-                    options.query,
+                    query,
                     browser,
                     totalFound,
                     queue

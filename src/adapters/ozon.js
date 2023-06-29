@@ -13,6 +13,7 @@ import {
     getItem,
     getItems,
     getReview,
+    getTags,
     updateTags,
     updateTime,
 } from "../helpers/db.js";
@@ -424,13 +425,31 @@ export async function updateReviews(queue) {
 }
 
 /**
- * Get items by query
+ * Update items with tags
  *
  * @param   {Object}  queue  Queue instance
  *
  * @return  {Boolean}        Result
  */
-export async function getItemsByQuery(queue) {
+export async function updateWithTags(queue) {
+    const tags = await getTags(prefix);
+
+    for (const tag of tags) {
+        await getItemsByQuery(queue, tag);
+    }
+
+    return true;
+}
+
+/**
+ * Get items by query
+ *
+ * @param   {Object}  queue  Queue instance
+ * @param   {String}  query  Query
+ *
+ * @return  {Boolean}        Result
+ */
+export async function getItemsByQuery(queue, query = options.query) {
     const browser = await puppeteer.launch({
         headless: options.headless,
         devtools: options.headless ? false : true,
@@ -453,7 +472,7 @@ export async function getItemsByQuery(queue) {
                     page = await createPage(browser, true);
 
                     await page.goto(
-                        `https://ozon.by/search/?from_global=true&text=${options.query}&page=${pageId}`,
+                        `https://ozon.by/search/?from_global=true&text=${query}&page=${pageId}`,
                         goSettings
                     );
 
