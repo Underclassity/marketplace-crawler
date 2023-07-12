@@ -1,11 +1,14 @@
 <template lang="pug">
 .main
     .info
-        span {{ adapter }}
-        span {{ itemId }}
+        h2 {{ adapter }}
+        h3 {{ itemId }}
+        h3 {{ prettySize }}
 
-    .files
-        img(v-for="file of files" :key="file" v-lazy=`{ src: getImageSrc(file) }`)
+    .files(v-viewer)
+        .file(v-for="file of files" :key="file")
+            img(v-if="file.indexOf('.mp4') == -1" v-lazy=`{ src: getImageSrc(file) }`)
+            video(v-if="file.indexOf('.mp4') != -1" :src="getVideoSrc(file)" controls autostart="false")
 </template>
 
 <script src="./ItemView.js"></script>

@@ -268,7 +268,7 @@ export async function updateItems(queue) {
  * @return  {Boolean}        Result
  */
 export function updateReviews(queue) {
-    const items = getItems(prefix);
+    const items = getItems(prefix, true);
 
     log(`Update ${items.length} items reviews`);
 

@@ -4,6 +4,9 @@ nav
     router-link(to="/adapters") Adapters
 
 router-view
+
+OverlayBlock
 </template>
 
+<script src="./App.js"></script>
 <style src="./App.styl" lang="styl"></style>

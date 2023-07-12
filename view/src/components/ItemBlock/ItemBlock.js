@@ -1,3 +1,4 @@
+import prettyBytes from "pretty-bytes";
 // import axios from "axios";
 
 // import getRandom from "../../../../src/helpers/random.js";
@@ -37,11 +38,11 @@ export default {
         // },
 
         images() {
-            return this.item.images;
+            return this.item.images || [];
         },
 
         count() {
-            return this.images.length;
+            return this.images.length || 0;
         },
     },
 
@@ -60,6 +61,14 @@ export default {
         //         console.log(error.message);
         //     }
         // },
+
+        pretty(size) {
+            return prettyBytes(size);
+        },
+
+        updateDeleteItems(id) {
+            this.emitter.emit("updateDeleteItems", id);
+        },
 
         getImageSrc(image) {
             const { adapter, itemId } = this;

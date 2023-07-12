@@ -1,8 +1,6 @@
+import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
-
-import { LowSync } from "lowdb";
-import { JSONFileSync } from "lowdb/node";
 
 import "dotenv/config";
 
@@ -14,19 +12,38 @@ import cors from "cors";
 import express from "express";
 import morgan from "morgan";
 
+import { LowSync, MemorySync } from "lowdb";
+
+import {
+    deleteItem,
+    getBrands,
+    getFilesSize,
+    getItem,
+    getPredictions,
+    loadDB,
+} from "./src/helpers/db.js";
 import getAdaptersIds from "./src/helpers/get-adapters-ids.js";
 import getRandom from "./src/helpers/random.js";
+import createQueue from "./src/helpers/create-queue.js";
 import logMsg from "./src/helpers/log-msg.js";
+
 import options from "./src/options.js";
+
+const sizeDb = new LowSync(new MemorySync(), {});
+
+sizeDb.read();
+
+if (!sizeDb.data) {
+    sizeDb.data = {};
+    sizeDb.write();
+}
 
 const app = express();
 const port = process.env.port || 3000;
 
 const downloadFolderPath = path.resolve(options.directory, "download");
 
-const dbPath = path.resolve(options.directory, "db");
-
-const dbCache = {};
+const queue = createQueue();
 
 app.use(bodyParser.json());
 app.use(compression());
@@ -50,16 +67,16 @@ for (const adapter of adapters) {
 function getRandomFilesIds(adapter, itemId) {
     const dbPrefix = `${adapter}-files`;
 
-    if (!(dbPrefix in dbCache)) {
-        dbCache[dbPrefix] = new LowSync(
-            new JSONFileSync(path.resolve(dbPath, `${dbPrefix}.json`))
-        );
-    }
+    const db = loadDB(dbPrefix);
 
-    dbCache[dbPrefix].read();
+    if (itemId in db.data) {
+        let files = db.data[itemId];
 
-    if (itemId in dbCache[dbPrefix].data) {
-        const files = dbCache[dbPrefix].data[itemId];
+        files = files.filter((filename) => path.extname(filename) != ".mp4");
+
+        if (!Array.isArray(files)) {
+            return [];
+        }
 
         return files.length >= 9 ? getRandom(files, 9) : files;
     } else {
@@ -72,57 +89,72 @@ app.get("/adapters", (req, res) => {
 });
 
 app.get("/adapters/:id", (req, res) => {
-    const { id } = req.params;
+    const { id: adapter } = req.params;
 
     const page = parseInt(req.query.page || 1, 10);
     const limit = parseInt(req.query.limit || 100, 10);
     const isPhotos = req.query.photos == "true" || false;
     const sortId = req.query.sort || false;
+    let brand = req.query.brand || false;
 
-    if (!adapters.includes(id)) {
+    if (brand == "false" || brand == "true") {
+        brand = false;
+    }
+
+    if (!adapters.includes(adapter)) {
         return res.json({
             items: {},
             count: 0,
-            error: `${id} not found in adapters`,
+            error: `${adapter} not found in adapters`,
         });
     }
 
-    const dbPrefix = `${id}-products`;
-    const dbFilesPrefix = `${id}-files`;
+    const dbPrefix = `${adapter}-products`;
+    const dbFilesPrefix = `${adapter}-files`;
 
-    if (!(dbPrefix in dbCache)) {
-        dbCache[dbPrefix] = new LowSync(
-            new JSONFileSync(path.resolve(dbPath, `${dbPrefix}.json`))
-        );
+    const db = loadDB(dbPrefix);
+    const dbFiles = loadDB(dbFilesPrefix);
+
+    const count = Object.keys(db.data).length;
+
+    let allItemsIDs = Object.keys(db.data)
+        .filter((itemId) => !db.data[itemId]?.deleted)
+        .filter((itemId) => {
+            if (!isPhotos) {
+                return true;
+            }
+
+            if (!(itemId in dbFiles.data)) {
+                return false;
+            }
+
+            return dbFiles.data[itemId].length;
+        });
+
+    if (brand) {
+        allItemsIDs = allItemsIDs.filter((itemId) => {
+            if (brand == "no-brand") {
+                return !("brand" in db.data[itemId]);
+            }
+
+            return db.data[itemId]?.brand == brand;
+        });
     }
-
-    if (!(dbFilesPrefix in dbCache)) {
-        dbCache[dbFilesPrefix] = new LowSync(
-            new JSONFileSync(path.resolve(dbPath, `${dbFilesPrefix}.json`))
-        );
-    }
-
-    dbCache[dbPrefix].read();
-    dbCache[dbFilesPrefix].read();
-
-    const count = Object.keys(dbCache[dbPrefix].data).length;
-
-    let allItemsIDs = Object.keys(dbCache[dbPrefix].data).filter((itemId) => {
-        if (!isPhotos) {
-            return true;
-        }
-
-        if (!(itemId in dbCache[dbFilesPrefix].data)) {
-            return false;
-        }
-
-        return dbCache[dbFilesPrefix].data[itemId].length;
-    });
 
     if (sortId) {
         allItemsIDs = allItemsIDs.sort((a, b) => {
-            const aItem = dbCache[dbPrefix].data[a];
-            const bItem = dbCache[dbPrefix].data[b];
+            const aItem = db.data[a];
+            const bItem = db.data[b];
+
+            if (!(`${adapter}-${a}` in sizeDb.data)) {
+                sizeDb.data[`${adapter}-${a}`] = getFilesSize(adapter, a);
+                sizeDb.write();
+            }
+
+            if (!(`${adapter}-${b}` in sizeDb.data)) {
+                sizeDb.data[`${adapter}-${b}`] = getFilesSize(adapter, b);
+                sizeDb.write();
+            }
 
             if (sortId == "reviewsAsc") {
                 return aItem.reviews.length - bItem.reviews.length;
@@ -132,18 +164,25 @@ app.get("/adapters/:id", (req, res) => {
                 return bItem.reviews.length - aItem.reviews.length;
             }
 
-            if (!(sortId == "filesAsc" || sortId == "filesDesc")) {
-                return;
+            if (sortId == "sizeAsc" || sortId == "sizeDesc") {
+                const aSize = sizeDb.data[`${adapter}-${a}`];
+                const bSize = sizeDb.data[`${adapter}-${b}`];
+
+                if (sortId == "sizeAsc") {
+                    return aSize - bSize;
+                }
+
+                if (sortId == "sizeDesc") {
+                    return bSize - aSize;
+                }
             }
 
-            const aFilesCount =
-                a in dbCache[dbFilesPrefix].data
-                    ? dbCache[dbFilesPrefix].data[a].length
-                    : 0;
-            const bFilesCount =
-                b in dbCache[dbFilesPrefix].data
-                    ? dbCache[dbFilesPrefix].data[b].length
-                    : 0;
+            if (!(sortId == "filesAsc" || sortId == "filesDesc")) {
+                return false;
+            }
+
+            const aFilesCount = a in dbFiles.data ? dbFiles.data[a].length : 0;
+            const bFilesCount = b in dbFiles.data ? dbFiles.data[b].length : 0;
 
             if (sortId == "filesAsc") {
                 return aFilesCount - bFilesCount;
@@ -161,20 +200,24 @@ app.get("/adapters/:id", (req, res) => {
         (page - 1) * limit + limit
     );
 
-    const items = {};
+    const items = [];
 
     for (const itemId of resultItemsIDs) {
-        items[itemId] = { ...dbCache[dbPrefix].data[itemId] };
-        items[itemId].reviews = dbCache[dbPrefix].data[itemId].reviews.length;
-        items[itemId].images = getRandomFilesIds(id, itemId);
-        items[itemId].files =
-            itemId in dbCache[dbFilesPrefix].data
-                ? dbCache[dbFilesPrefix].data[itemId].length
-                : 0;
+        const resultItem = { ...db.data[itemId] };
+
+        resultItem.id = itemId;
+        resultItem.reviews = db.data[itemId].reviews.length;
+        resultItem.images = getRandomFilesIds(adapter, itemId).sort();
+        resultItem.files =
+            itemId in dbFiles.data ? dbFiles.data[itemId].length : 0;
+
+        resultItem.size = sizeDb.data[`${adapter}-${itemId}`];
+
+        items.push(resultItem);
     }
 
     logMsg(
-        `Get page ${page} for adapter ${id} with limit ${limit}: ${resultItemsIDs.length} items from ${count}`
+        `Get page ${page} for adapter ${adapter} with limit ${limit}: ${resultItemsIDs.length} items from ${count}`
     );
 
     return res.json({ items, count: allItemsIDs.length, error: false });
@@ -188,6 +231,7 @@ app.get("/adapters/:id/:itemId", (req, res) => {
             info: {},
             files: [],
             count: 0,
+            size: 0,
             error: `${id} not found in adapters`,
         });
     }
@@ -195,32 +239,70 @@ app.get("/adapters/:id/:itemId", (req, res) => {
     const dbPrefix = `${id}-products`;
     const dbFilesPrefix = `${id}-files`;
 
-    if (!(dbPrefix in dbCache)) {
-        dbCache[dbPrefix] = new LowSync(
-            new JSONFileSync(path.resolve(dbPath, `${dbPrefix}.json`))
-        );
-    }
+    const db = loadDB(dbPrefix);
+    const dbFiles = loadDB(dbFilesPrefix);
 
-    if (!(dbFilesPrefix in dbCache)) {
-        dbCache[dbFilesPrefix] = new LowSync(
-            new JSONFileSync(path.resolve(dbPath, `${dbFilesPrefix}.json`))
-        );
-    }
+    const info = db.data[itemId];
 
-    dbCache[dbPrefix].read();
-    dbCache[dbFilesPrefix].read();
+    const files = itemId in dbFiles.data ? dbFiles.data[itemId].sort() : [];
 
-    const info = dbCache[dbPrefix].data[itemId];
-
-    const files =
-        itemId in dbCache[dbFilesPrefix].data
-            ? dbCache[dbFilesPrefix].data[itemId]
-            : [];
+    const size = files.reduce((previous, current) => {
+        previous += fs.statSync(
+            path.resolve(options.directory, "download", id, itemId, current)
+        ).size;
+        return previous;
+    }, 0);
 
     return res.json({
         info,
         files,
         count: files.length,
+        size,
+        error: false,
+    });
+});
+
+app.delete("/adapters/:id/:itemId", (req, res) => {
+    const { id, itemId } = req.params;
+
+    const item = getItem(id, itemId);
+
+    if (!item || item.deleted) {
+        return res.json({
+            result: true,
+            error: false,
+        });
+    }
+
+    const thumbnailFilePath = path.resolve(
+        options.directory,
+        "thumbnails",
+        id,
+        `${id}.webp`
+    );
+
+    const itemDownloadFolder = path.resolve(
+        options.directory,
+        "download",
+        id,
+        id
+    );
+
+    // found db item and set delete param to true
+    const { result } = deleteItem(id, itemId);
+
+    // delete thumbnail
+    if (fs.existsSync(thumbnailFilePath) && result) {
+        fs.unlinkSync(thumbnailFilePath);
+    }
+
+    // delete item dir if exist
+    if (fs.existsSync(itemDownloadFolder) && result) {
+        fs.rmSync(itemDownloadFolder, { recursive: true });
+    }
+
+    return res.json({
+        result,
         error: false,
     });
 });
@@ -239,15 +321,9 @@ app.get("/files/:id/:itemId", (req, res) => {
 
     const dbFilesPrefix = `${id}-files`;
 
-    if (!(dbFilesPrefix in dbCache)) {
-        dbCache[dbFilesPrefix] = new LowSync(
-            new JSONFileSync(path.resolve(dbPath, `${dbFilesPrefix}.json`))
-        );
-    }
+    const dbFiles = loadDB(dbFilesPrefix);
 
-    dbCache[dbFilesPrefix].read();
-
-    if (!(itemId in dbCache[dbFilesPrefix].data)) {
+    if (!(itemId in dbFiles.data)) {
         return res.json({
             files: {},
             count: 0,
@@ -255,11 +331,40 @@ app.get("/files/:id/:itemId", (req, res) => {
         });
     }
 
-    const files = dbCache[dbFilesPrefix].data[itemId];
+    const files = itemId in dbFiles.data ? dbFiles.data[itemId].sort() : [];
 
     return res.json({
         files,
         count: files.length,
+        error: false,
+    });
+});
+
+app.get("/brands/:adapter", (req, res) => {
+    const { adapter } = req.params;
+
+    const brands = getBrands(adapter);
+
+    return res.json({
+        brands,
+        error: false,
+    });
+});
+
+app.get("/predictions/:adapter", (req, res) => {
+    const { adapter } = req.params;
+
+    const predictions = getPredictions(adapter);
+
+    return res.json({
+        predictions,
+        error: false,
+    });
+});
+
+app.get("/queue", (req, res) => {
+    return res.json({
+        queue,
         error: false,
     });
 });

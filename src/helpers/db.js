@@ -670,6 +670,29 @@ export function getFiles(prefix, itemId) {
 }
 
 /**
+ * Get files size by files from DB by item ID
+ *
+ * @param   {String}  prefix  Prefix
+ * @param   {String}  itemId  Item ID
+ *
+ * @return  {Number}          Files size
+ */
+export function getFilesSize(prefix, itemId) {
+    const files = getFiles(prefix, itemId);
+
+    if (!files || !files.length || !Array.isArray(files)) {
+        return 0;
+    }
+
+    return files.reduce((previous, current) => {
+        previous += fs.statSync(
+            path.resolve(options.directory, "download", prefix, itemId, current)
+        ).size;
+        return previous;
+    }, 0);
+}
+
+/**
  * Add predictions to DB
  *
  * @param   {String}  prefix       Prefix
@@ -722,7 +745,7 @@ export function addPrediction(prefix, itemId, filename, predictions) {
  *
  * @return  {Array}             Predictions
  */
-export function getPredictions(prefix, itemId, filename) {
+export function getItemPredictions(prefix, itemId, filename) {
     if (!filename) {
         logMsg("Filename not defined!", itemId, prefix);
         return false;
@@ -743,6 +766,57 @@ export function getPredictions(prefix, itemId, filename) {
     }
 
     return db.data[itemId][filename];
+}
+
+/**
+ * Get all predictions from DB
+ *
+ * @param   {String}  prefix  Prefix
+ *
+ * @return  {Object}          Predictions object
+ */
+export function getPredictions(prefix) {
+    const dbPrefix = `${prefix}-predictions`;
+
+    loadDB(dbPrefix);
+
+    const db = dbCache[dbPrefix];
+
+    const allPredictions = {};
+
+    for (const itemId in db.data) {
+        const item = db.data[itemId];
+
+        for (const filename in item) {
+            const predictions = item[filename];
+
+            for (const prediction of predictions) {
+                if (!(prediction.class in allPredictions)) {
+                    allPredictions[prediction.class] = [prediction.score];
+                } else {
+                    allPredictions[prediction.class].push(prediction.score);
+                }
+            }
+        }
+    }
+
+    for (const boxClass in allPredictions) {
+        const scores = allPredictions[boxClass];
+
+        const max = Math.max(...scores);
+        const min = Math.min(...scores);
+        const count = scores.length;
+        const avg = scores.reduce((a, b) => a + b, 0) / count;
+
+        allPredictions[boxClass] = {
+            max,
+            min,
+            avg,
+            count,
+        };
+    }
+
+    return allPredictions;
 }
 
 export default updateTime;

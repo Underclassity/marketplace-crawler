@@ -303,7 +303,7 @@ export async function getItemsOnPages(queue, query = options.query) {
  * @return  {Boolean}        Result
  */
 export async function updateReviews(queue) {
-    const items = getItems(prefix);
+    const items = getItems(prefix, true);
 
     logMsg(`Update ${items.length} items reviews`);
 

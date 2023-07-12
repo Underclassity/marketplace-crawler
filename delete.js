@@ -3,13 +3,34 @@ import path from "node:path";
 
 import inquirer from "inquirer";
 
-import { getItem, deleteItem } from "./src/helpers/db.js";
+import { getItem, deleteItem, getItems } from "./src/helpers/db.js";
 import getAdaptersIds from "./src/helpers/get-adapters-ids.js";
 import logMsg from "./src/helpers/log-msg.js";
 
 import options from "./src/options.js";
 
 const ids = getAdaptersIds();
+
+/**
+ * Check and delete items
+ *
+ * @return  {Boolean}  Result
+ */
+async function checkDeleted() {
+    for (const adapter of ids) {
+        const items = getItems(adapter, true);
+
+        for (const itemId of items) {
+            const item = getItem(adapter, itemId);
+
+            if (item?.deleted) {
+                await deleteItemFromDBs(itemId);
+            }
+        }
+    }
+
+    return true;
+}
 
 /**
  * Delete item by ID
@@ -102,6 +123,8 @@ async function deleteItemFromDBs(id) {
 }
 
 (async () => {
+    await checkDeleted();
+
     if (options.id) {
         await deleteItemFromDBs(options.id);
         return false;

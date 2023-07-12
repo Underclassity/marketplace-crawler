@@ -4,7 +4,7 @@ import {
     addPrediction,
     getFiles,
     getItems,
-    getPredictions,
+    getItemPredictions,
 } from "./src/helpers/db.js";
 import { detectImage, loadModel, readImage } from "./src/helpers/detect.js";
 import { logMsg, logQueue } from "./src/helpers/log-msg.js";
@@ -34,7 +34,7 @@ let counter = 0;
 async function getFilePredictions(adapter, itemId, filename) {
     // logMsg(`Process file ${filename}`, itemId, adapter);
 
-    const dbPredictions = getPredictions(adapter, itemId, filename);
+    const dbPredictions = getItemPredictions(adapter, itemId, filename);
 
     if (Array.isArray(dbPredictions) && !options.force) {
         // logMsg(`Predictions for ${filename} already in DB`, itemId, adapter);

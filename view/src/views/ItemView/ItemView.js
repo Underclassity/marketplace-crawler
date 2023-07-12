@@ -1,4 +1,5 @@
 import axios from "axios";
+import prettyBytes from "pretty-bytes";
 
 export default {
     name: "ItemView",
@@ -7,6 +8,7 @@ export default {
         return {
             files: [],
             count: 0,
+            size: 0,
         };
     },
 
@@ -18,13 +20,24 @@ export default {
         itemId() {
             return this.$route.params.itemId;
         },
+
+        prettySize() {
+            return prettyBytes(this.size);
+        },
     },
 
     methods: {
-        getImageSrc(image) {
+        getImageSrc(file) {
             const { adapter, itemId } = this;
 
-            return `http://localhost:3000/static/${adapter}/${itemId}/${image}?w=200`;
+            // return `http://localhost:3000/static/${adapter}/${itemId}/${image}?w=200`;
+            return `http://localhost:3000/static/${adapter}/${itemId}/${file}`;
+        },
+
+        getVideoSrc(file) {
+            const { adapter, itemId } = this;
+
+            return `http://localhost:3000/${adapter}/${itemId}/${file}`;
         },
 
         async getData() {
@@ -33,10 +46,11 @@ export default {
             try {
                 const request = await axios(`/adapters/${adapter}/${itemId}`);
 
-                const { files, count } = request.data;
+                const { files, count, size } = request.data;
 
                 this.files = files;
                 this.count = count;
+                this.size = size;
             } catch (error) {
                 console.log(error.message);
             }

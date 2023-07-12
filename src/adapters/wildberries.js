@@ -237,31 +237,31 @@ export async function getFeedbacks(id, queue) {
         }
     }
 
-    const priceInfo = isResult ? await getPriceInfo(id) : false;
+    // const priceInfo = isResult ? await getPriceInfo(id) : false;
 
-    if (priceInfo) {
-        const item = getItem(prefix, id);
+    // if (priceInfo) {
+    //     const item = getItem(prefix, id);
 
-        if (!item) {
-            addItem(prefix, id, {
-                prices: [],
-            });
-        }
+    //     if (!item) {
+    //         addItem(prefix, id, {
+    //             prices: [],
+    //         });
+    //     }
 
-        if (item && !("prices" in item)) {
-            updateItem(prefix, id, {
-                prices: [],
-            });
-        }
+    //     if (item && !("prices" in item)) {
+    //         updateItem(prefix, id, {
+    //             prices: [],
+    //         });
+    //     }
 
-        for (const price of priceInfo) {
-            if (item?.prices && !item.prices.includes(price)) {
-                updateItem(prefix, id, {
-                    prices: item.prices.concat(price),
-                });
-            }
-        }
-    }
+    //     for (const price of priceInfo) {
+    //         if (item?.prices && !item.prices.includes(price)) {
+    //             updateItem(prefix, id, {
+    //                 prices: item.prices.concat(price),
+    //             });
+    //         }
+    //     }
+    // }
 
     if (isResult) {
         updateTime(prefix, id);
@@ -549,7 +549,7 @@ export function updateItems(queue) {
  * @return  {Boolean}        Result
  */
 export function updateReviews(queue) {
-    const items = getItems(prefix);
+    const items = getItems(prefix, true);
 
     log(`Update ${items.length} items reviews`);
 
@@ -680,9 +680,15 @@ export async function getBrandItemsByID(brandID, queue) {
 export async function getItemsByBrand(queue) {
     log("Get items call by brand");
 
-    const items = await getBrandItemsByID(options.brand, queue);
+    let brand = options.brand;
 
-    processItems(items, options.brand, queue);
+    if (brand.indexOf("__") != -1) {
+        brand = brand.slice(0, brand.indexOf("__"));
+    }
+
+    const items = await getBrandItemsByID(brand, queue);
+
+    processItems(items, brand, queue);
 
     return true;
 }
