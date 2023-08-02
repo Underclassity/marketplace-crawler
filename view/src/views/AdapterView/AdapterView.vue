@@ -25,12 +25,19 @@
                 option(value="sizeAsc") Size ASC
                 option(value="sizeDesc") Size DESC
 
-        .filter-item(v-if="brands?.length")
+        .filter-item(v-if="brands && Object.keys(brands).length")
             label(for="brand-select") Brands
             select(v-model="brand" id="brand-select" v-on:change="changeRoute")
                 option(value="") None
                 option(value="no-brand") No brand
-                option(v-for="brand of brands" :key="brand" :value="brand") {{ brand }}
+                option(v-for="brand in brands" :key="brand.id" :value="brand.id") {{ brand.name || brand.id }}
+
+        .filter-item(v-if="tags?.length")
+            label(for="brand-select") tags
+            select(v-model="tag" id="brand-select" v-on:change="changeRoute")
+                option(value="") None
+                option(value="no-tag") No tag
+                option(v-for="tag of tags" :key="tag" :value="tag") {{ tag }}
 
         .filter-item(v-if="Object.keys(predictions).length")
             label(for="predictions-select") Predictions
@@ -39,8 +46,13 @@
                 option(value="no-prediction") No prediction
                 option(v-for="(prediction, id) in predictions" :key="id" :value="id") {{ id }} ({{ prediction.min.toFixed(2) }}-{{ prediction.avg.toFixed(2) }}-{{ prediction.max.toFixed(2) }})
 
-    .items(v-if="items")
+        .filter-item
+            button(v-on:click.prevent.stop="updateAllOnPage") Update all on page
+
+    .items(v-if="items?.length")
         ItemBlock(v-for="item of items" :key="item.id" :item="item" :itemId="item.id" :adapter="adapter")
+
+    h1(v-if="!items?.length") No items found
 
     PaginationBlock(:count="count")
 

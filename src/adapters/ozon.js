@@ -346,6 +346,30 @@ export async function getOzonItem(link, id, queue, browser) {
 }
 
 /**
+ * Update item by ID
+ *
+ * @param   {String}  itemId    Item ID
+ * @param   {Object}  queue     Queue instance
+ * @param   {Object}  browser   Puppeteer instance
+ *
+ * @return  {Boolean}           Result
+ */
+export async function updateItemById(itemId, queue, browser) {
+    const item = getItem(prefix, itemId);
+
+    if (!item) {
+        return false;
+    }
+
+    return await queue.add(
+        async () => getOzonItem(item.link, itemId, queue, browser),
+        {
+            priority: priorities.item,
+        }
+    );
+}
+
+/**
  * Update items
  *
  * @param   {Object}  queue  Queue instance
@@ -364,6 +388,10 @@ export async function updateItems(queue) {
 
     items.forEach((itemId) => {
         const item = getItem(prefix, itemId);
+
+        if (!item) {
+            return false;
+        }
 
         queue.add(() => getOzonItem(item.link, itemId, queue, browser), {
             priority: priorities.item,

@@ -81,17 +81,17 @@ export function dbWrite(dbPrefix, write = true, prefix = false) {
             writeCache[dbPrefix] = true;
         }
 
-        // const startTime = Date.now();
+        const startTime = Date.now();
 
         db.write();
 
-        // const endTime = Date.now();
+        const endTime = Date.now();
 
-        // logMsg(
-        //     `Write in DB ${dbPrefix}: ${endTime - startTime}ms`,
-        //     false,
-        //     prefix
-        // );
+        logMsg(
+            `Write in DB ${dbPrefix}: ${endTime - startTime}ms`,
+            false,
+            prefix
+        );
 
         if (dbPrefix) {
             writeCache[dbPrefix] = false;
@@ -222,13 +222,14 @@ export function deleteItem(prefix, itemId) {
 /**
  * Update item data`
  *
- * @param   {String}  prefix  Prefix
- * @param   {String}  itemId  Item ID
- * @param   {Object}  data    Data
+ * @param   {String}   prefix  Prefix
+ * @param   {String}   itemId  Item ID
+ * @param   {Object}   data    Data
+ * @param   {Boolean}  write   Write flag
  *
- * @return  {Boolean}         Result
+ * @return  {Boolean}          Result
  */
-export function updateItem(prefix, itemId, data) {
+export function updateItem(prefix, itemId, data, write = true) {
     const dbPrefix = `${prefix}-products`;
 
     loadDB(dbPrefix);
@@ -244,7 +245,7 @@ export function updateItem(prefix, itemId, data) {
         ...data,
     };
 
-    dbWrite(dbPrefix, true, prefix);
+    dbWrite(dbPrefix, write, prefix);
 
     return true;
 }
@@ -376,12 +377,17 @@ export function updateBrand(prefix, itemId, brand) {
 /**
  * Get items from DB
  *
- * @param   {String}   prefix  Log prefix
- * @param   {Boolean}  force   Force get all flag
+ * @param   {String}   prefix    Log prefix
+ * @param   {Boolean}  force     Force get all flag
+ * @param   {Boolean}  deleted   Flag to return with deleted items
  *
- * @return  {Array}            Items IDs array
+ * @return  {Array}              Items IDs array
  */
-export function getItems(prefix = false, force = options.force) {
+export function getItems(
+    prefix = false,
+    force = options.force,
+    deleted = false
+) {
     const dbPrefix = `${prefix}-products`;
 
     loadDB(dbPrefix);
@@ -404,7 +410,7 @@ export function getItems(prefix = false, force = options.force) {
                 return false;
             }
 
-            if ("deleted" in item && item.deleted) {
+            if ("deleted" in item && item.deleted && !deleted) {
                 logMsg(`Deleted item`, id, prefix);
 
                 return false;
@@ -427,11 +433,12 @@ export function getItems(prefix = false, force = options.force) {
 /**
  * Get items brands from DB
  *
- * @param   {String}  prefix  Log prefix
+ * @param   {String}   prefix     Log prefix
+ * @param   {Boolean}  withNames  Get with names flag
  *
- * @return  {Array}           Array of brands
+ * @return  {Array}               Array of brands
  */
-export function getBrands(prefix) {
+export function getBrands(prefix, withNames = false) {
     const dbPrefix = `${prefix}-products`;
 
     loadDB(dbPrefix);
@@ -445,21 +452,46 @@ export function getBrands(prefix) {
 
     db.read();
 
-    let brands = [];
+    let brands = withNames ? {} : [];
 
     for (const itemId in db.data) {
         const item = db.data[itemId];
 
-        if (item?.brand?.length && !brands.includes(item.brand)) {
+        if (!withNames && item?.brand?.length && !brands.includes(item.brand)) {
             brands.push(item.brand);
+        }
+
+        if (withNames && item?.brand?.length && !(item.brand in brands)) {
+            brands[item.brand] = { id: item.brand, name: undefined };
+        }
+
+        if (item?.ids && withNames) {
+            const firstItem = item.ids[0];
+
+            if (firstItem.brandName) {
+                if (firstItem.brand in brands) {
+                    brands[firstItem.brand].name = firstItem.brandName;
+                } else {
+                    brands[firstItem.brand] = {
+                        id: firstItem.brand,
+                        name: firstItem.brandName,
+                    };
+                }
+            } else {
+                if (!(firstItem.brand in brands)) {
+                    brands[firstItem.brand] = { id: firstItem.brand };
+                }
+            }
         }
     }
 
     // fitler brands
-    brands = brands
-        .filter((item) => item)
-        .map((item) => item.trim())
-        .filter((item, index, array) => array.indexOf(item) === index);
+    if (!withNames) {
+        brands = brands
+            .filter((item) => item)
+            .map((item) => item.trim())
+            .filter((item, index, array) => array.indexOf(item) === index);
+    }
 
     return brands;
 }
@@ -490,7 +522,7 @@ export function getTags(prefix = false) {
     for (const itemId in db.data) {
         const item = db.data[itemId];
 
-        if (item?.tags.length) {
+        if (item?.tags?.length) {
             item.tags.forEach((tag) => {
                 if (!tags.includes(tag)) {
                     tags.push(tag);
@@ -573,6 +605,8 @@ export function addReview(prefix, itemId, reviewId, review, write = true) {
     const reviewsDB = dbCache[dbReviewsPrefix];
     const productsDB = dbCache[dbProductsPrefix];
 
+    let isWrite = false;
+
     // Add item if not defined
     if (!(itemId in productsDB.data)) {
         addItem(prefix, itemId);
@@ -583,18 +617,31 @@ export function addReview(prefix, itemId, reviewId, review, write = true) {
         productsDB.data[itemId].reviews = Object.keys(
             productsDB.data[itemId].reviews
         );
-        dbWrite(dbProductsPrefix, true, prefix);
+        dbWrite(dbProductsPrefix, write, prefix);
+        isWrite = true;
     }
 
     // Check is review in product item
     if (!productsDB.data[itemId].reviews.includes(reviewId)) {
         productsDB.data[itemId].reviews.push(reviewId);
-        dbWrite(dbProductsPrefix, true, prefix);
+        dbWrite(dbProductsPrefix, write, prefix);
+        isWrite = true;
     }
+
+    // console.log(new Array(20).join("-"));
+    // console.log(JSON.stringify(reviewsDB.data[reviewId]));
+    // console.log(new Array(10).join("-"));
+    // console.log(JSON.stringify(review));
+    // console.log(new Array(10).join("-"));
+    // console.log(
+    //     JSON.stringify(reviewsDB.data[reviewId]) == JSON.stringify(review)
+    // );
+    // console.log(new Array(20).join("-"));
 
     if (!(reviewId in reviewsDB.data)) {
         reviewsDB.data[reviewId] = review;
         dbWrite(dbReviewsPrefix, write, prefix);
+        isWrite = true;
 
         logMsg(`Force add/update review ${reviewId} in DB`, itemId, prefix);
     } else if (
@@ -604,11 +651,12 @@ export function addReview(prefix, itemId, reviewId, review, write = true) {
     } else {
         reviewsDB.data[reviewId] = review;
         dbWrite(dbReviewsPrefix, write, prefix);
+        isWrite = true;
 
         logMsg(`Update review ${reviewId} in DB`, itemId, prefix);
     }
 
-    return true;
+    return { result: true, isWrite };
 }
 
 /**

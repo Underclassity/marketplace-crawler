@@ -42,6 +42,8 @@ puppeteer.use(
 puppeteer.use(StealthPlugin());
 
 let isStartPageReloading = false;
+let isStartPageLoaded = false;
+let startPage;
 
 /**
  * Log message helper
@@ -360,6 +362,11 @@ export async function scrapeItem(itemId, queue) {
         !options.force
     ) {
         log(`Already updated by time`, itemId);
+        return false;
+    }
+
+    if (dbReviewItem.deleted) {
+        logMsg("Deleted item", itemId);
         return false;
     }
 
@@ -937,26 +944,18 @@ export async function processPage(
 }
 
 /**
- * Update items
+ * Load aliexpress start page
  *
- * @param   {Object}  queue   Queue instance
+ * @param   {Object}  browser  Puppeteer instance
  *
- * @return  {Boolean}         Result
+ * @return  {Object}           Puppeteer page
  */
-export async function updateItems(queue) {
-    const puppeteerPath = path.resolve("./puppeteer/");
-
-    if (!fs.existsSync(puppeteerPath)) {
-        fs.mkdirSync(puppeteerPath);
+export async function loadStartPage(browser) {
+    if (isStartPageLoaded) {
+        return startPage;
     }
 
-    const browser = await puppeteer.launch(browserConfig);
-
-    const items = getItems(prefix);
-
-    log(`Update ${items.length} items`);
-
-    const startPage = await createPage(browser, false);
+    startPage = await createPage(browser, false);
 
     await startPage.goto(`https://aliexpress.ru/`, goSettings);
 
@@ -1001,6 +1000,47 @@ export async function updateItems(queue) {
 
     //     throw new Error("Captcha found");
     // }
+
+    isStartPageLoaded = true;
+
+    return startPage;
+}
+
+/**
+ * Update item by ID
+ *
+ * @param   {String}  itemId    Item ID
+ * @param   {Object}  queue     Queue instance
+ * @param   {Object}  browser   Puppeteer instance
+ *
+ * @return  {Boolean}           Result
+ */
+export async function updateItemById(itemId, queue, browser) {
+    await loadStartPage(browser);
+
+    return await queue.add(
+        async () => scrapeItemByBrowser(itemId, browser, startPage, queue),
+        {
+            priority: priorities.item,
+        }
+    );
+}
+
+/**
+ * Update items
+ *
+ * @param   {Object}  queue   Queue instance
+ *
+ * @return  {Boolean}         Result
+ */
+export async function updateItems(queue) {
+    const browser = await puppeteer.launch(browserConfig);
+
+    const items = getItems(prefix);
+
+    log(`Update ${items.length} items`);
+
+    await loadStartPage(browser);
 
     items.forEach((itemId) =>
         queue.add(

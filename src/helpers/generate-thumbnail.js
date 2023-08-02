@@ -1,12 +1,13 @@
-import path from "node:path";
 import fs from "node:fs";
+import path from "node:path";
+import process from "node:process";
 
 import sizeOf from "image-size";
 
 import { processFile, extractVideoFrames } from "./image-process.js";
 import commandCall from "./command-call.js";
-import priorities from "./priorities.js";
 import logMsg from "./log-msg.js";
+import priorities from "./priorities.js";
 
 import options from "../options.js";
 
@@ -112,6 +113,7 @@ export async function generateThumbail(
     // })
 
     let images = itemImages
+        .filter((filename) => path.extname(filename) != ".mp4")
         .slice(0, 16)
         .map((filename) => path.resolve(dir, filename));
 

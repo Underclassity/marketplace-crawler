@@ -1,4 +1,5 @@
 import path from "node:path";
+import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import yargs from "yargs";
@@ -45,7 +46,7 @@ export const options = yargs(hideBin(process.argv))
     })
     .option("thumbnail", {
         describe: "Thumbnail generate flag",
-        default: true,
+        default: false,
         type: "boolean",
     })
     .option("image", {

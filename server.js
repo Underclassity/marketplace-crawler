@@ -10,9 +10,13 @@ import bodyParser from "body-parser";
 import compression from "compression";
 import cors from "cors";
 import express from "express";
-import morgan from "morgan";
+// import morgan from "morgan";
 
 import { LowSync, MemorySync } from "lowdb";
+
+import puppeteer from "puppeteer-extra";
+import StealthPlugin from "puppeteer-extra-plugin-stealth";
+import AdblockerPlugin from "puppeteer-extra-plugin-adblocker";
 
 import {
     deleteItem,
@@ -20,14 +24,32 @@ import {
     getFilesSize,
     getItem,
     getPredictions,
+    getTags,
     loadDB,
 } from "./src/helpers/db.js";
+import { processCookiesAndSession } from "./src/adapters/aliexpress.js";
+import browserConfig from "./src/helpers/browser-config.js";
+import createQueue from "./src/helpers/create-queue.js";
 import getAdaptersIds from "./src/helpers/get-adapters-ids.js";
 import getRandom from "./src/helpers/random.js";
-import createQueue from "./src/helpers/create-queue.js";
 import logMsg from "./src/helpers/log-msg.js";
 
 import options from "./src/options.js";
+
+// Configure puppeteer
+puppeteer.use(
+    AdblockerPlugin({
+        blockTrackers: true,
+    })
+);
+
+puppeteer.use(StealthPlugin());
+
+const browser = await puppeteer.launch({
+    ...browserConfig,
+    headless: false,
+    devtools: true,
+});
 
 const sizeDb = new LowSync(new MemorySync(), {});
 
@@ -49,7 +71,7 @@ app.use(bodyParser.json());
 app.use(compression());
 app.use(cors());
 app.use(express.static(downloadFolderPath));
-app.use(morgan("combined"));
+// app.use(morgan("combined"));
 
 const adapters = getAdaptersIds();
 
@@ -72,11 +94,11 @@ function getRandomFilesIds(adapter, itemId) {
     if (itemId in db.data) {
         let files = db.data[itemId];
 
-        files = files.filter((filename) => path.extname(filename) != ".mp4");
-
         if (!Array.isArray(files)) {
             return [];
         }
+
+        files = files.filter((filename) => path.extname(filename) != ".mp4");
 
         return files.length >= 9 ? getRandom(files, 9) : files;
     } else {
@@ -96,9 +118,14 @@ app.get("/adapters/:id", (req, res) => {
     const isPhotos = req.query.photos == "true" || false;
     const sortId = req.query.sort || false;
     let brand = req.query.brand || false;
+    let tag = req.query.tag || false;
 
     if (brand == "false" || brand == "true") {
         brand = false;
+    }
+
+    if (tag == "false") {
+        tag = false;
     }
 
     if (!adapters.includes(adapter)) {
@@ -119,6 +146,17 @@ app.get("/adapters/:id", (req, res) => {
 
     let allItemsIDs = Object.keys(db.data)
         .filter((itemId) => !db.data[itemId]?.deleted)
+        .filter((itemId) => {
+            if (!tag) {
+                return true;
+            }
+
+            if (tag == "no-tag") {
+                return !db.data[itemId]?.tags.length;
+            }
+
+            return db.data[itemId].tags.includes(tag);
+        })
         .filter((itemId) => {
             if (!isPhotos) {
                 return true;
@@ -157,11 +195,17 @@ app.get("/adapters/:id", (req, res) => {
             }
 
             if (sortId == "reviewsAsc") {
-                return aItem.reviews.length - bItem.reviews.length;
+                return (
+                    (aItem?.reviews?.length || 0) -
+                    (bItem?.reviews?.length || 0)
+                );
             }
 
             if (sortId == "reviewsDesc") {
-                return bItem.reviews.length - aItem.reviews.length;
+                return (
+                    (bItem?.reviews?.length || 0) -
+                    (aItem?.reviews?.length || 0)
+                );
             }
 
             if (sortId == "sizeAsc" || sortId == "sizeDesc") {
@@ -206,7 +250,7 @@ app.get("/adapters/:id", (req, res) => {
         const resultItem = { ...db.data[itemId] };
 
         resultItem.id = itemId;
-        resultItem.reviews = db.data[itemId].reviews.length;
+        resultItem.reviews = db.data[itemId]?.reviews?.length || 0;
         resultItem.images = getRandomFilesIds(adapter, itemId).sort();
         resultItem.files =
             itemId in dbFiles.data ? dbFiles.data[itemId].length : 0;
@@ -238,24 +282,96 @@ app.get("/adapters/:id/:itemId", (req, res) => {
 
     const dbPrefix = `${id}-products`;
     const dbFilesPrefix = `${id}-files`;
+    const dbReviewsPrefix = `${id}-reviews`;
 
     const db = loadDB(dbPrefix);
     const dbFiles = loadDB(dbFilesPrefix);
+    const dbReviews = loadDB(dbReviewsPrefix);
 
     const info = db.data[itemId];
 
     const files = itemId in dbFiles.data ? dbFiles.data[itemId].sort() : [];
+    const filesNames = files.map((filename) => path.parse(filename).name);
 
-    const size = files.reduce((previous, current) => {
-        previous += fs.statSync(
-            path.resolve(options.directory, "download", id, itemId, current)
-        ).size;
-        return previous;
-    }, 0);
+    const reviews = info.reviews
+        .map((reviewId) => dbReviews.data[reviewId] || [])
+        .filter((review) => {
+            if (id == "aliexpress") {
+                return review?.images || review?.additionalReview?.images;
+            }
+
+            if (id == "wildberries") {
+                return review?.photos;
+            }
+        })
+        .map((review) => {
+            let images = [];
+
+            if (Array.isArray(review.images)) {
+                images.push(...review.images);
+            }
+
+            if (Array.isArray(review?.additionalReview?.images)) {
+                images.push(...review.additionalReview.images);
+            }
+
+            if (Array.isArray(review.photos)) {
+                images.push(
+                    ...review.photos.map((item) => {
+                        return {
+                            url: `https://feedbackphotos.wbstatic.net/${item.fullSizeUri}`,
+                        };
+                    })
+                );
+            }
+
+            images = images
+                .filter((item) => item?.url)
+                .map((item) => path.basename(item.url))
+                .filter((filename) =>
+                    filesNames.includes(path.parse(filename).name)
+                )
+                .map((filename) => {
+                    const parsedFilename = path.parse(filename);
+                    const webpFilename = `${parsedFilename.name}.webp`;
+
+                    if (files.includes(webpFilename)) {
+                        return webpFilename;
+                    }
+
+                    return filename;
+                });
+
+            return {
+                id: review.id,
+                images,
+            };
+        });
+
+    delete info.reviews;
+
+    const size = files
+        .filter((filename) =>
+            fs.existsSync(
+                path.resolve(
+                    options.directory,
+                    "download",
+                    id,
+                    itemId,
+                    filename
+                )
+            )
+        )
+        .reduce((previous, current) => {
+            previous += fs.statSync(
+                path.resolve(options.directory, "download", id, itemId, current)
+            ).size;
+            return previous;
+        }, 0);
 
     return res.json({
         info,
-        files,
+        reviews,
         count: files.length,
         size,
         error: false,
@@ -343,10 +459,21 @@ app.get("/files/:id/:itemId", (req, res) => {
 app.get("/brands/:adapter", (req, res) => {
     const { adapter } = req.params;
 
-    const brands = getBrands(adapter);
+    const brands = getBrands(adapter, true);
 
     return res.json({
         brands,
+        error: false,
+    });
+});
+
+app.get("/tags/:adapter", (req, res) => {
+    const { adapter } = req.params;
+
+    const tags = getTags(adapter);
+
+    return res.json({
+        tags,
         error: false,
     });
 });
@@ -363,8 +490,50 @@ app.get("/predictions/:adapter", (req, res) => {
 });
 
 app.get("/queue", (req, res) => {
+    const { size, pending, isPaused } = queue;
+
     return res.json({
-        queue,
+        size,
+        pending,
+        isPaused,
+        error: false,
+    });
+});
+
+app.post("/queue/:adapter", async (req, res) => {
+    const { adapter } = req.params;
+
+    if (adapter == "aliexpress" && options.cookies) {
+        await processCookiesAndSession();
+    }
+
+    const { updateItemById } = await import(`./src/adapters/${adapter}.js`);
+
+    if (!updateItemById) {
+        return res.json({
+            result: false,
+            error: true,
+        });
+    }
+
+    const { items } = req.body;
+
+    const result = {};
+
+    if (Array.isArray(items)) {
+        for (const itemId of items) {
+            const updateResult = await updateItemById(itemId, queue, browser);
+
+            // Update size DB
+            sizeDb.data[`${adapter}-${itemId}`] = getFilesSize(adapter, itemId);
+            sizeDb.write();
+
+            result[itemId] = updateResult;
+        }
+    }
+
+    return res.json({
+        result,
         error: false,
     });
 });

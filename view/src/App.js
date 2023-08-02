@@ -1,5 +1,3 @@
-// import axios from "axios";
-
 import OverlayBlock from "./components/OverlayBlock/OverlayBlock.vue";
 
 export default {
@@ -9,15 +7,28 @@ export default {
         OverlayBlock,
     },
 
-    // async mounted() {
-    //     try {
-    //         const request = await axios("/queue");
+    data() {
+        return {
+            updateInterval: undefined,
+            size: this.$store.state.queue.size,
+            pending: this.$store.state.queue.pending,
+            isPaused: this.$store.state.queue.isPaused,
+        };
+    },
 
-    //         const { queue } = request.data;
+    async mounted() {
+        await this.$store.dispatch("getQueueStatus");
 
-    //         console.log(queue);
-    //     } catch (error) {
-    //         console.error(error);
-    //     }
-    // },
+        this.updateInterval = setInterval(async () => {
+            await this.$store.dispatch("getQueueStatus");
+
+            this.size = this.$store.state.queue.size;
+            this.pending = this.$store.state.queue.pending;
+            this.isPaused = this.$store.state.queue.isPaused;
+        }, 5 * 1000);
+    },
+
+    beforeUnmount() {
+        clearInterval(this.updateInterval);
+    },
 };

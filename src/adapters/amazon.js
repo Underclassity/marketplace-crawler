@@ -5,7 +5,7 @@ import url from "node:url";
 import {
     products as amazonProducts,
     reviews as amazonReviews,
-} from "../libs/amazon-buddy/index.js";
+} from "amazon-buddy";
 
 import downloadItem from "../helpers/image-process.js";
 
@@ -237,9 +237,15 @@ export async function getItemsByQuery(queue, query = options.query) {
                         queue,
                         timeout: options.timeout,
                     });
+
+                    console.log(results);
                 } catch (error) {
                     results = false;
                     log(`Error get from page ${page}: ${error.message}`);
+
+                    if (error.message == "No more products") {
+                        page = options.pages;
+                    }
                 }
             },
             { priority: priorities.item }

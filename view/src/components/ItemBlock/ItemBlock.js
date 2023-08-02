@@ -23,12 +23,14 @@ export default {
         },
     },
 
-    // data() {
-    //     return {
-    //         files: [],
-    //         count: 0,
-    //     };
-    // },
+    data() {
+        return {
+            // files: [],
+            // count: 0,
+
+            isUpdating: false,
+        };
+    },
 
     computed: {
         // images() {
@@ -36,6 +38,24 @@ export default {
 
         //     return count >= 9 ? getRandom(files, 9) : files;
         // },
+
+        emptyImagesCount() {
+            const { count } = this;
+
+            if (count == 0) {
+                return 1;
+            }
+
+            if (count == 1) {
+                return 0;
+            }
+
+            if (count > 1 && count <= 4) {
+                return 4 - count;
+            }
+
+            return 9 - count;
+        },
 
         images() {
             return this.item.images || [];
@@ -62,8 +82,31 @@ export default {
         //     }
         // },
 
+        async updateItem() {
+            if (this.isUpdating) {
+                return false;
+            }
+
+            this.isUpdating = true;
+
+            const { itemId, adapter } = this;
+
+            const { result } = await this.$store.dispatch("updateItems", {
+                items: [itemId],
+                adapter,
+            });
+
+            this.isUpdating = false;
+
+            if (result) {
+                this.emitter.emit("updateItems");
+            }
+
+            return true;
+        },
+
         pretty(size) {
-            return prettyBytes(size);
+            return prettyBytes(size || 0);
         },
 
         updateDeleteItems(id) {
@@ -71,9 +114,47 @@ export default {
         },
 
         getImageSrc(image) {
-            const { adapter, itemId } = this;
+            const { adapter, itemId, count } = this;
 
-            return `http://localhost:3000/static/${adapter}/${itemId}/${image}?w=100&h=100&c=true`;
+            const ratio = count <= 4 ? 2 : 1;
+
+            const size = 100 * ratio;
+
+            return `http://localhost:3000/static/${adapter}/${itemId}/${image}?w=${size}&h=${size}&c=true`;
+        },
+
+        getImageClassname() {
+            const { count } = this;
+
+            if (count <= 1) {
+                return "item-images-1";
+            }
+
+            if (count > 1 && count <= 4) {
+                return "item-images-4";
+            }
+
+            return "item-images-9";
+        },
+
+        getTimeClass() {
+            const { time } = this.item;
+
+            const currentTime = Date.now();
+
+            const timeDiff = currentTime - time;
+
+            const optTimeDiff = 12 * 60 * 60 * 1000; // 12 hours
+
+            if (timeDiff > optTimeDiff) {
+                return "red";
+            }
+
+            if (timeDiff >= optTimeDiff / 2) {
+                return "yellow";
+            }
+
+            return "green";
         },
     },
 

@@ -2,6 +2,9 @@
 nav
     router-link(to="/") Home
     router-link(to="/adapters") Adapters
+    span Size {{ size }}
+    span Pending {{ pending }}
+    span Paused {{  isPaused }}
 
 router-view
 

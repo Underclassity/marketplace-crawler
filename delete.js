@@ -18,13 +18,37 @@ const ids = getAdaptersIds();
  */
 async function checkDeleted() {
     for (const adapter of ids) {
-        const items = getItems(adapter, true);
+        const items = getItems(adapter, true, true);
 
         for (const itemId of items) {
             const item = getItem(adapter, itemId);
 
             if (item?.deleted) {
-                await deleteItemFromDBs(itemId);
+                const thumbnailFilePath = path.resolve(
+                    options.directory,
+                    "thumbnails",
+                    adapter,
+                    `${itemId}.webp`
+                );
+
+                const itemDownloadFolder = path.resolve(
+                    options.directory,
+                    "download",
+                    adapter,
+                    itemId
+                );
+
+                // delete thumbnail
+                if (fs.existsSync(thumbnailFilePath)) {
+                    logMsg("Delete thumbnail", itemId, adapter);
+                    fs.unlinkSync(thumbnailFilePath);
+                }
+
+                // delete item dir if exist
+                if (fs.existsSync(itemDownloadFolder)) {
+                    logMsg("Delete folder", itemId, adapter);
+                    fs.rmSync(itemDownloadFolder, { recursive: true });
+                }
             }
         }
     }

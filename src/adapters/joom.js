@@ -294,14 +294,12 @@ export function updateReviews(queue) {
             }
 
             for (const media of feedback.media) {
-                // console.log(media);
+                const image = media.payload.images.find((item) =>
+                    item.url.includes("_original")
+                );
 
                 switch (media.type) {
                     case "image":
-                        const image = media.payload.images.find((item) =>
-                            item.url.includes("_original")
-                        );
-
                         downloadItem(
                             image.url,
                             path.resolve(

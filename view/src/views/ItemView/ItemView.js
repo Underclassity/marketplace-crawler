@@ -6,7 +6,7 @@ export default {
 
     data() {
         return {
-            files: [],
+            reviews: [],
             count: 0,
             size: 0,
         };
@@ -46,9 +46,9 @@ export default {
             try {
                 const request = await axios(`/adapters/${adapter}/${itemId}`);
 
-                const { files, count, size } = request.data;
+                const { reviews, count, size } = request.data;
 
-                this.files = files;
+                this.reviews = reviews;
                 this.count = count;
                 this.size = size;
             } catch (error) {

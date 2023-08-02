@@ -1,5 +1,5 @@
 <template lang="pug">
-.controls
+.controls(v-if="items?.length")
     span.button(@click.prevent.stop="deleteItems") Delete items
 </template>
 

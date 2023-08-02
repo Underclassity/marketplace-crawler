@@ -50,7 +50,7 @@ export async function getFeedback(id, feedback, queue) {
         return false;
     }
 
-    addReview(prefix, id, feedback.id, feedback, true);
+    // addReview(prefix, id, feedback.id, feedback, true);
 
     if (!options.download) {
         return true;
@@ -88,34 +88,125 @@ export async function getFeedback(id, feedback, queue) {
 /**
  * Get item info
  *
- * @param   {Number}  id  Item ID
+ * @param   {Number}  itemId  Item ID
  *
- * @return  {Object}      Item info
+ * @return  {Object}          Item info
  */
-export async function getItemInfo(id) {
-    log("Try to get full info", id);
+export async function getItemInfo(itemId) {
+    log("Try to get full info", itemId);
+
+    function p(t, e) {
+        for (let i = 0; i < e.length; i++) if (t <= e[i]) return i + 1;
+    }
+
+    const h = [143, 287, 431, 719, 1007, 1061, 1115, 1169, 1313, 1601, 1655];
+
+    const s = Math.floor(itemId / 1e5);
+    const n = p(s, h);
+
+    const url = `https://basket-${
+        n && n >= 10 ? n : `0${n}`
+    }.wb.ru/vol${s}/part${Math.floor(
+        itemId / 1e3
+    )}/${itemId}/info/ru/card.json`;
 
     try {
-        const request = await axios(
-            "https://feedbacks.wildberries.ru/api/v1/summary/full",
-            {
-                data: {
-                    imtId: parseInt(id, 10),
-                    take: 30,
-                    skip: 0,
-                },
-                method: "POST",
+        const request = await axios(url, {
+            headers: getHeaders(),
+            timeout: options.timeout,
+        });
 
+        log("Get full info", itemId);
+
+        return request.data;
+    } catch (error) {
+        log(`Get full info error: ${error.message}`, itemId);
+    }
+
+    // try {
+    //     const request = await axios("https://card.wb.ru/cards/detail", {
+    //         params: {
+    //             nm: itemId,
+
+    //             appType: 12,
+    //             curr: "byn",
+    //             locale: "by",
+    //             lang: "ru",
+    //             dest: -59208,
+    //             regions: [
+    //                 1, 4, 22, 30, 31, 33, 40, 48, 66, 68, 69, 70, 80, 83, 114,
+    //                 115,
+    //             ],
+    //             emp: 0,
+    //             reg: 1,
+    //             spp: 0,
+    //         },
+
+    //         headers: getHeaders(),
+    //         timeout: options.timeout,
+    //     });
+
+    //     log("Get full info", itemId);
+
+    //     const { data } = request.data;
+    //     const { products } = data;
+    //     const [product] = products;
+
+    //     return product || false;
+    // } catch (error) {
+    //     log(`Get full info error: ${error.message}`, itemId);
+    // }
+
+    return false;
+}
+
+/**
+ * Get item questions
+ *
+ * @param   {Number}  itemId  Item root ID
+ *
+ * @return  {Object}          Questions object
+ */
+export async function getQuestions(itemId) {
+    log(`Try to get questions`, itemId);
+
+    try {
+        const countRequest = await axios(
+            `https://questions.wildberries.ru/api/v1/questions?imtId=${itemId}&onlyCount=true`,
+            {
                 headers: getHeaders(),
                 timeout: options.timeout,
             }
         );
 
-        log("Get full info", id);
+        const { count } = countRequest.data;
 
-        return request.data;
+        const questions = [];
+
+        const pagesCount = Math.round(count / 20);
+
+        for (let page = 0; page <= pagesCount; page++) {
+            const request = await axios(
+                `https://questions.wildberries.ru/api/v1/questions`,
+                {
+                    headers: getHeaders(),
+                    timeout: options.timeout,
+                    params: {
+                        imtId: itemId,
+                        take: 20,
+                        skip: page ? page * 20 : 0,
+                    },
+                }
+            );
+
+            questions.push(...request.data.questions);
+        }
+
+        log("Get all questions", itemId);
+
+        return questions;
     } catch (error) {
-        log(`Get full info error: ${error.message}`, id);
+        log(`Get all questions error: ${error.message}`, itemId);
     }
 
     return false;
@@ -133,7 +224,7 @@ export async function getFeedbackByXhr(id) {
 
     try {
         const request = await axios(
-            `https://feedbacks1.wb.ru/feedbacks/v1/${id}`,
+            `https://feedbacks2.wb.ru/feedbacks/v1/${id}`,
             {
                 headers: getHeaders(),
                 timeout: options.timeout,
@@ -224,11 +315,26 @@ export async function getFeedbacks(id, queue) {
     if (isResult) {
         log(`Found ${feedbacks.length} feedbacks items`, id);
 
+        let isWriteCall = false;
+
         for (const feedback of feedbacks) {
-            addReview(prefix, id, feedback.id, feedback, false);
+            let { isWrite } = addReview(
+                prefix,
+                id,
+                feedback.id,
+                feedback,
+                false
+            );
+
+            if (isWrite) {
+                isWriteCall = true;
+            }
         }
 
-        dbWrite(`${prefix}-reviews`, true, prefix);
+        if (feedbacks.length && isWriteCall) {
+            dbWrite(`${prefix}-reviews`, true, prefix);
+            dbWrite(`${prefix}-products`, true, prefix);
+        }
 
         for (const feedback of feedbacks) {
             queue.add(async () => getFeedback(id, feedback, queue), {
@@ -341,7 +447,6 @@ export async function itemsRequest(page = 1, query = options.query) {
                     curr: "byn",
                     locale: "by",
                     lang: "ru",
-                    // dest: [12358386, 12358404, 3, -59208],
                     dest: -59208,
                     regions: [
                         1, 4, 22, 30, 31, 33, 40, 48, 66, 68, 69, 70, 80, 83,
@@ -448,6 +553,10 @@ export async function processItems(items, brand = options.brand, queue) {
             return false;
         }
 
+        if (dbReviewItem.deleted) {
+            return false;
+        }
+
         return true;
     });
 
@@ -518,6 +627,20 @@ export async function updateWithTags(queue) {
     }
 
     return true;
+}
+
+/**
+ * Update item by ID
+ *
+ * @param   {String}  itemId  Item ID
+ * @param   {Object}  queue   Queue instance
+ *
+ * @return  {Boolean}         Result
+ */
+export async function updateItemById(itemId, queue) {
+    return await queue.add(async () => getFeedbacks(itemId, queue), {
+        priority: priorities.item,
+    });
 }
 
 /**
@@ -667,7 +790,15 @@ export async function getBrandItemsByID(brandID, queue) {
 
     items = items.filter((item, index, array) => array.indexOf(item) === index);
 
-    return items;
+    return items.filter((itemId) => {
+        const item = getItem(prefix, itemId);
+
+        if (item?.deleted) {
+            return false;
+        }
+
+        return true;
+    });
 }
 
 /**
@@ -730,6 +861,109 @@ export async function getItemsByQuery(queue, query = options.query) {
 
         count += getItemsData.data.products.length;
 
+        getItemsData.data.products.forEach((product) => {
+            const item = getItem(prefix, parseInt(product.root, 10));
+
+            if (!item) {
+                return false;
+            }
+
+            const {
+                id,
+                root,
+                kindId,
+                subjectId,
+                subjectParentId,
+                name,
+                brand,
+                brandId,
+                siteBrandId,
+                supplierId,
+                rating,
+                reviewRating,
+                feedbacks,
+            } = product;
+
+            if (
+                item.ids &&
+                Array.isArray(item.ids) &&
+                !item.ids.map((item) => item.id).includes(id)
+            ) {
+                logMsg(`Add another info to item`, parseInt(product.root, 10));
+
+                updateItem(
+                    prefix,
+                    parseInt(product.root, 10),
+                    {
+                        brand: brandId,
+                        ids: [
+                            ...item.ids,
+                            {
+                                id,
+                                root,
+                                kindId,
+                                subjectId,
+                                subjectParentId,
+                                name,
+                                brandName: brand,
+                                brand: brandId,
+                                siteBrandId,
+                                supplierId,
+                                rating,
+                                reviewRating,
+                                feedbacks,
+                            },
+                        ],
+                    },
+                    false
+                );
+            } else if (
+                item.ids &&
+                Array.isArray(item.ids) &&
+                item.ids.map((item) => item.id).includes(id)
+            ) {
+                updateItem(
+                    prefix,
+                    parseInt(product.root, 10),
+                    {
+                        brand: brandId,
+                    },
+                    false
+                );
+                return true;
+            } else if (!item.ids || !Array.isArray(item.ids)) {
+                logMsg(`Add info to item`, parseInt(product.root, 10));
+
+                updateItem(
+                    prefix,
+                    parseInt(product.root, 10),
+                    {
+                        brand: brandId,
+                        ids: [
+                            {
+                                id,
+                                root,
+                                kindId,
+                                subjectId,
+                                subjectParentId,
+                                name,
+                                brandName: brand,
+                                brand: brandId,
+                                siteBrandId,
+                                supplierId,
+                                rating,
+                                reviewRating,
+                                feedbacks,
+                            },
+                        ],
+                    },
+                    false
+                );
+            }
+        });
+
+        dbWrite(`${prefix}-products`, true, prefix);
+
         const results = getItemsData.data.products
             .map((item) => item.root)
             .filter((item, index, array) => array.indexOf(item) === index)
@@ -743,6 +977,10 @@ export async function getItemsByQuery(queue, query = options.query) {
                     Date.now() - dbReviewItem.time <= time &&
                     !options.force
                 ) {
+                    return false;
+                }
+
+                if (dbReviewItem?.deleted) {
                     return false;
                 }
 
