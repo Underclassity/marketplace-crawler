@@ -4,7 +4,7 @@
 )
     .overlay--spinner
         .overlay--spinner--icon
-            img(src="@/assets/spinners/180-ring-with-bg.svg")
+            img(src="../../assets/spinners/180-ring-with-bg.svg")
 </template>
 
 <script src="./OverlayBlock.js"></script>

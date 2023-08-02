@@ -2,6 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 
+import ViteExpress from "vite-express";
+
 import "dotenv/config";
 
 // Express.js and modules
@@ -26,15 +28,15 @@ import {
     getPredictions,
     getTags,
     loadDB,
-} from "./src/helpers/db.js";
-import { processCookiesAndSession } from "./src/adapters/aliexpress.js";
-import browserConfig from "./src/helpers/browser-config.js";
-import createQueue from "./src/helpers/create-queue.js";
-import getAdaptersIds from "./src/helpers/get-adapters-ids.js";
-import getRandom from "./src/helpers/random.js";
-import logMsg from "./src/helpers/log-msg.js";
+} from "../helpers/db.js";
+import { processCookiesAndSession } from "../adapters/aliexpress.js";
+import browserConfig from "../helpers/browser-config.js";
+import createQueue from "../helpers/create-queue.js";
+import getAdaptersIds from "../helpers/get-adapters-ids.js";
+import getRandom from "../helpers/random.js";
+import logMsg from "../helpers/log-msg.js";
 
-import options from "./src/options.js";
+import options from "../options.js";
 
 // Configure puppeteer
 puppeteer.use(
@@ -507,7 +509,7 @@ app.post("/queue/:adapter", async (req, res) => {
         await processCookiesAndSession();
     }
 
-    const { updateItemById } = await import(`./src/adapters/${adapter}.js`);
+    const { updateItemById } = await import(`../adapters/${adapter}.js`);
 
     if (!updateItemById) {
         return res.json({
@@ -538,6 +540,10 @@ app.post("/queue/:adapter", async (req, res) => {
     });
 });
 
-app.listen(port, () => {
+// app.listen(port, () => {
+//     logMsg(`Example app listening on port ${port}`);
+// });
+
+ViteExpress.listen(app, port, () => {
     logMsg(`Example app listening on port ${port}`);
 });

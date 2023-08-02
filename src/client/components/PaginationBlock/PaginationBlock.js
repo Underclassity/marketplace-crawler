@@ -141,6 +141,26 @@ export default {
             this.page = page ? parseInt(page, 10) : 1;
             this.limit = limit ? parseInt(limit, 10) : 10;
         },
+
+        keyHandler(event) {
+            switch (event.key) {
+                case "ArrowRight":
+                    this.nextCall();
+                    break;
+
+                case "ArrowLeft":
+                    this.prevCall();
+                    break;
+            }
+        },
+    },
+
+    beforeMount() {
+        document.addEventListener("keyup", this.keyHandler);
+    },
+
+    beforeUnmount() {
+        document.removeEventListener("keyup", this.keyHandler);
     },
 
     created() {

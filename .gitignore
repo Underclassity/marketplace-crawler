@@ -14,6 +14,7 @@ _SpecRunner.html
 reports
 jsdoc
 dist
+dist-ssr
 build/temp
 coverage/
 

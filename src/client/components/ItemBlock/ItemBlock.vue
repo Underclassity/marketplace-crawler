@@ -13,7 +13,7 @@
         .item-update(v-on:click="updateItem" v-if="!isUpdating") Update
         .item-update(v-on:click="updateItem" v-if="isUpdating")
             span Updating
-            img(src="@/assets/spinners/180-ring-with-bg.svg")
+            img(src="../../assets/spinners/180-ring-with-bg.svg")
 
     .item-info
         router-link.span(:to='{ name:"ItemView", params: { itemId: itemId } }') ID: {{ itemId }}
