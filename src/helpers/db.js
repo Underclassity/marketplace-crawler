@@ -867,4 +867,94 @@ export function getPredictions(prefix) {
     return allPredictions;
 }
 
+/**
+ * Add item to favorites
+ *
+ * @param   {String}  prefix  Prefix
+ * @param   {String}  itemId  Item ID
+ *
+ * @return  {Boolean}         Result
+ */
+export function addToFavorite(prefix, itemId) {
+    const dbPrefix = `${prefix}-favorites`;
+
+    loadDB(dbPrefix);
+
+    const db = dbCache[dbPrefix];
+
+    if (!(itemId in db.data)) {
+        db.data[itemId] = true;
+        db.write();
+        return true;
+    }
+
+    return false;
+}
+
+/**
+ * Remove item from favorites
+ *
+ * @param   {String}  prefix  Prefix
+ * @param   {String}  itemId  Item ID
+ *
+ * @return  {Boolean}         Result
+ */
+export function removeFromFavorite(prefix, itemId) {
+    const dbPrefix = `${prefix}-favorites`;
+
+    loadDB(dbPrefix);
+
+    const db = dbCache[dbPrefix];
+
+    if (itemId in db.data) {
+        db.data[itemId] = false;
+        db.write();
+        return true;
+    }
+
+    return false;
+}
+
+/**
+ * Toggle item in favorites
+ *
+ * @param   {String}  prefix  Prefix
+ * @param   {String}  itemId  Item ID
+ *
+ * @return  {Boolean}         Result
+ */
+export function toggleFavorite(prefix, itemId) {
+    const dbPrefix = `${prefix}-favorites`;
+
+    loadDB(dbPrefix);
+
+    const db = dbCache[dbPrefix];
+
+    return itemId in db.data && db.data[itemId]
+        ? removeFromFavorite(prefix, itemId)
+        : addToFavorite(prefix, itemId);
+}
+
+/**
+ * Check is item favorite
+ *
+ * @param   {String}  prefix  Prefix
+ * @param   {String}  itemId  Item ID
+ *
+ * @return  {Boolean}         Result
+ */
+export function isFavorite(prefix, itemId) {
+    const dbPrefix = `${prefix}-favorites`;
+
+    loadDB(dbPrefix);
+
+    const db = dbCache[dbPrefix];
+
+    if (itemId in db.data && db.data[itemId]) {
+        return true;
+    }
+
+    return false;
+}
+
 export default updateTime;

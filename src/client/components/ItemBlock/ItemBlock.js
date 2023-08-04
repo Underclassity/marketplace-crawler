@@ -39,6 +39,10 @@ export default {
         //     return count >= 9 ? getRandom(files, 9) : files;
         // },
 
+        isFavorite() {
+            return this.item.favorite || false;
+        },
+
         emptyImagesCount() {
             const { count } = this;
 
@@ -64,6 +68,17 @@ export default {
         count() {
             return this.images.length || 0;
         },
+
+        brand() {
+            const brands = this.$store.state.brands[this.adapter];
+            const { brand } = this.item;
+
+            if (brands && brand in brands && brands[brand].name) {
+                return brands[brand].name;
+            }
+
+            return brand;
+        },
     },
 
     methods: {
@@ -81,6 +96,31 @@ export default {
         //         console.log(error.message);
         //     }
         // },
+
+        async addToFavorite() {
+            let { adapter, itemId } = this;
+
+            console.log(`Add ${adapter} item ${itemId} to favorite`);
+
+            this.emitter.emit("triggerSpinner", true);
+            await this.$store.dispatch("addToFavorite", { adapter, itemId });
+            this.emitter.emit("triggerSpinner", false);
+            this.emitter.emit("updateItems");
+        },
+
+        async removeFromFavorite() {
+            let { adapter, itemId } = this;
+
+            console.log(`Remove ${adapter} item ${itemId} from favorite`);
+
+            this.emitter.emit("triggerSpinner", true);
+            await this.$store.dispatch("removeFromFavorite", {
+                adapter,
+                itemId,
+            });
+            this.emitter.emit("triggerSpinner", false);
+            this.emitter.emit("updateItems");
+        },
 
         async updateItem() {
             if (this.isUpdating) {

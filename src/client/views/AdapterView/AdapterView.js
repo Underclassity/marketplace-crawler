@@ -30,6 +30,7 @@ export default {
             prediction: false,
 
             isPhotos: true,
+            isFavorite: false,
 
             itemsForDelete: [],
         };
@@ -37,45 +38,25 @@ export default {
 
     methods: {
         async getBrands() {
-            try {
-                const request = await axios(`/brands/${this.adapter}`);
-
-                let { brands } = request.data;
-
-                this.brands = brands;
-            } catch (error) {
-                console.error(error.message);
-            }
+            this.brands = await this.$store.dispatch("getBrands", this.adapter);
         },
 
         async getTags() {
-            try {
-                const request = await axios(`/tags/${this.adapter}`);
-
-                let { tags } = request.data;
-
-                this.tags = tags;
-            } catch (error) {
-                console.error(error.message);
-            }
+            this.tags = await this.$store.dispatch("getTags", this.adapter);
         },
 
         async getPredictions() {
-            try {
-                const request = await axios(`/predictions/${this.adapter}`);
-
-                let { predictions } = request.data;
-
-                this.predictions = predictions;
-            } catch (error) {
-                console.error(error.message);
-            }
+            this.predictions = await this.$store.dispatch(
+                "getPredictions",
+                this.adapter
+            );
         },
 
         async getItems() {
             this.emitter.emit("triggerSpinner", true);
 
-            let { page, limit, isPhotos, sortId, brand, tag } = this;
+            let { page, limit, isPhotos, sortId, brand, tag, isFavorite } =
+                this;
 
             try {
                 const request = await axios(`/adapters/${this.adapter}`, {
@@ -83,6 +64,7 @@ export default {
                         page,
                         limit,
                         photos: isPhotos,
+                        favorite: isFavorite,
                         sort: sortId,
                         brand,
                         tag,
@@ -100,17 +82,31 @@ export default {
             this.emitter.emit("triggerSpinner", false);
         },
 
+        changeFilter() {
+            this.page = 1;
+            this.changeRoute();
+        },
+
         changeRoute() {
             console.log("Change route call");
 
-            let { page, limit, isPhotos, sortId, brand, prediction, tag } =
-                this;
+            let {
+                page,
+                limit,
+                isPhotos,
+                sortId,
+                brand,
+                prediction,
+                tag,
+                isFavorite,
+            } = this;
 
             this.$router.push({
                 query: {
                     page,
                     limit,
                     photos: isPhotos,
+                    favorite: isFavorite,
                     sort: sortId,
                     brand,
                     prediction,
@@ -120,12 +116,21 @@ export default {
         },
 
         getRouterParams() {
-            let { page, limit, photos, sort, brand, prediction, tag } =
-                this.$route.query;
+            let {
+                page,
+                limit,
+                photos,
+                sort,
+                brand,
+                prediction,
+                tag,
+                favorite,
+            } = this.$route.query;
 
             this.page = page ? parseInt(page, 10) : 1;
             this.limit = limit ? parseInt(limit, 10) : 12;
             this.isPhotos = photos == "true";
+            this.isFavorite = favorite == "true";
             this.sortId = sort || false;
             this.brand = brand || false;
             this.prediction = prediction || false;

@@ -6,6 +6,12 @@
         .item-image(v-if="emptyImagesCount" v-for="index in emptyImagesCount" :key="index")
             span.material-symbols-outlined no_photography
 
+        .item-like.green(v-on:click="addToFavorite" v-if="!isFavorite")
+            span.material-symbols-outlined heart_plus
+
+        .item-like.red(v-on:click="removeFromFavorite" v-if="isFavorite")
+            span.material-symbols-outlined heart_minus
+
         .item-checkbox
             label(:for="`delete-${itemId}`") Delete
             input(type="checkbox" :id="`delete-${itemId}`" @change.prevent.stop="updateDeleteItems(itemId)")
@@ -17,7 +23,7 @@
 
     .item-info
         router-link.span(:to='{ name:"ItemView", params: { itemId: itemId } }') ID: {{ itemId }}
-        span Brand: {{ item.brand || "none" }}
+        span Brand: {{ brand }}
         span {{ item.reviews }} reviews
         span {{ item.files || 0 }} files
         span {{ pretty(item.size) }} size

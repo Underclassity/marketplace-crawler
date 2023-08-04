@@ -86,6 +86,110 @@ export async function getFeedback(id, feedback, queue) {
 }
 
 /**
+ * Add info to products helper
+ *
+ * @param   {Array}    products  Products array
+ *
+ * @return  {Boolean}            Result
+ */
+export function addInfoToProducts(products) {
+    if (!Array.isArray(products)) {
+        return false;
+    }
+
+    products.forEach((product) => {
+        const item = getItem(prefix, parseInt(product.root, 10));
+
+        if (!item) {
+            return false;
+        }
+
+        const {
+            id,
+            root,
+            kindId,
+            subjectId,
+            subjectParentId,
+            name,
+            brand,
+            brandId,
+            siteBrandId,
+            supplierId,
+            rating,
+            reviewRating,
+            feedbacks,
+        } = product;
+
+        const idObject = {
+            id,
+            root,
+            kindId,
+            subjectId,
+            subjectParentId,
+            name,
+            brandName: brand,
+            brand: brandId,
+            siteBrandId,
+            supplierId,
+            rating,
+            reviewRating,
+            feedbacks,
+        };
+
+        if (
+            item.ids &&
+            Array.isArray(item.ids) &&
+            !item.ids.map((item) => item.id).includes(id)
+        ) {
+            logMsg(`Add another info to item`, parseInt(product.root, 10));
+
+            updateItem(
+                prefix,
+                parseInt(product.root, 10),
+                {
+                    brand: brandId,
+                    ids: [...item.ids, idObject],
+                },
+                false
+            );
+        } else if (
+            item.ids &&
+            Array.isArray(item.ids) &&
+            item.ids.map((item) => item.id).includes(id)
+        ) {
+            const idIndex = item.ids.map((item) => item.id).indexOf(id);
+
+            item.ids[idIndex] = idObject;
+
+            updateItem(
+                prefix,
+                parseInt(product.root, 10),
+                {
+                    brand: brandId,
+                    ids: item.ids,
+                },
+                false
+            );
+            return true;
+        } else if (!item.ids || !Array.isArray(item.ids)) {
+            logMsg(`Add info to item`, parseInt(product.root, 10));
+
+            updateItem(
+                prefix,
+                parseInt(product.root, 10),
+                {
+                    brand: brandId,
+                    ids: [idObject],
+                },
+                false
+            );
+        }
+    });
+
+    return true;
+}
+
+/**
  * Get item info
  *
  * @param   {Number}  itemId  Item ID
@@ -754,6 +858,8 @@ export async function getBrandItemsByID(brandID, queue) {
 
         const beforeFilterCount = getItemsData.data.products.length;
 
+        addInfoToProducts(getItemsData.data.products);
+
         const results = getItemsData.data.products
             .map((item) => item.root)
             .filter((item, index, array) => array.indexOf(item) === index)
@@ -861,106 +967,7 @@ export async function getItemsByQuery(queue, query = options.query) {
 
         count += getItemsData.data.products.length;
 
-        getItemsData.data.products.forEach((product) => {
-            const item = getItem(prefix, parseInt(product.root, 10));
-
-            if (!item) {
-                return false;
-            }
-
-            const {
-                id,
-                root,
-                kindId,
-                subjectId,
-                subjectParentId,
-                name,
-                brand,
-                brandId,
-                siteBrandId,
-                supplierId,
-                rating,
-                reviewRating,
-                feedbacks,
-            } = product;
-
-            if (
-                item.ids &&
-                Array.isArray(item.ids) &&
-                !item.ids.map((item) => item.id).includes(id)
-            ) {
-                logMsg(`Add another info to item`, parseInt(product.root, 10));
-
-                updateItem(
-                    prefix,
-                    parseInt(product.root, 10),
-                    {
-                        brand: brandId,
-                        ids: [
-                            ...item.ids,
-                            {
-                                id,
-                                root,
-                                kindId,
-                                subjectId,
-                                subjectParentId,
-                                name,
-                                brandName: brand,
-                                brand: brandId,
-                                siteBrandId,
-                                supplierId,
-                                rating,
-                                reviewRating,
-                                feedbacks,
-                            },
-                        ],
-                    },
-                    false
-                );
-            } else if (
-                item.ids &&
-                Array.isArray(item.ids) &&
-                item.ids.map((item) => item.id).includes(id)
-            ) {
-                updateItem(
-                    prefix,
-                    parseInt(product.root, 10),
-                    {
-                        brand: brandId,
-                    },
-                    false
-                );
-                return true;
-            } else if (!item.ids || !Array.isArray(item.ids)) {
-                logMsg(`Add info to item`, parseInt(product.root, 10));
-
-                updateItem(
-                    prefix,
-                    parseInt(product.root, 10),
-                    {
-                        brand: brandId,
-                        ids: [
-                            {
-                                id,
-                                root,
-                                kindId,
-                                subjectId,
-                                subjectParentId,
-                                name,
-                                brandName: brand,
-                                brand: brandId,
-                                siteBrandId,
-                                supplierId,
-                                rating,
-                                reviewRating,
-                                feedbacks,
-                            },
-                        ],
-                    },
-                    false
-                );
-            }
-        });
+        addInfoToProducts(getItemsData.data.products);
 
         dbWrite(`${prefix}-products`, true, prefix);
 

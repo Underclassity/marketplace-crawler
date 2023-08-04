@@ -21,13 +21,16 @@ import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import AdblockerPlugin from "puppeteer-extra-plugin-adblocker";
 
 import {
+    addToFavorite,
     deleteItem,
     getBrands,
     getFilesSize,
     getItem,
     getPredictions,
     getTags,
+    isFavorite,
     loadDB,
+    removeFromFavorite,
 } from "../helpers/db.js";
 import { processCookiesAndSession } from "../adapters/aliexpress.js";
 import browserConfig from "../helpers/browser-config.js";
@@ -118,6 +121,7 @@ app.get("/adapters/:id", (req, res) => {
     const page = parseInt(req.query.page || 1, 10);
     const limit = parseInt(req.query.limit || 100, 10);
     const isPhotos = req.query.photos == "true" || false;
+    const isFavoriteFlag = req.query.favorite == "true" || false;
     const sortId = req.query.sort || false;
     let brand = req.query.brand || false;
     let tag = req.query.tag || false;
@@ -158,6 +162,17 @@ app.get("/adapters/:id", (req, res) => {
             }
 
             return db.data[itemId].tags.includes(tag);
+        })
+        .filter((itemId) => {
+            if (!isFavoriteFlag) {
+                return true;
+            }
+
+            if (isFavorite(adapter, itemId)) {
+                return true;
+            }
+
+            return false;
         })
         .filter((itemId) => {
             if (!isPhotos) {
@@ -258,6 +273,7 @@ app.get("/adapters/:id", (req, res) => {
             itemId in dbFiles.data ? dbFiles.data[itemId].length : 0;
 
         resultItem.size = sizeDb.data[`${adapter}-${itemId}`];
+        resultItem.favorite = isFavorite(adapter, itemId);
 
         items.push(resultItem);
     }
@@ -295,7 +311,7 @@ app.get("/adapters/:id/:itemId", (req, res) => {
     const files = itemId in dbFiles.data ? dbFiles.data[itemId].sort() : [];
     const filesNames = files.map((filename) => path.parse(filename).name);
 
-    const reviews = info.reviews
+    const reviews = (info.reviews || [])
         .map((reviewId) => dbReviews.data[reviewId] || [])
         .filter((review) => {
             if (id == "aliexpress") {
@@ -487,6 +503,69 @@ app.get("/predictions/:adapter", (req, res) => {
 
     return res.json({
         predictions,
+        error: false,
+    });
+});
+
+app.get("/favorite/:adapter/:itemId", (req, res) => {
+    const { adapter, itemId } = req.params;
+
+    if (!adapters.includes(adapter)) {
+        return res.json({
+            result: false,
+            error: `${adapter} not found in adapters`,
+        });
+    }
+
+    const dbFavoritePrefix = `${adapter}-favorite`;
+
+    const dbFavorite = loadDB(dbFavoritePrefix);
+
+    if (!(itemId in dbFavorite.data) && !dbFavorite.data[itemId]) {
+        return res.json({
+            result: false,
+            error: false,
+        });
+    }
+
+    return res.json({
+        result: true,
+        error: false,
+    });
+});
+
+app.post("/favorite/:adapter/:itemId", (req, res) => {
+    const { adapter, itemId } = req.params;
+
+    if (!adapters.includes(adapter)) {
+        return res.json({
+            result: false,
+            error: `${adapter} not found in adapters`,
+        });
+    }
+
+    const result = addToFavorite(adapter, itemId);
+
+    return res.json({
+        result,
+        error: false,
+    });
+});
+
+app.delete("/favorite/:adapter/:itemId", (req, res) => {
+    const { adapter, itemId } = req.params;
+
+    if (!adapters.includes(adapter)) {
+        return res.json({
+            result: false,
+            error: `${adapter} not found in adapters`,
+        });
+    }
+
+    const result = removeFromFavorite(adapter, itemId);
+
+    return res.json({
+        result,
         error: false,
     });
 });
