@@ -34,6 +34,11 @@ export const options = yargs(hideBin(process.argv))
         type: "boolean",
         default: false,
     })
+    .option("favorite", {
+        describe: "Update only favorite items",
+        type: "boolean",
+        default: false,
+    })
     .option("proxy", {
         describe: "Proxy use flag",
         default: false,

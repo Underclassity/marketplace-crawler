@@ -405,6 +405,14 @@ export function getItems(
         .filter((id) => {
             const item = db.data[id];
 
+            if (options.favorite) {
+                const favoriteFlag = isFavorite(prefix, id);
+
+                if (!favoriteFlag) {
+                    return false;
+                }
+            }
+
             if (item?.time && Date.now() - item.time <= time && !force) {
                 logMsg(`Already updated by time`, id, prefix);
                 return false;

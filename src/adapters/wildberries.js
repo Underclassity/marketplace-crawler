@@ -387,13 +387,13 @@ export async function getPriceInfo(id) {
 /**
  * Get feedbacks for item
  *
- * @param   {Number}  id     Item ID
- * @param   {Object}  queue  Queue
+ * @param   {Number}  itemId     Item ID
+ * @param   {Object}  queue      Queue
  *
- * @return  {Boolean}        Result
+ * @return  {Boolean}            Result
  */
-export async function getFeedbacks(id, queue) {
-    log("Feedbacks get", id);
+export async function getFeedbacks(itemId, queue) {
+    log("Feedbacks get", itemId);
 
     // const feedbacks = [];
 
@@ -412,19 +412,19 @@ export async function getFeedbacks(id, queue) {
     //     }
     // }
 
-    const feedbacks = await getFeedbackByXhr(id);
+    const feedbacks = await getFeedbackByXhr(itemId);
 
     const isResult = Array.isArray(feedbacks);
 
     if (isResult) {
-        log(`Found ${feedbacks.length} feedbacks items`, id);
+        log(`Found ${feedbacks.length} feedbacks items`, itemId);
 
         let isWriteCall = false;
 
         for (const feedback of feedbacks) {
             let { isWrite } = addReview(
                 prefix,
-                id,
+                itemId,
                 feedback.id,
                 feedback,
                 false
@@ -441,8 +441,23 @@ export async function getFeedbacks(id, queue) {
         }
 
         for (const feedback of feedbacks) {
-            queue.add(async () => getFeedback(id, feedback, queue), {
+            queue.add(async () => getFeedback(itemId, feedback, queue), {
                 priority: priorities.review,
+            });
+        }
+    }
+
+    const item = getItem(prefix, itemId);
+
+    // Try to get item info
+    if (item.ids && Array.isArray(item.ids) && item.ids.length && !item.info) {
+        const firstIdItem = item.ids[0];
+
+        const infoData = await getItemInfo(firstIdItem.id);
+
+        if (firstIdItem.name == infoData.imt_name) {
+            updateItem(prefix, itemId, {
+                info: infoData,
             });
         }
     }
@@ -474,14 +489,14 @@ export async function getFeedbacks(id, queue) {
     // }
 
     if (isResult) {
-        updateTime(prefix, id);
-        updateTags(prefix, id, options.query);
+        updateTime(prefix, itemId);
+        updateTags(prefix, itemId, options.query);
     }
 
-    log(`End get: result ${isResult}`, id);
+    log(`End get: result ${isResult}`, itemId);
 
     if (!isResult) {
-        queue.add(() => getFeedbacks(id, queue), {
+        queue.add(() => getFeedbacks(itemId, queue), {
             priority: priorities.item,
         });
     }
