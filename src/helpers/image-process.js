@@ -2,6 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 
+import which from "which";
+
 import axios from "axios";
 import prettyBytes from "pretty-bytes";
 
@@ -83,6 +85,11 @@ export async function extractVideoFrames(
     id,
     prefix
 ) {
+    if (!which("ffmpeg", { nothrow: true })) {
+        logMsg("ffmpeg binary not found!", id, prefix);
+        return false;
+    }
+
     const parsedPath = path.parse(videoFilePath);
 
     let videoFrames = fs
@@ -150,6 +157,11 @@ export async function convertVideoItem(filepath, itemId, prefix) {
         return false;
     }
 
+    if (!which("ffmpeg", { nothrow: true })) {
+        logMsg("ffmpeg binary not found!", itemId, prefix);
+        return false;
+    }
+
     const exportFilePath = path.resolve(
         options.directory,
         "temp",
@@ -208,6 +220,11 @@ export async function convertVideoItem(filepath, itemId, prefix) {
  * @return  {Boolean}           Result
  */
 export async function processFile(filepath, queue, id, prefix) {
+    if (!which("cwebp", { nothrow: true })) {
+        logMsg("cwebp binary not found!", id, prefix);
+        return false;
+    }
+
     if (!fs.existsSync(filepath)) {
         logMsg(`File ${filepath} not found to convert`, id, prefix);
         return false;
@@ -369,6 +386,11 @@ export async function downloadFile(url, filepath, queue, id, prefix) {
 export async function downloadVideo(url, filepath, queue, id, prefix) {
     if (!options.video) {
         return true;
+    }
+
+    if (!which("yt-dlp", { nothrow: true })) {
+        logMsg("yt-dlp binary not found!", id, prefix);
+        return false;
     }
 
     const filename = path.basename(filepath);

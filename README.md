@@ -1,17 +1,17 @@
 # Marketplace crawler
 
-Crawl reviews from different sites.
+Crawl reviews from different sites, save and convert images and videos. Detect images and videos with classification.
 
 Supported sites:
-- aliexpress.com
-- amazon.com
-- decathlon.com
-- ebay.com
-- joom.com
-- kufar.by
-- onliner.by
-- ozon.ru
-- wildberries.ru
+- [aliexpress.com](https://aliexpress.com)
+- [amazon.com](https://amazon.com)
+- [decathlon.com](https://decathlon.com)
+- [ebay.com](https://ebay.com)
+- [joom.com](https://joom.com)
+- [kufar.by](https://kufar.by)
+- [onliner.by](https://onliner.by)
+- [ozon.ru](https://ozon.ru)
+- [wildberries.ru](https://wildberries.ru)
 
 ***
 
@@ -29,7 +29,7 @@ Command line params:
 - `video` - download video flag
 - `update` - update items flag
 - `reviews` - update reviews flag
-- `throat` - concurency for queue
+- `throat` - concurrency for queue
 - `pages` - pages to get
 - `start` - start page
 - `timeout` - timeout number for different requests
@@ -49,3 +49,10 @@ Usage examples:
 - `node index.js --throat 3 --timeout 10000 --include wildberries --update true`
 - `node index.js --throat 5 --include aliexpress --download false`
 - `node index.js --throat 2 --include kufar --query "wetsuit"`
+
+***
+
+System dependencies:
+- `ffmpeg` - cut video to frames
+- `cwebp` - convert images to webp file format
+- `yt-dlp` - download m3u8 video files
