@@ -45,15 +45,15 @@ function log(msg, id) {
 /**
  * Download helper
  *
- * @param   {String}  id     Item ID
- * @param   {Object}  queue  Queue instance
- * @param   {String}  url    URL to download
- * @param   {String}  type   Download item type
- * @param   {String}  uuid   UUID
+ * @param   {String}  itemid   Item ID
+ * @param   {Object}  queue    Queue instance
+ * @param   {String}  url      URL to download
+ * @param   {String}  type     Download item type
+ * @param   {String}  uuid     UUID
  *
- * @return  {Boolean}        Result
+ * @return  {Boolean}          Result
  */
-async function download(id, queue, url, type = "photo", uuid) {
+async function download(itemid, queue, url, type = "photo", uuid) {
     if (url.includes(".m3u8")) {
         type = "video";
     }
@@ -62,7 +62,7 @@ async function download(id, queue, url, type = "photo", uuid) {
         options.directory,
         "download",
         "ozon",
-        id.toString()
+        itemid.toString()
     );
 
     if (!fs.existsSync(dirPath)) {
@@ -81,23 +81,23 @@ async function download(id, queue, url, type = "photo", uuid) {
  * Get ozon item by link
  *
  * @param   {String}  link     Item link
- * @param   {String}  id       Item ID
+ * @param   {String}  itemId   Item ID
  * @param   {Object}  queue    Queue instance
  * @param   {Object}  browser  Puppeteer instance
  *
  * @return  {Boolean}          Result
  */
-export async function getOzonItem(link, id, queue, browser) {
-    log("Try to get reviews", id);
+export async function getOzonItem(link, itemId, queue, browser) {
+    log("Try to get reviews", itemId);
 
     if (!link) {
-        const dbItem = getItem(prefix, id);
+        const dbItem = getItem(prefix, itemId);
 
         if (dbItem?.link) {
             link = dbItem.link;
-            log("Link found in DB", id);
+            log("Link found in DB", itemId);
         } else {
-            log(`${id} not found in db`);
+            log(`${itemId} not found in db`);
             return false;
         }
     }
@@ -130,7 +130,7 @@ export async function getOzonItem(link, id, queue, browser) {
 
         reviewsTimeout = setTimeout(() => {
             if (!isReviews) {
-                log(`No reviews found by timeout`, id);
+                log(`No reviews found by timeout`, itemId);
                 isReviews = true;
             }
         }, options.timeout);
@@ -155,7 +155,7 @@ export async function getOzonItem(link, id, queue, browser) {
         try {
             data = await response.json();
         } catch (error) {
-            log(error.message, id);
+            log(error.message, itemId);
             return false;
         }
 
@@ -174,11 +174,11 @@ export async function getOzonItem(link, id, queue, browser) {
 
             resultReviews[reviewId] = reviewItem;
 
-            addReview(prefix, id, reviewId, reviewItem, true);
+            addReview(prefix, itemId, reviewId, reviewItem, true);
         }
 
         if (Object.keys(resultReviews).length == reviews.length) {
-            log(`All reviews found`, id);
+            log(`All reviews found`, itemId);
             isReviews = true;
         }
 
@@ -201,10 +201,10 @@ export async function getOzonItem(link, id, queue, browser) {
                 .map((element) => element.getAttribute("data-review-uuid"));
         });
 
-        log(`Found ${reviews.length} reviews`, id);
+        log(`Found ${reviews.length} reviews`, itemId);
 
         if (reviews.length) {
-            const reviewsPageLink = `${link}/reviews?reviewPuuid=${reviews[0]}&itemId=${id}&reviewsVariantMode=2&page=1`;
+            const reviewsPageLink = `${link}/reviews?reviewPuuid=${reviews[0]}&itemId=${itemId}&reviewsVariantMode=2&page=1`;
 
             await page.goto(reviewsPageLink, goSettings);
 
@@ -219,7 +219,7 @@ export async function getOzonItem(link, id, queue, browser) {
                 return links.length;
             }, `${link}/reviews`);
         } else {
-            log("Ended", id);
+            log("Ended", itemId);
 
             isReviews = true;
 
@@ -228,8 +228,8 @@ export async function getOzonItem(link, id, queue, browser) {
                 page = undefined;
             }
 
-            updateTime(prefix, id);
-            updateTags(prefix, id, options.query);
+            updateTime(prefix, itemId);
+            updateTags(prefix, itemId, options.query);
 
             // await browserClose(browser);
             // return false;
@@ -241,12 +241,12 @@ export async function getOzonItem(link, id, queue, browser) {
         let emptyDiffCount = 0;
 
         if (isLinksNavigation > 1) {
-            log(`Process ${isLinksNavigation} reviews pages`, id);
+            log(`Process ${isLinksNavigation} reviews pages`, itemId);
 
             for (let pageId = 2; pageId <= isLinksNavigation; pageId++) {
-                log(`Go to reviews page ${pageId}`, id);
+                log(`Go to reviews page ${pageId}`, itemId);
 
-                const reviewsPageLink = `${link}/reviews?reviewPuuid=${reviews[0]}&itemId=${id}&reviewsVariantMode=2&page=${pageId}`;
+                const reviewsPageLink = `${link}/reviews?reviewPuuid=${reviews[0]}&itemId=${itemId}&reviewsVariantMode=2&page=${pageId}`;
 
                 await page.goto(reviewsPageLink, goSettings);
 
@@ -276,7 +276,7 @@ export async function getOzonItem(link, id, queue, browser) {
                         }
 
                         if (emptyDiffCount > 50) {
-                            log("End by count", id);
+                            log("End by count", itemId);
 
                             isReviews = true;
                         }
@@ -289,13 +289,13 @@ export async function getOzonItem(link, id, queue, browser) {
             }
         }
 
-        log(`Process ${Object.keys(resultReviews).length} reviews`, id);
+        log(`Process ${Object.keys(resultReviews).length} reviews`, itemId);
 
         if (Object.keys(resultReviews).length) {
             for (const reviewId in resultReviews) {
                 const reviewItem = resultReviews[reviewId];
 
-                addReview(prefix, id, reviewId, reviewItem, true);
+                addReview(prefix, itemId, reviewId, reviewItem, true);
 
                 if (reviewItem.content.photos.length) {
                     for (const photoItem of reviewItem.content.photos) {
@@ -323,13 +323,13 @@ export async function getOzonItem(link, id, queue, browser) {
             }
         }
 
-        updateTime(prefix, id);
-        updateTags(prefix, id, options.query);
+        updateTime(prefix, itemId);
+        updateTags(prefix, itemId, options.query);
 
         // await page.close();
         // await browserClose(browser);
     } catch (error) {
-        log(`Error: ${error.message}`, id);
+        log(`Error: ${error.message}`, itemId);
 
         // await page.close();
         // await browserClose(browser);
@@ -340,7 +340,7 @@ export async function getOzonItem(link, id, queue, browser) {
         page = undefined;
     }
 
-    log("Ended", id);
+    log("Ended", itemId);
 
     return true;
 }

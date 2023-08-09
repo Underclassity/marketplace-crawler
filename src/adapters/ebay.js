@@ -38,8 +38,8 @@ puppeteer.use(
 
 puppeteer.use(StealthPlugin());
 
-function log(msg, id) {
-    return logMsg(msg, id, prefix);
+function log(msg, itemId) {
+    return logMsg(msg, itemId, prefix);
 }
 
 /**
@@ -196,22 +196,27 @@ export async function updateWithTags(queue) {
 /**
  * Get item by ID
  *
- * @param   {String}  id      Item ID
+ * @param   {String}  itemId  Item ID
  * @param   {Object}  queue   Queue instance
  *
  * @return  {Boolean}         Result
  */
-export async function getItemById(id, queue) {
-    log(`Get photos`, id);
+export async function getItemById(itemId, queue) {
+    log(`Get photos`, itemId);
 
-    const folderPath = path.resolve(options.directory, "download", "ebay", id);
+    const folderPath = path.resolve(
+        options.directory,
+        "download",
+        "ebay",
+        itemId
+    );
 
-    const photos = await getPhotosURLs(id);
+    const photos = await getPhotosURLs(itemId);
 
-    updateTime(prefix, id);
+    updateTime(prefix, itemId);
 
     for (const photoObject of photos) {
-        addReview(prefix, id, photoObject.id, photoObject, true);
+        addReview(prefix, itemId, photoObject.id, photoObject, true);
 
         const photoURL = `https://i.ebayimg.com/images/g/${photoObject.id}/s-l1600.${photoObject.ext}`;
 

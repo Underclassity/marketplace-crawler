@@ -36,30 +36,30 @@ puppeteer.use(
 
 puppeteer.use(StealthPlugin());
 
-function log(msg, id) {
-    return logMsg(msg, id, prefix);
+function log(msg, itemId) {
+    return logMsg(msg, itemId, prefix);
 }
 
 /**
  * Get feedback by ID
  *
- * @param   {Number}  id        Item ID
+ * @param   {Number}  itemId    Item ID
  * @param   {Object}  feedback  Feedback object
  *
  * @return  {Boolean}           Result
  */
-export async function getFeedback(id, feedback) {
-    if (!id) {
+export async function getFeedback(itemId, feedback) {
+    if (!itemId) {
         log("ID not defined!");
         return false;
     }
 
     if (!feedback) {
-        log("Feedback not defined!", id);
+        log("Feedback not defined!", itemId);
         return false;
     }
 
-    addReview(prefix, id, feedback.id, feedback, true);
+    addReview(prefix, itemId, feedback.id, feedback, true);
 
     if (!options.download) {
         return true;
@@ -71,17 +71,18 @@ export async function getFeedback(id, feedback) {
 /**
  * Get item by ID
  *
- * @param   {String}  id       Item ID
+ * @param   {String}  itemId   Item ID
  * @param   {Object}  browser  Puppeteer browser instance
  *
  * @return  {Boolean}          Result
  */
-export async function getItemById(id, browser) {
-    if (!id) {
+export async function getItemById(itemId, browser) {
+    if (!itemId) {
+        log("ID not defined!");
         return false;
     }
 
-    log(`Try to get item`, id);
+    log(`Try to get item`, itemId);
 
     const page = await createPage(browser, false);
 
@@ -106,7 +107,7 @@ export async function getItemById(id, browser) {
         try {
             let { payload } = await response.json();
 
-            log("Reviews data get", id);
+            log("Reviews data get", itemId);
 
             if (payload?.items?.length) {
                 for (const reviewItem of payload.items) {
@@ -125,37 +126,40 @@ export async function getItemById(id, browser) {
                         continue;
                     }
 
-                    addReview(prefix, id, reviewItem.id, reviewItem, true);
+                    addReview(prefix, itemId, reviewItem.id, reviewItem, true);
                 }
             }
 
             if (payload.nextPageToken) {
                 await page.goto(
-                    `https://www.joom.com/ru/products/${id}?reviewsPage=${payload.nextPageToken}`,
+                    `https://www.joom.com/ru/products/${itemId}?reviewsPage=${payload.nextPageToken}`,
                     goSettings
                 );
 
                 clearTimeout(getReviewsTimeout);
                 getReviewsTimeout = setTimeout(() => {
-                    const item = getItem(prefix, id);
+                    const item = getItem(prefix, itemId);
 
                     if (item.reviews.length == reviewsCount) {
                         isReviewsData = false;
-                        log("Clear reviews data timeout", id);
+                        log("Clear reviews data timeout", itemId);
                     }
                 }, options.timeout);
             } else {
                 isReviewsData = false;
-                log("Get all data", id);
+                log("Get all data", itemId);
             }
         } catch (error) {
-            log(`Get reviews error: ${error.message}`, id);
+            log(`Get reviews error: ${error.message}`, itemId);
             return false;
         }
     });
 
     try {
-        await page.goto(`https://www.joom.com/ru/products/${id}`, goSettings);
+        await page.goto(
+            `https://www.joom.com/ru/products/${itemId}`,
+            goSettings
+        );
 
         await autoScroll(page);
 
@@ -171,7 +175,7 @@ export async function getItemById(id, browser) {
                 : 0;
         });
 
-        const dbItem = getItem(prefix, id);
+        const dbItem = getItem(prefix, itemId);
 
         const dbReviewsCount = dbItem.reviews.length;
 
@@ -180,12 +184,12 @@ export async function getItemById(id, browser) {
             isReviewsData = false;
             log(
                 `Saved DB reviews ${dbReviewsCount} equal to parsed ${reviewsCount}`,
-                id
+                itemId
             );
         } else if (!reviewsCount) {
             clearTimeout(getReviewsTimeout);
             isReviewsData = false;
-            log("Reviews not found", id);
+            log("Reviews not found", itemId);
         }
 
         while (isReviewsData) {
@@ -214,13 +218,13 @@ export async function getItemById(id, browser) {
             // }
         }
     } catch (error) {
-        log(`Get item error: ${error.message}`, id);
+        log(`Get item error: ${error.message}`, itemId);
     }
 
-    updateTime(prefix, id);
-    updateTags(prefix, id, options.query);
+    updateTime(prefix, itemId);
+    updateTags(prefix, itemId, options.query);
 
-    log("Close page", id);
+    log("Close page", itemId);
 
     await page.close();
 

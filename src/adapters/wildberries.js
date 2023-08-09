@@ -26,27 +26,35 @@ import priorities from "../helpers/priorities.js";
 
 const prefix = "wildberries";
 
-function log(msg, id = false) {
-    return logMsg(msg, id, prefix);
+/**
+ * Log helper
+ *
+ * @param   {String}  msg             Message
+ * @param   {String}  [itemId=false]  Item ID
+ *
+ * @return  {Boolean}                 Result
+ */
+function log(msg, itemId = false) {
+    return logMsg(msg, itemId, prefix);
 }
 
 /**
  * Get feedback by ID
  *
- * @param   {Number}  id        Item ID
+ * @param   {Number}  itemId    Item ID
  * @param   {Object}  feedback  Feedback object
  * @param   {Object}  queue     Queue
  *
  * @return  {Boolean}           Result
  */
-export async function getFeedback(id, feedback, queue) {
-    if (!id) {
+export async function getFeedback(itemId, feedback, queue) {
+    if (!itemId) {
         log("ID not defined!");
         return false;
     }
 
     if (!feedback) {
-        log("Feedback not defined!", id);
+        log("Feedback not defined!", itemId);
         return false;
     }
 
@@ -64,11 +72,11 @@ export async function getFeedback(id, feedback, queue) {
         (item) => `https://feedbackphotos.wbstatic.net/${item.fullSizeUri}`
     );
 
-    log(`Try to download ${photos.length} photos`, id);
+    log(`Try to download ${photos.length} photos`, itemId);
 
     const itemFolderPath = path.resolve(
         path.resolve(options.directory, "./download", "wildberries"),
-        id.toString()
+        itemId.toString()
     );
 
     if (!fs.existsSync(itemFolderPath)) {
@@ -192,18 +200,24 @@ export function addInfoToProducts(products) {
 /**
  * Get item info
  *
- * @param   {Number}  itemId  Item ID
+ * @param   {Number}          itemId  Item ID
  *
- * @return  {Object}          Item info
+ * @return  {Object|Boolean}          Item info
  */
 export async function getItemInfo(itemId) {
+    if (!itemId) {
+        return false;
+    }
+
     log("Try to get full info", itemId);
 
     function p(t, e) {
         for (let i = 0; i < e.length; i++) if (t <= e[i]) return i + 1;
     }
 
-    const h = [143, 287, 431, 719, 1007, 1061, 1115, 1169, 1313, 1601, 1655];
+    const h = [
+        143, 287, 431, 719, 1007, 1061, 1115, 1169, 1313, 1601, 1655, 1919,
+    ];
 
     const s = Math.floor(itemId / 1e5);
     const n = p(s, h);
@@ -267,11 +281,15 @@ export async function getItemInfo(itemId) {
 /**
  * Get item questions
  *
- * @param   {Number}  itemId  Item root ID
+ * @param   {Number}          itemId  Item root ID
  *
- * @return  {Object}          Questions object
+ * @return  {Object|Boolean}          Questions object
  */
 export async function getQuestions(itemId) {
+    if (!itemId) {
+        return false;
+    }
+
     log(`Try to get questions`, itemId);
 
     try {
@@ -319,16 +337,20 @@ export async function getQuestions(itemId) {
 /**
  * Get feedbacks by XHR
  *
- * @param   {String}  id  Item ID
+ * @param   {String}  itemId          Item ID
  *
- * @return  {Array}       Feedbacks array
+ * @return  {Array|Boolean}           Feedbacks array
  */
-export async function getFeedbackByXhr(id) {
-    log("Get all reviews by XHR", id);
+export async function getFeedbackByXhr(itemId) {
+    if (!itemId) {
+        return false;
+    }
+
+    log("Get all reviews by XHR", itemId);
 
     try {
         const request = await axios(
-            `https://feedbacks2.wb.ru/feedbacks/v1/${id}`,
+            `https://feedbacks2.wb.ru/feedbacks/v1/${itemId}`,
             {
                 headers: getHeaders(),
                 timeout: options.timeout,
@@ -348,12 +370,12 @@ export async function getFeedbackByXhr(id) {
 /**
  * Get item price info
  *
- * @param   {Number}  id  Item ID
+ * @param   {Number}  itemId  Item ID
  *
- * @return  {Object}      Item info
+ * @return  {Object}          Item info
  */
-export async function getPriceInfo(id) {
-    log("Try to get price info", id);
+export async function getPriceInfo(itemId) {
+    log("Try to get price info", itemId);
 
     function p(t, e) {
         for (let i = 0; i < e.length; i++) if (t <= e[i]) return i + 1;
@@ -361,12 +383,14 @@ export async function getPriceInfo(id) {
 
     const h = [143, 287, 431, 719, 1007, 1061, 1115, 1169, 1313, 1601, 1655];
 
-    const s = Math.floor(id / 1e5);
+    const s = Math.floor(itemId / 1e5);
     const n = p(s, h);
 
     const url = `https://basket-${
         n && n >= 10 ? n : `0${n}`
-    }.wb.ru/vol${s}/part${Math.floor(id / 1e3)}/${id}/info/price-history.json`;
+    }.wb.ru/vol${s}/part${Math.floor(
+        itemId / 1e3
+    )}/${itemId}/info/price-history.json`;
 
     try {
         const request = await axios(url, {
@@ -374,11 +398,11 @@ export async function getPriceInfo(id) {
             timeout: options.timeout,
         });
 
-        log("Get price info", id);
+        log("Get price info", itemId);
 
         return request.data;
     } catch (error) {
-        log(`Get price info error: ${error.message}`, id);
+        log(`Get price info error: ${error.message}`, itemId);
     }
 
     return false;
@@ -507,13 +531,13 @@ export async function getFeedbacks(itemId, queue) {
 /**
  * Get feedbacks for items with offset
  *
- * @param   {Number}  id    Item ID
- * @param   {Number}  skip  Offset
+ * @param   {Number}  itemId    Item ID
+ * @param   {Number}  skip      Offset
  *
- * @return  {Object}        Result
+ * @return  {Object}            Result
  */
-export async function feedbacksRequest(id, skip) {
-    log(`Get feedbacks with skip ${skip}`, id);
+export async function feedbacksRequest(itemId, skip) {
+    log(`Get feedbacks with skip ${skip}`, itemId);
 
     try {
         const request = await axios(
@@ -521,7 +545,7 @@ export async function feedbacksRequest(id, skip) {
             {
                 data: {
                     hasPhoto: true,
-                    imtId: parseInt(id, 10),
+                    imtId: parseInt(itemId, 10),
                     order: "dateDesc",
                     take: 30,
                     skip,
@@ -535,7 +559,7 @@ export async function feedbacksRequest(id, skip) {
 
         return request.data;
     } catch (error) {
-        log(`Get feedbacks with skip ${skip} error: ${error.message}`, id);
+        log(`Get feedbacks with skip ${skip} error: ${error.message}`, itemId);
     }
 
     return false;

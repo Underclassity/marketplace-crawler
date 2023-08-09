@@ -26,8 +26,8 @@ import priorities from "../helpers/priorities.js";
 
 const prefix = "amazon";
 
-function log(msg, id) {
-    return logMsg(msg, id, prefix);
+function log(msg, itemId) {
+    return logMsg(msg, itemId, prefix);
 }
 
 /**
@@ -237,8 +237,6 @@ export async function getItemsByQuery(queue, query = options.query) {
                         queue,
                         timeout: options.timeout,
                     });
-
-                    console.log(results);
                 } catch (error) {
                     results = false;
                     log(`Error get from page ${page}: ${error.message}`);

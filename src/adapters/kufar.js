@@ -41,6 +41,11 @@ function log(msg, id = false) {
  * @return  {Boolean}         Result
  */
 export function processItem(itemId, queue) {
+    if (!itemId) {
+        log("ID not defined!");
+        return false;
+    }
+
     log("Update item", itemId);
 
     const item = getItem(prefix, itemId);

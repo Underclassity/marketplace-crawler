@@ -48,13 +48,13 @@ let startPage;
 /**
  * Log message helper
  *
- * @param   {String}  msg     Message
- * @param   {String}  id      Item ID
+ * @param   {String}  msg      Message
+ * @param   {String}  itemI    Item ID
  *
- * @return  {Boolean}         Result
+ * @return  {Boolean}          Result
  */
-function log(msg, id = false) {
-    return logMsg(msg, id, prefix);
+function log(msg, itemId = false) {
+    return logMsg(msg, itemId, prefix);
 }
 
 /**
@@ -66,6 +66,11 @@ function log(msg, id = false) {
  * @return  {Boolean}         Result
  */
 async function sleepAfterEnd(itemId, pageId = false) {
+    if (!itemId) {
+        log(`Item not defined`, itemId);
+        return false;
+    }
+
     const sleepTime = Math.random() * options.timeout;
 
     let startMsg = `Wait for ${Math.round(sleepTime / 1000)} sec after end`;
@@ -96,7 +101,7 @@ async function sleepAfterEnd(itemId, pageId = false) {
  *
  * @return  {String}       User ID
  */
-export function getUserId(str) {
+export function getUserId(str = "") {
     return str
         .replace(
             "https://feedback.aliexpress.ru/display/detail.htm?ownerMemberId=",
@@ -114,6 +119,10 @@ export function getUserId(str) {
  * @return  {Array}             Items array with user reviews
  */
 export async function getUserReviews(username, browser) {
+    if (!username) {
+        return false;
+    }
+
     log(`Get user ${username} items`);
 
     const page = await createPage(browser);
@@ -212,17 +221,21 @@ export async function processCookiesAndSession() {
  * Process review download
  *
  * @param   {Object}  review  Review
- * @param   {Number}  id      Item ID
+ * @param   {Number}  itemId  Item ID
  * @param   {Object}  queue   Queue instance
  *
  * @return  {Boolean}         Result
  */
-export async function download(review, id, queue) {
+export async function download(review, itemId, queue) {
+    if (!review || !itemId || !queue) {
+        return false;
+    }
+
     const dirPath = path.resolve(
         options.directory,
         "download",
         "aliexpress",
-        id.toString()
+        itemId.toString()
     );
 
     if (!fs.existsSync(dirPath)) {
@@ -234,7 +247,7 @@ export async function download(review, id, queue) {
             `Download ${review.evaluationId || review.id} review ${
                 review.images.length
             } images`,
-            id
+            itemId
         );
 
         for (let url of review.images) {
@@ -256,7 +269,7 @@ export async function download(review, id, queue) {
             `Download ${review.evaluationId || review.id} additional review ${
                 review.additionalReview.images.length
             } images`,
-            id
+            itemId
         );
 
         for (let url of review.additionalReview.images) {
@@ -282,6 +295,10 @@ export async function download(review, id, queue) {
  * @return  {Object}          Reviews object
  */
 export async function getItemReviewsPage(itemId, pageId) {
+    if (!itemId || pageId == undefined) {
+        return false;
+    }
+
     let reviewsData = {};
 
     log(`Process page ${pageId}`, itemId);
@@ -848,7 +865,7 @@ export async function processPage(
     totalFound,
     queue
 ) {
-    if (!pageId) {
+    if (pageId == undefined) {
         log("Page ID not defined!");
         return false;
     }

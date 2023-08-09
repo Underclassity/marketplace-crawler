@@ -14,10 +14,10 @@ import {
     updateTags,
     updateTime,
 } from "../helpers/db.js";
+import { logMsg } from "../helpers/log-msg.js";
 import autoScroll from "../helpers/auto-scroll.js";
 import createPage from "../helpers/create-page.js";
 import goSettings from "../helpers/go-settings.js";
-import log from "../helpers/log.js";
 import sleep from "../helpers/sleep.js";
 
 import options from "../options.js";
@@ -34,34 +34,28 @@ puppeteer.use(
 
 puppeteer.use(StealthPlugin());
 
-function logMsg(msg, id) {
-    const query = options.query || "";
-
-    if (id) {
-        return log(`[Decathlon] ${query}: ${id} - ${msg}`);
-    }
-
-    return log(`[Decathlon] ${query}: ${msg}`);
+function log(msg, itemId) {
+    return logMsg(msg, itemId, prefix);
 }
 
 /**
  * Get reviews for item
  *
- * @param   {String}  id     Item ID
- * @param   {Object}  queue  Queue instance
+ * @param   {String}  itemId   Item ID
+ * @param   {Object}  queue    Queue instance
  *
- * @return  {Boolean}        Result
+ * @return  {Boolean}          Result
  */
-export async function getReviews(id, queue) {
-    if (!id) {
-        logMsg("ID not defined!");
+export async function getReviews(itemId, queue) {
+    if (!itemId) {
+        log("ID not defined!");
         return false;
     }
 
-    const dbItem = getItem(prefix, id);
+    const dbItem = getItem(prefix, itemId);
 
     if (!dbItem) {
-        logMsg("Item not found in DB", id);
+        log("Item not found in DB", itemId);
         return false;
     }
 
@@ -75,7 +69,7 @@ export async function getReviews(id, queue) {
         const reviews = [];
 
         for (let pageId = 1; pageId <= totalPages; pageId++) {
-            logMsg(`Get reviews for model ${model_id} on page ${pageId}`, id);
+            log(`Get reviews for model ${model_id} on page ${pageId}`, itemId);
 
             await queue.add(
                 async () => {
@@ -100,9 +94,9 @@ export async function getReviews(id, queue) {
                         //     items.length
                         // );
 
-                        logMsg(
+                        log(
                             `Found ${items.length} of ${reviews.length}/${total_item_count} on page ${current_page_number}`,
-                            id
+                            itemId
                         );
 
                         if (!items.length) {
@@ -115,7 +109,7 @@ export async function getReviews(id, queue) {
                                 total_item_count / item_number_per_page + 1
                             );
 
-                            logMsg(`Set total pages to ${totalPages}`, id);
+                            log(`Set total pages to ${totalPages}`, itemId);
 
                             if (!total_item_count) {
                                 pageId = totalPages + 1;
@@ -123,7 +117,10 @@ export async function getReviews(id, queue) {
                             }
                         }
                     } catch (error) {
-                        logMsg(`Get error reviews error: ${error.message}`, id);
+                        log(
+                            `Get error reviews error: ${error.message}`,
+                            itemId
+                        );
                     }
                 },
                 { priority: priorities.review }
@@ -131,16 +128,16 @@ export async function getReviews(id, queue) {
         }
 
         for (const item of reviews) {
-            addReview(prefix, id, item.id, item, true);
+            addReview(prefix, itemId, item.id, item, true);
         }
 
-        logMsg(`All reviews get for model ${model_id}`, id);
+        log(`All reviews get for model ${model_id}`, itemId);
     }
 
-    updateTime(prefix, id);
-    updateTags(prefix, id, options.query);
+    updateTime(prefix, itemId);
+    updateTags(prefix, itemId, options.query);
 
-    logMsg(`All models get`, id);
+    log(`All models get`, itemId);
 
     return true;
 }
@@ -154,7 +151,7 @@ export async function getReviews(id, queue) {
  * @return  {Boolean}        Result
  */
 export async function getItemsOnPages(queue, query = options.query) {
-    logMsg(`Get items for ${options.query}`);
+    log(`Get items for ${options.query}`);
 
     const browser = await puppeteer.launch({
         headless: options.headless,
@@ -188,7 +185,7 @@ export async function getItemsOnPages(queue, query = options.query) {
 
                 const { products, payload } = data;
 
-                logMsg(`Found ${products.length}`);
+                log(`Found ${products.length}`);
 
                 for (const product of products) {
                     addItem(prefix, product.shopify_product_id, product);
@@ -207,13 +204,13 @@ export async function getItemsOnPages(queue, query = options.query) {
                     'a[aria-label="Go to next page"]'
                 );
 
-                logMsg(`Is more items found: ${isPagination}`);
+                log(`Is more items found: ${isPagination}`);
 
                 if (isPagination) {
                     let pageId = 2;
 
                     while (isPagination) {
-                        logMsg(`Get page ${pageId}`);
+                        log(`Get page ${pageId}`);
 
                         await page.click('a[aria-label="Go to next page"]');
 
@@ -264,7 +261,7 @@ export async function getItemsOnPages(queue, query = options.query) {
 
                 // for (const product of products) {
                 //     if (!(product.shopify_product_id in decathlonDb.data)) {
-                //         logMsg(`Add new product ${product.shopify_product_id}`);
+                //         log(`Add new product ${product.shopify_product_id}`);
                 //         decathlonDb.data[product.shopify_product_id] = product;
                 //         decathlonDb.write();
                 //     }
@@ -272,14 +269,12 @@ export async function getItemsOnPages(queue, query = options.query) {
 
                 // return true;
             } catch (error) {
-                logMsg(
-                    `Get items for ${options.query} error: ${error.message}`
-                );
+                log(`Get items for ${options.query} error: ${error.message}`);
                 console.log(error.message);
                 return false;
             }
 
-            // logMsg("Close page");
+            // log("Close page");
 
             await page.close();
 
@@ -288,7 +283,7 @@ export async function getItemsOnPages(queue, query = options.query) {
         { priority: priorities.page }
     );
 
-    // logMsg("Close browser");
+    // log("Close browser");
 
     await browser.close();
 
@@ -305,7 +300,7 @@ export async function getItemsOnPages(queue, query = options.query) {
 export async function updateReviews(queue) {
     const items = getItems(prefix, true);
 
-    logMsg(`Update ${items.length} items reviews`);
+    log(`Update ${items.length} items reviews`);
 
     items.forEach((itemId) => {
         const item = getItem(prefix, itemId);
@@ -340,7 +335,7 @@ export async function updateReviews(queue) {
 export async function updateItems(queue) {
     const items = getItems(prefix);
 
-    logMsg(`Update ${items.length} items`);
+    log(`Update ${items.length} items`);
 
     for (const itemId of items) {
         await getReviews(itemId, queue);
@@ -379,7 +374,7 @@ export async function updateWithTags(queue) {
  * @return  {Boolean}        Result
  */
 export async function getItemsByQuery(queue, query = options.query) {
-    logMsg("Get items");
+    log("Get items");
 
     await getItemsOnPages(queue, query);
 

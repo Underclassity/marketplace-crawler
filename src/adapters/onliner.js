@@ -22,22 +22,22 @@ import priorities from "../helpers/priorities.js";
 
 const prefix = "onliner";
 
-function log(msg, id) {
-    return logMsg(msg, id, prefix);
+function log(msg, itemId) {
+    return logMsg(msg, itemId, prefix);
 }
 
 /**
  * Update item prices
  *
- * @param   {String}  id     Item ID
- * @param   {Object}  queue  Queue instance
+ * @param   {String}  itemId    Item ID
+ * @param   {Object}  queue     Queue instance
  *
- * @return  {Boolean}        Rtsult
+ * @return  {Boolean}           Result
  */
-export async function updateItemPrices(id, queue) {
-    log("Try to update item prices", id);
+export async function updateItemPrices(itemId, queue) {
+    log("Try to update item prices", itemId);
 
-    const dbItem = getItem(prefix, id);
+    const dbItem = getItem(prefix, itemId);
 
     if (!dbItem) {
         log("Not found in DB");
@@ -47,7 +47,7 @@ export async function updateItemPrices(id, queue) {
     for (const monthFilter of ["2m", "12m"]) {
         await queue.add(
             async () => {
-                log(`Try to update item prices for ${monthFilter}`, id);
+                log(`Try to update item prices for ${monthFilter}`, itemId);
 
                 try {
                     const priceRequest = await axios(
@@ -60,7 +60,7 @@ export async function updateItemPrices(id, queue) {
 
                     // const { chart_data, sale } = priceRequest.data;
 
-                    updateItem(prefix, id, {
+                    updateItem(prefix, itemId, {
                         prices: priceRequest.data,
                     });
 
@@ -90,7 +90,7 @@ export async function updateItemPrices(id, queue) {
                 } catch (error) {
                     log(
                         `Update item prices for ${monthFilter} error: ${error.message}`,
-                        id
+                        itemId
                     );
                 }
             },
@@ -111,15 +111,15 @@ export async function updateItemPrices(id, queue) {
 /**
  * Update item reviews
  *
- * @param   {String}  id     Item ID
- * @param   {Object}  queue  Queue instance
+ * @param   {String}  itemId    Item ID
+ * @param   {Object}  queue     Queue instance
  *
- * @return  {Boolean}        Result
+ * @return  {Boolean}           Result
  */
-export async function updateItemReviews(id, queue) {
-    log("Try to update", id);
+export async function updateItemReviews(itemId, queue) {
+    log("Try to update", itemId);
 
-    const dbItem = getItem(prefix, id);
+    const dbItem = getItem(prefix, itemId);
 
     if (!dbItem) {
         log("Not found in DB");
@@ -132,7 +132,7 @@ export async function updateItemReviews(id, queue) {
         await queue.add(
             async () => {
                 try {
-                    log("Get item reviews", id);
+                    log("Get item reviews", itemId);
 
                     const itemRequest = await axios(
                         `https://catalog.onliner.by/sdapi/catalog.api/products/${dbItem.key}/reviews?order=created_at:desc`,
@@ -146,13 +146,13 @@ export async function updateItemReviews(id, queue) {
 
                     totalPages = page.last;
 
-                    log(`${reviews.length} reviews get`, id);
+                    log(`${reviews.length} reviews get`, itemId);
 
                     for (const review of reviews) {
-                        addReview(prefix, id, review.id, review, true);
+                        addReview(prefix, itemId, review.id, review, true);
                     }
                 } catch (error) {
-                    log(`Get item reviews error: ${error.message}`, id);
+                    log(`Get item reviews error: ${error.message}`, itemId);
                 }
             },
             { priority: priorities.item }
