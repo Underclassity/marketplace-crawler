@@ -43,6 +43,7 @@ puppeteer.use(StealthPlugin());
 
 let isStartPageReloading = false;
 let isStartPageLoaded = false;
+let isDragAndDropSlide = false;
 let startPage;
 
 /**
@@ -60,10 +61,10 @@ function log(msg, itemId = false) {
 /**
  * Sleep helper after end item process
  *
- * @param   {String}  itemId  Item ID
- * @param   {Number}  pageId  Optional page number
+ * @param   {String}  itemId          Item ID
+ * @param   {Number}  [pageId=false]  Optional page number
  *
- * @return  {Boolean}         Result
+ * @return  {Boolean}                 Result
  */
 async function sleepAfterEnd(itemId, pageId = false) {
     if (!itemId) {
@@ -97,9 +98,9 @@ async function sleepAfterEnd(itemId, pageId = false) {
 /**
  * Get user ID from string
  *
- * @param   {String}  str  User URL string
+ * @param   {String}  [str=""]  User URL string
  *
- * @return  {String}       User ID
+ * @return  {String}            User ID
  */
 export function getUserId(str = "") {
     return str
@@ -576,6 +577,69 @@ export async function scrapeItemByBrowser(itemId, browser, startPage, queue) {
                 const isCaptchaPopup = await startPage.$(".baxia-dialog");
 
                 if (isCaptcha || isCaptchaPopup) {
+                    if (!isDragAndDropSlide) {
+                        isDragAndDropSlide = true;
+
+                        log("Start drag and drop captcha slide");
+
+                        const { x, y } = await startPage.evaluate(() => {
+                            const rect = document
+                                .getElementById("baxia-dialog-content")
+                                .getBoundingClientRect();
+
+                            return {
+                                x: rect.x,
+                                y: rect.y,
+                            };
+                        });
+
+                        // await startPage.mouse.move({
+                        //     x: 741.5 + 62 + 42 / 2,
+                        //     y: 380 + 171 + 30 / 2,
+                        // });
+                        // await startPage.mouse.down();
+                        // await startPage.mouse.move({
+                        //     x: 741.5 + 62 - 42 / 2 + 300,
+                        //     y: 380 + 171 + 30 / 2,
+                        // });
+                        // await startPage.mouse.up();
+
+                        await startPage.mouse.dragAndDrop(
+                            { x: x + 62 + 42 / 2, y: y + 171 + 30 / 2 },
+                            {
+                                x: x + 62 - 42 / 2 + 300,
+                                y: y + 171 + 30 / 2,
+                            },
+                            { delay: 100 }
+                        );
+
+                        log("End drag and drop captcha slide");
+
+                        isDragAndDropSlide = false;
+                    }
+
+                    // Try to sumbit iframe form
+                    // const submitFormResult = await startPage.evaluate(() => {
+                    //     const iframe = document.getElementById(
+                    //         "baxia-dialog-content"
+                    //     );
+
+                    //     if (!iframe) {
+                    //         return false;
+                    //     }
+
+                    //     const form =
+                    //         iframe.contentWindow.document.getElementById(
+                    //             "nc-verify-form"
+                    //         );
+
+                    //     form.submit();
+
+                    //     return true;
+                    // });
+
+                    // console.log(submitFormResult);
+
                     // if (!options.headless) {
                     await sleep(Math.random() * 60 * 1000); // Waif random time, from 0 to 5 min
                     // }
@@ -851,7 +915,7 @@ export async function scrapeItemByBrowser(itemId, browser, startPage, queue) {
 /**
  * Process page for query
  * @param   {Number}  pageId       Page number
- * @param   {String}  query        Query string
+ * @param   {String}  [query=""]   Query string
  * @param   {Object}  browser      Puppeteer browser instance
  * @param   {Number}  totalFound   Total items found number
  * @param   {Object}  queue        Queue instance

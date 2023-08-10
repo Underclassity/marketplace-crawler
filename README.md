@@ -53,6 +53,7 @@ Usage examples:
 ***
 
 System dependencies:
-- `ffmpeg` - cut video to frames
 - `cwebp` - convert images to webp file format
+- `ffmpeg` - cut video to frames
+- `imagemagic` - convert and process images
 - `yt-dlp` - download m3u8 video files

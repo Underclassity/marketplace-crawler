@@ -8,6 +8,10 @@ import sleep from "./sleep.js";
  * @return  {Object}        Promise
  */
 export async function autoScroll(page) {
+    if (!page) {
+        return false;
+    }
+
     await page.evaluate(async () => {
         await new Promise((resolve) => {
             let totalHeight = 0;
@@ -36,6 +40,10 @@ export async function autoScroll(page) {
  * @return  {Boolean}       Result
  */
 export async function scrollTick(page) {
+    if (!page) {
+        return false;
+    }
+
     await page.evaluate(async () => {
         const distance = Math.floor(document.body.offsetHeight / 2);
 

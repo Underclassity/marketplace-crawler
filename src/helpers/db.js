@@ -22,6 +22,10 @@ const dbCache = {};
  * @return  {Object}            DB instance
  */
 export function loadDB(dbPrefix) {
+    if (!dbPrefix || !dbPrefix.length) {
+        return false;
+    }
+
     if (!(dbPrefix in dbCache)) {
         dbCache[dbPrefix] = new LowSync(
             new JSONFileSync(path.resolve(dbPath, `${dbPrefix}.json`))
@@ -52,6 +56,10 @@ export function loadDB(dbPrefix) {
  * @return  {Boolean}              Result
  */
 export function dbWrite(dbPrefix, write = true, prefix = false) {
+    if (!dbPrefix || !dbPrefix.length) {
+        return false;
+    }
+
     if (typeof dbPrefix != "string") {
         console.trace();
         logMsg(`Input DB prefix ${dbPrefix} is not a string!`, false, prefix);
@@ -117,6 +125,14 @@ export function dbWrite(dbPrefix, write = true, prefix = false) {
  * @return  {Boolean}            Result
  */
 export function dbItemCheck(dbPrefix, itemId, prefix = false) {
+    if (!dbPrefix || !dbPrefix.length) {
+        return false;
+    }
+
+    if (itemId == undefined) {
+        return false;
+    }
+
     loadDB(dbPrefix);
 
     const db = dbCache[dbPrefix];

@@ -37,9 +37,9 @@ const proxyURLs = [
 /**
  * Get random proxy config
  *
- * @param   {Boolean}  force  Force get flag
+ * @param   {Boolean}  [force=false]  Force get flag
  *
- * @return  {Object}          Proxy settings
+ * @return  {Object}                  Proxy settings
  */
 export function getProxy(force = false) {
     if (!options.proxy && !force) {
@@ -76,6 +76,10 @@ export function getProxy(force = false) {
  * @return  {Array}        Proxies array list
  */
 export async function getProxyList(url) {
+    if (!url || !url.length) {
+        return false;
+    }
+
     let proxies = [];
 
     if (!url) {
@@ -100,9 +104,10 @@ export async function getProxyList(url) {
 /**
  * Filter proxy list
  *
- * @param   {Array}  data          Input proxies array
+ * @param   {Array}   data          Input proxies array
+ * @param   {Number}  [delay=500]   Delay between tests
  *
- * @return  {Array}                Filtered proxies array
+ * @return  {Array}                 Filtered proxies array
  */
 export async function filterProxyList(data = getProxyList(), delay = 500) {
     const resultData = [];

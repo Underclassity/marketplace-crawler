@@ -1,7 +1,18 @@
 import fs from "node:fs";
 import path from "node:path";
 
+/**
+ * Walk directory helper
+ *
+ * @param   {String}  dir  Directory path
+ *
+ * @return  {Array}        Files array
+ */
 export async function walk(dir) {
+    if (!dir || fs.existsSync(dir)) {
+        return [];
+    }
+
     let files = fs.readdirSync(dir);
 
     files = await Promise.all(

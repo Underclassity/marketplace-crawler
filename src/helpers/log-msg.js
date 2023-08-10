@@ -19,11 +19,11 @@ for (const id of ids) {
 /**
  * Log message helper
  *
- * @param   {String}  msg     Message string
- * @param   {String}  id      ID
- * @param   {String}  prefix  Prfix
+ * @param   {String}  msg                Message string
+ * @param   {String}  [id="Common"]      ID
+ * @param   {String}  [prefix="Common"]  Prefix
  *
- * @return  {Boolean}         Log result
+ * @return  {Boolean}                    Log result
  */
 export function logMsg(msg, id = "Common", prefix = "Common") {
     if ((!msg || !id || !prefix) && prefix == undefined) {

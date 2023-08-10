@@ -6,7 +6,7 @@ import path from "node:path";
  *
  * @param   {String}  dir  Dir path
  *
- * @return  {Array}       Files array
+ * @return  {Array}        Files array
  */
 export function readDir(dir) {
     return fs

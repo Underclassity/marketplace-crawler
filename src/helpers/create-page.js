@@ -4,11 +4,11 @@ import logMsg from "./log-msg.js";
 /**
  * Create page in puppeteer
  *
- * @param   {Object}       browser           Browser instance
- * @param   {Boolean}      intersection      Intersection enable flag
- * @param   {Array}        types             Intersection types array
+ * @param   {Object}       browser                                   Browser instance
+ * @param   {Boolean}      [intersection=false]                      Intersection enable flag
+ * @param   {Array}        [types=["image", "font", "stylesheet"]]   Intersection types array
  *
- * @return  {Object}                         Puppeteer Page instance
+ * @return  {Object}                                                 Puppeteer Page instance
  */
 export async function createPage(
     browser,

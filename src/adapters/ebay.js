@@ -1,7 +1,7 @@
 import path from "node:path";
 
 import axios from "axios";
-import cheerio from "cheerio";
+import { load } from "cheerio";
 
 import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
@@ -73,9 +73,9 @@ async function getPhotosURLs(itemId) {
 
         const html = request.data;
 
-        let $ = cheerio.load(html);
+        let $ = load(html);
 
-        $ = cheerio.load($("#pagesourcecode").text());
+        $ = load($("#pagesourcecode").text());
 
         const imageUrls = [];
 
@@ -202,6 +202,10 @@ export async function updateWithTags(queue) {
  * @return  {Boolean}         Result
  */
 export async function getItemById(itemId, queue) {
+    if (!itemId || !itemId.length) {
+        return false;
+    }
+
     log(`Get photos`, itemId);
 
     const folderPath = path.resolve(

@@ -46,12 +46,12 @@ const downloadCache = {};
  * Delete file by filepath helper
  *
  * @param   {String}  filepath  File filepath
- * @param   {String}  id      ID
- * @param   {String}  prefix  Prfix
+ * @param   {String}  itemId    Item ID
+ * @param   {String}  prefix    Prefix
  *
  * @return  {Boolean}           Result
  */
-function deleteHelper(filepath, id, prefix) {
+function deleteHelper(filepath, itemId, prefix) {
     if (!fs.existsSync(filepath)) {
         // logMsg(`${filepath} not exists`, id, prefix);
         return false;
@@ -59,10 +59,10 @@ function deleteHelper(filepath, id, prefix) {
 
     try {
         fs.unlinkSync(filepath);
-        logMsg(`Deleted ${filepath}`, id, prefix);
+        logMsg(`Deleted ${filepath}`, itemId, prefix);
         return true;
     } catch (error) {
-        logMsg(`Delete error ${filepath}: ${error.message}`, id, prefix);
+        logMsg(`Delete error ${filepath}: ${error.message}`, itemId, prefix);
         return false;
     }
 }
@@ -214,24 +214,24 @@ export async function convertVideoItem(filepath, itemId, prefix) {
  *
  * @param   {String}  filepath  Input filepath
  * @param   {Object}  queue     Queue instance`
- * @param   {String}  id        Item ID
+ * @param   {String}  itemId    Item ID
  * @param   {String}  prefix    Prefix for logs
  *
  * @return  {Boolean}           Result
  */
-export async function processFile(filepath, queue, id, prefix) {
+export async function processFile(filepath, queue, itemId, prefix) {
     if (!which("cwebp", { nothrow: true })) {
-        logMsg("cwebp binary not found!", id, prefix);
+        logMsg("cwebp binary not found!", itemId, prefix);
         return false;
     }
 
     if (!fs.existsSync(filepath)) {
-        logMsg(`File ${filepath} not found to convert`, id, prefix);
+        logMsg(`File ${filepath} not found to convert`, itemId, prefix);
         return false;
     }
 
     if (convertDb.data.includes(filepath)) {
-        logMsg(`File ${filepath} found in convert cache`, id, prefix);
+        logMsg(`File ${filepath} found in convert cache`, itemId, prefix);
         return false;
     }
 
@@ -251,7 +251,7 @@ export async function processFile(filepath, queue, id, prefix) {
         isWin ? ".exe" : ""
     } -quiet -preset photo -q 80 -mt -m 6 -preset photo ${filepath} -o ${tempWebpFilepath}`;
 
-    logMsg(`Convert to webp ${path.basename(filepath)}`, id, prefix);
+    logMsg(`Convert to webp ${path.basename(filepath)}`, itemId, prefix);
 
     try {
         await queue.add(
@@ -269,11 +269,11 @@ export async function processFile(filepath, queue, id, prefix) {
                 `${filepath}: ${prettyBytes(tempSize)} < ${prettyBytes(
                     originalSize
                 )}`,
-                id,
+                itemId,
                 prefix
             );
 
-            deleteHelper(filepath, id, prefix);
+            deleteHelper(filepath, itemId, prefix);
 
             fs.renameSync(tempWebpFilepath, outputFilename);
         } else {
@@ -281,11 +281,11 @@ export async function processFile(filepath, queue, id, prefix) {
                 `${filepath}: ${prettyBytes(tempSize)} > ${prettyBytes(
                     originalSize
                 )}`,
-                id,
+                itemId,
                 prefix
             );
 
-            deleteHelper(tempWebpFilepath, id, prefix);
+            deleteHelper(tempWebpFilepath, itemId, prefix);
 
             convertDb.data.push(filepath);
             convertDb.write();
@@ -293,7 +293,7 @@ export async function processFile(filepath, queue, id, prefix) {
 
         return true;
     } catch (error) {
-        logMsg(`Convert error ${filepath}: ${error.message}`, id, prefix);
+        logMsg(`Convert error ${filepath}: ${error.message}`, itemId, prefix);
         return false;
     }
 }
@@ -304,12 +304,12 @@ export async function processFile(filepath, queue, id, prefix) {
  * @param   {String}  url       File url
  * @param   {String}  filepath  Download filepath
  * @param   {Object}  queue     Queue instance
- * @param   {String}  id        Item ID
+ * @param   {String}  itemId    Item ID
  * @param   {String}  prefix    Prefix for logs
  *
  * @return  {Boolean}           Result
  */
-export async function downloadFile(url, filepath, queue, id, prefix) {
+export async function downloadFile(url, filepath, queue, itemId, prefix) {
     if (!options.image) {
         return true;
     }
@@ -322,7 +322,7 @@ export async function downloadFile(url, filepath, queue, id, prefix) {
         async () => {
             logMsg(
                 `Try to download ${filename} to ${path.dirname(filepath)}`,
-                id,
+                itemId,
                 prefix
             );
 
@@ -341,7 +341,7 @@ export async function downloadFile(url, filepath, queue, id, prefix) {
                     `Downloaded ${filename} to ${path.dirname(
                         filepath
                     )}(size ${prettyBytes(fs.statSync(filepath).size)})`,
-                    id,
+                    itemId,
                     prefix
                 );
 
@@ -351,7 +351,7 @@ export async function downloadFile(url, filepath, queue, id, prefix) {
                     `Download error ${filename} to ${path.dirname(filepath)}: ${
                         error.message
                     }`,
-                    id,
+                    itemId,
                     prefix
                 );
 
@@ -365,7 +365,7 @@ export async function downloadFile(url, filepath, queue, id, prefix) {
 
     // wait for file
     while (result && !fs.existsSync(filepath)) {
-        logMsg(`Wait for file ${filename}`, id, prefix);
+        logMsg(`Wait for file ${filename}`, itemId, prefix);
         await sleep(1000);
     }
 
@@ -378,18 +378,18 @@ export async function downloadFile(url, filepath, queue, id, prefix) {
  * @param   {String}  url       File url
  * @param   {String}  filepath  Download filepath
  * @param   {Object}  queue     Queue instance
- * @param   {String}  id        Item ID
+ * @param   {String}  itemId    Item ID
  * @param   {String}  prefix    Prefix for logs
  *
  * @return  {Boolean}           Result
  */
-export async function downloadVideo(url, filepath, queue, id, prefix) {
+export async function downloadVideo(url, filepath, queue, itemId, prefix) {
     if (!options.video) {
         return true;
     }
 
     if (!which("yt-dlp", { nothrow: true })) {
-        logMsg("yt-dlp binary not found!", id, prefix);
+        logMsg("yt-dlp binary not found!", itemId, prefix);
         return false;
     }
 
@@ -407,7 +407,7 @@ export async function downloadVideo(url, filepath, queue, id, prefix) {
 
     await queue.add(
         async () => {
-            logMsg(`Start video download ${filename}`, id, prefix);
+            logMsg(`Start video download ${filename}`, itemId, prefix);
 
             commandResult = await commandCall(ytDlpCommand);
 
@@ -425,13 +425,13 @@ export async function downloadVideo(url, filepath, queue, id, prefix) {
     if (commandResult.result && fs.existsSync(filepath)) {
         logMsg(
             `Downloaded video ${filename}: ${commandResult.result}`,
-            id,
+            itemId,
             prefix
         );
     } else {
         logMsg(
             `Download error video ${filename}: ${commandResult.stderr}`,
-            id,
+            itemId,
             prefix
         );
     }
@@ -445,7 +445,7 @@ export async function downloadVideo(url, filepath, queue, id, prefix) {
  * @param   {String}   url       File url
  * @param   {String}   filepath  Download filepath
  * @param   {Object}   queue     Queue instance
- * @param   {String}   id        Item ID
+ * @param   {String}   itemId    Item ID
  * @param   {String}   prefix    Prefix for logs
  * @param   {Boolean}  isVideo   Is video flag
  *
@@ -455,19 +455,19 @@ export async function checkSize(
     url,
     filepath,
     queue,
-    id,
+    itemId,
     prefix,
     isVideo = false
 ) {
     const filename = path.basename(filepath);
 
     if (!fs.existsSync(filepath)) {
-        logMsg(`File ${filepath} not found for check size`, id, prefix);
+        logMsg(`File ${filepath} not found for check size`, itemId, prefix);
         return false;
     }
 
     if (!fs.statSync(filepath).size) {
-        logMsg(`File ${filename} is empty`, id, prefix);
+        logMsg(`File ${filename} is empty`, itemId, prefix);
         return false;
     }
 
@@ -476,14 +476,14 @@ export async function checkSize(
             `File ${filename} is video with size ${prettyBytes(
                 fs.statSync(filepath).size
             )}`,
-            id,
+            itemId,
             prefix
         );
 
         return true;
     }
 
-    logMsg(`Try to check size ${filename}`, id, prefix);
+    logMsg(`Try to check size ${filename}`, itemId, prefix);
 
     const result = await queue.add(
         async () => {
@@ -506,13 +506,13 @@ export async function checkSize(
                     `Filesize for ${filename} equal is ${isSizeEqual}(r ${prettyBytes(
                         contentLength
                     )} f ${prettyBytes(size)})`,
-                    id,
+                    itemId,
                     prefix
                 );
             } catch (error) {
                 logMsg(
                     `Filesize ${filename} check error: ${error.message}`,
-                    id,
+                    itemId,
                     prefix
                 );
             }
@@ -522,7 +522,7 @@ export async function checkSize(
         { priority: priorities.checkSize }
     );
 
-    logMsg(`Check size ${filename} result ${result}`, id, prefix);
+    logMsg(`Check size ${filename} result ${result}`, itemId, prefix);
 
     return result;
 }

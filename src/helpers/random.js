@@ -1,10 +1,10 @@
 /**
  * Get random items from array
  *
- * @param   {Array}   arr  Input array
- * @param   {Number}  n    Result array length
+ * @param   {Array}   arr      Input array
+ * @param   {Number}  [n=1]    Result array length
  *
- * @return  {Array}       Result array
+ * @return  {Array}            Result array
  */
 export function getRandom(arr, n = 1) {
     const result = new Array(n);

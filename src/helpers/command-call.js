@@ -10,6 +10,10 @@ import spawn from "cross-spawn";
  * @return  {Object}           Promise
  */
 export async function commandCall(command) {
+    if (!command || !command.length) {
+        return false;
+    }
+
     let [prog, ...args] = command.split(" ");
 
     args = args.map((item) => item.replace(/"/gim, ""));
