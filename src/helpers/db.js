@@ -757,9 +757,20 @@ export function getFilesSize(prefix, itemId) {
     }
 
     return files.reduce((previous, current) => {
-        previous += fs.statSync(
-            path.resolve(options.directory, "download", prefix, itemId, current)
-        ).size;
+        const filepath = path.resolve(
+            options.directory,
+            "download",
+            prefix,
+            itemId,
+            current
+        );
+
+        if (!fs.existsSync(filepath)) {
+            return previous;
+        }
+
+        previous += fs.statSync(filepath).size;
+
         return previous;
     }, 0);
 }

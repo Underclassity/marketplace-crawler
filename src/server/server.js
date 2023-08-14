@@ -38,6 +38,7 @@ import createQueue from "../helpers/create-queue.js";
 import getAdaptersIds from "../helpers/get-adapters-ids.js";
 import getRandom from "../helpers/random.js";
 import logMsg from "../helpers/log-msg.js";
+import priorities from "../helpers/priorities.js";
 
 import options from "../options.js";
 
@@ -92,6 +93,10 @@ for (const adapter of adapters) {
 }
 
 function getRandomFilesIds(adapter, itemId) {
+    if (!adapter || !itemId) {
+        return [];
+    }
+
     const dbPrefix = `${adapter}-files`;
 
     const db = loadDB(dbPrefix);
@@ -115,8 +120,8 @@ app.get("/adapters", (req, res) => {
     return res.json({ adapters: getAdaptersIds() });
 });
 
-app.get("/adapters/:id", (req, res) => {
-    const { id: adapter } = req.params;
+app.get("/adapters/:adapter", (req, res) => {
+    const { adapter } = req.params;
 
     const page = parseInt(req.query.page || 1, 10);
     const limit = parseInt(req.query.limit || 100, 10);
@@ -285,22 +290,22 @@ app.get("/adapters/:id", (req, res) => {
     return res.json({ items, count: allItemsIDs.length, error: false });
 });
 
-app.get("/adapters/:id/:itemId", (req, res) => {
-    const { id, itemId } = req.params;
+app.get("/adapters/:adapter/:itemId", (req, res) => {
+    const { adapter, itemId } = req.params;
 
-    if (!adapters.includes(id)) {
+    if (!adapters.includes(adapter)) {
         return res.json({
             info: {},
             files: [],
             count: 0,
             size: 0,
-            error: `${id} not found in adapters`,
+            error: `${adapter} not found in adapters`,
         });
     }
 
-    const dbPrefix = `${id}-products`;
-    const dbFilesPrefix = `${id}-files`;
-    const dbReviewsPrefix = `${id}-reviews`;
+    const dbPrefix = `${adapter}-products`;
+    const dbFilesPrefix = `${adapter}-files`;
+    const dbReviewsPrefix = `${adapter}-reviews`;
 
     const db = loadDB(dbPrefix);
     const dbFiles = loadDB(dbFilesPrefix);
@@ -314,11 +319,11 @@ app.get("/adapters/:id/:itemId", (req, res) => {
     const reviews = (info.reviews || [])
         .map((reviewId) => dbReviews.data[reviewId] || [])
         .filter((review) => {
-            if (id == "aliexpress") {
+            if (adapter == "aliexpress") {
                 return review?.images || review?.additionalReview?.images;
             }
 
-            if (id == "wildberries") {
+            if (adapter == "wildberries") {
                 return review?.photos;
             }
         })
@@ -374,7 +379,7 @@ app.get("/adapters/:id/:itemId", (req, res) => {
                 path.resolve(
                     options.directory,
                     "download",
-                    id,
+                    adapter,
                     itemId,
                     filename
                 )
@@ -382,7 +387,13 @@ app.get("/adapters/:id/:itemId", (req, res) => {
         )
         .reduce((previous, current) => {
             previous += fs.statSync(
-                path.resolve(options.directory, "download", id, itemId, current)
+                path.resolve(
+                    options.directory,
+                    "download",
+                    adapter,
+                    itemId,
+                    current
+                )
             ).size;
             return previous;
         }, 0);
@@ -396,10 +407,10 @@ app.get("/adapters/:id/:itemId", (req, res) => {
     });
 });
 
-app.delete("/adapters/:id/:itemId", (req, res) => {
-    const { id, itemId } = req.params;
+app.delete("/adapters/:adapter/:itemId", (req, res) => {
+    const { adapter, itemId } = req.params;
 
-    const item = getItem(id, itemId);
+    const item = getItem(adapter, itemId);
 
     if (!item || item.deleted) {
         return res.json({
@@ -411,19 +422,19 @@ app.delete("/adapters/:id/:itemId", (req, res) => {
     const thumbnailFilePath = path.resolve(
         options.directory,
         "thumbnails",
-        id,
-        `${id}.webp`
+        adapter,
+        `${adapter}.webp`
     );
 
     const itemDownloadFolder = path.resolve(
         options.directory,
         "download",
-        id,
-        id
+        adapter,
+        adapter
     );
 
     // found db item and set delete param to true
-    const { result } = deleteItem(id, itemId);
+    const { result } = deleteItem(adapter, itemId);
 
     // delete thumbnail
     if (fs.existsSync(thumbnailFilePath) && result) {
@@ -441,19 +452,19 @@ app.delete("/adapters/:id/:itemId", (req, res) => {
     });
 });
 
-app.get("/files/:id/:itemId", (req, res) => {
-    const { id, itemId } = req.params;
+app.get("/files/:adapter/:itemId", (req, res) => {
+    const { adapter, itemId } = req.params;
 
-    if (!adapters.includes(id)) {
+    if (!adapters.includes(adapter)) {
         return res.json({
             info: {},
             files: [],
             count: 0,
-            error: `${id} not found in adapters`,
+            error: `${adapter} not found in adapters`,
         });
     }
 
-    const dbFilesPrefix = `${id}-files`;
+    const dbFilesPrefix = `${adapter}-files`;
 
     const dbFiles = loadDB(dbFilesPrefix);
 
@@ -573,12 +584,18 @@ app.delete("/favorite/:adapter/:itemId", (req, res) => {
 app.get("/queue", (req, res) => {
     const { size, pending, isPaused } = queue;
 
-    return res.json({
+    const result = {
         size,
         pending,
         isPaused,
         error: false,
-    });
+    };
+
+    for (const priority in priorities) {
+        result[priority] = queue.sizeBy({ priority: priorities[priority] });
+    }
+
+    return res.json(result);
 });
 
 app.post("/queue/:adapter", async (req, res) => {
@@ -588,20 +605,20 @@ app.post("/queue/:adapter", async (req, res) => {
         await processCookiesAndSession();
     }
 
-    const { updateItemById } = await import(`../adapters/${adapter}.js`);
-
-    if (!updateItemById) {
-        return res.json({
-            result: false,
-            error: true,
-        });
-    }
-
-    const { items } = req.body;
+    const { items, brand, query } = req.body;
 
     const result = {};
 
     if (Array.isArray(items)) {
+        const { updateItemById } = await import(`../adapters/${adapter}.js`);
+
+        if (!updateItemById) {
+            return res.json({
+                result: false,
+                error: true,
+            });
+        }
+
         for (const itemId of items) {
             const updateResult = await updateItemById(itemId, queue, browser);
 
@@ -611,6 +628,36 @@ app.post("/queue/:adapter", async (req, res) => {
 
             result[itemId] = updateResult;
         }
+    }
+
+    if (brand?.length) {
+        const { getItemsByBrand } = await import(`../adapters/${adapter}.js`);
+
+        if (!getItemsByBrand) {
+            return res.json({
+                result: false,
+                error: true,
+            });
+        }
+
+        const updateResult = await getItemsByBrand(queue, brand, browser);
+
+        result[brand] = updateResult;
+    }
+
+    if (query?.length) {
+        const { getItemsByQuery } = await import(`../adapters/${adapter}.js`);
+
+        if (!getItemsByQuery) {
+            return res.json({
+                result: false,
+                error: true,
+            });
+        }
+
+        const updateResult = await getItemsByQuery(queue, query, browser);
+
+        result[brand] = updateResult;
     }
 
     return res.json({

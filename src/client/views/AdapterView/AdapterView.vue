@@ -34,7 +34,7 @@
             select(v-model="brand" id="brand-select" v-on:change="changeFilter")
                 option(value="") None
                 option(value="no-brand") No brand
-                option(v-for="brand in brands" :key="brand.id" :value="brand.id") {{ brand.name || brand.id }}
+                option(v-for="brand in brands" :key="brand.id" :value="brand.id") {{ brand.name || brand.id }}({{ brand.id }})
 
         .filter-item(v-if="tags?.length")
             label(for="brand-select") Tags
@@ -52,6 +52,13 @@
 
         .filter-item
             button(v-on:click.prevent.stop="updateAllOnPage") Update all on page
+
+        .filter-item(v-if="brand && brand.length")
+            button(v-on:click.prevent.stop="updateBrand") Update brand
+
+        .filter-item
+            input(type="text" v-model="query")
+            button(v-bind:disabled="!query.length" v-on:click="getItemsByQuery") Search query
 
     .items(v-if="items?.length")
         ItemBlock(v-for="item of items" :key="item.id" :item="item" :itemId="item.id" :adapter="adapter")

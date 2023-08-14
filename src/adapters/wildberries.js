@@ -950,13 +950,12 @@ export async function getBrandItemsByID(brandID, queue) {
  * Get items by brand
  *
  * @param   {Object}  queue  Queue
+ * @param   {String}  brand  Brand ID
  *
  * @return  {Boolean}        Result
  */
-export async function getItemsByBrand(queue) {
+export async function getItemsByBrand(queue, brand = options.brand) {
     log("Get items call by brand");
-
-    let brand = options.brand;
 
     if (brand.indexOf("__") != -1) {
         brand = brand.slice(0, brand.indexOf("__"));

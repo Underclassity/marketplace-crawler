@@ -2,7 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 
-import tf from "@tensorflow/tfjs-node-gpu";
+import tf from "@tensorflow/tfjs-node";
+
 // import mobilenet from '@tensorflow-models/mobilenet';
 import cocoSsd from "@tensorflow-models/coco-ssd";
 

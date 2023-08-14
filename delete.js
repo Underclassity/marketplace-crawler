@@ -146,12 +146,59 @@ async function deleteItemFromDBs(id) {
     return true;
 }
 
+async function deleteBrand(brandId) {
+    for (const adapter of ids) {
+        let items = getItems(adapter, true);
+
+        items = items.map((itemId) => {
+            const item = getItem(adapter, itemId);
+
+            if (item.brand == brandId && !item.deleted) {
+                const thumbnailFilePath = path.resolve(
+                    options.directory,
+                    "thumbnails",
+                    adapter,
+                    `${itemId}.webp`
+                );
+
+                const itemDownloadFolder = path.resolve(
+                    options.directory,
+                    "download",
+                    adapter,
+                    itemId
+                );
+
+                // delete thumbnail
+                if (fs.existsSync(thumbnailFilePath)) {
+                    logMsg("Delete thumbnail", itemId, adapter);
+                    fs.unlinkSync(thumbnailFilePath);
+                }
+
+                // delete item dir if exist
+                if (fs.existsSync(itemDownloadFolder)) {
+                    logMsg("Delete folder", itemId, adapter);
+                    fs.rmSync(itemDownloadFolder, { recursive: true });
+                }
+
+                return true;
+            }
+
+            return true;
+        });
+    }
+}
+
 (async () => {
     await checkDeleted();
 
     if (options.id) {
         await deleteItemFromDBs(options.id);
-        return false;
+        return true;
+    }
+
+    if (options.brand) {
+        await deleteBrand(options.id);
+        return true;
     }
 
     let stoped = false;

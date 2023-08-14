@@ -8,8 +8,16 @@ import options from "./src/options.js";
 import getAdaptersIds from "./src/helpers/get-adapters-ids.js";
 import logMsg from "./src/helpers/log-msg.js";
 
-async function analyzeDb(db, id) {
-    logMsg(`Analyze reviews`, id, false);
+/**
+ * Analyze DB reviews
+ *
+ * @param   {Object}  db       LowDB instance
+ * @param   {String}  adapter  Adapter
+ *
+ * @return  {Boolean}          Result
+ */
+async function analyzeDb(db, adapter) {
+    logMsg(`Analyze reviews`, false, adapter);
 
     let urls = [];
 
@@ -23,7 +31,7 @@ async function analyzeDb(db, id) {
         for (const reviewId in item.reviews) {
             const review = item.reviews[reviewId];
 
-            switch (id) {
+            switch (adapter) {
                 case "aliexpress":
                     if (review.images?.length) {
                         urls.push(...review.images);
@@ -63,12 +71,12 @@ async function analyzeDb(db, id) {
         }
     }
 
-    logMsg(`Before sort ${urls.length}`, id, false);
+    logMsg(`Before sort ${urls.length}`, false, adapter);
 
     urls = urls.filter((item, index, array) => array.indexOf(item) === index);
 
-    logMsg(`After sort ${urls.length}`, id, false);
-    logMsg(new Array(25).join("-"), id, false);
+    logMsg(`After sort ${urls.length}`, false, adapter);
+    logMsg(new Array(25).join("-"), false, adapter);
 
     return true;
 }

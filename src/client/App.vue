@@ -1,14 +1,10 @@
 <template lang="pug">
-nav
-    router-link(to="/") Home
-    router-link(to="/adapters") Adapters
-    span Size {{ size }}
-    span Pending {{ pending }}
-    span Paused {{  isPaused }}
+NavigationBar
 
 router-view
 
 OverlayBlock
+QueueStatus
 </template>
 
 <script src="./App.js"></script>

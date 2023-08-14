@@ -21,11 +21,7 @@ export default createStore({
             try {
                 const request = await axios("/queue");
 
-                const { size, pending, isPaused } = request.data;
-
-                context.state.queue.size = size;
-                context.state.queue.pending = pending;
-                context.state.queue.isPaused = isPaused;
+                context.state.queue = request.data;
             } catch (error) {
                 console.error(error);
             }
@@ -37,6 +33,38 @@ export default createStore({
                     method: "POST",
                     data: {
                         items,
+                    },
+                });
+
+                return request.data;
+            } catch (error) {
+                console.error(error);
+            }
+        },
+
+        async updateBrand(context, { adapter, brand }) {
+            try {
+                const request = await axios(`/queue/${adapter}`, {
+                    method: "POST",
+                    data: {
+                        brand,
+                    },
+                });
+
+                return request.data;
+            } catch (error) {
+                console.error(error);
+            }
+        },
+
+        async getItemsByQuery(context, { adapter, query }) {
+            console.log(query);
+
+            try {
+                const request = await axios(`/queue/${adapter}`, {
+                    method: "POST",
+                    data: {
+                        query,
                     },
                 });
 

@@ -29,6 +29,8 @@ export default {
             tag: false,
             prediction: false,
 
+            query: "",
+
             isPhotos: true,
             isFavorite: false,
 
@@ -155,14 +157,56 @@ export default {
 
             this.emitter.emit("triggerSpinner", true);
 
-            const { items, adapter } = this;
+            const { adapter, items } = this;
 
             const { result } = await this.$store.dispatch("updateItems", {
                 items: items.map((item) => item.id),
                 adapter,
             });
 
-            console.log("Update result: ", result);
+            console.log(`Update items on page result: ${result}`);
+
+            this.emitter.emit("triggerSpinner", false);
+
+            return await this.getItems();
+        },
+
+        async updateBrand() {
+            const { adapter, brand } = this;
+
+            if (!brand || !brand.length) {
+                return false;
+            }
+
+            this.emitter.emit("triggerSpinner", true);
+
+            const { result } = await this.$store.dispatch("updateBrand", {
+                adapter,
+                brand,
+            });
+
+            console.log(`Update brand ${brand} result: ${result}`);
+
+            this.emitter.emit("triggerSpinner", false);
+
+            return await this.getItems();
+        },
+
+        async getItemsByQuery() {
+            const { adapter, query } = this;
+
+            if (!query || !query.length) {
+                return false;
+            }
+
+            this.emitter.emit("triggerSpinner", true);
+
+            const { result } = await this.$store.dispatch("getItemsByQuery", {
+                adapter,
+                query,
+            });
+
+            console.log(`Get items by query ${query} result: ${result}`);
 
             this.emitter.emit("triggerSpinner", false);
 

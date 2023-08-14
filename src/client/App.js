@@ -1,34 +1,13 @@
+import NavigationBar from "./components/NavigationBar/NavigationBar.vue";
 import OverlayBlock from "./components/OverlayBlock/OverlayBlock.vue";
+import QueueStatus from "./components/QueueStatus/QueueStatus.vue";
 
 export default {
     name: "App",
 
     components: {
+        NavigationBar,
         OverlayBlock,
-    },
-
-    data() {
-        return {
-            updateInterval: undefined,
-            size: this.$store.state.queue.size,
-            pending: this.$store.state.queue.pending,
-            isPaused: this.$store.state.queue.isPaused,
-        };
-    },
-
-    async mounted() {
-        await this.$store.dispatch("getQueueStatus");
-
-        this.updateInterval = setInterval(async () => {
-            await this.$store.dispatch("getQueueStatus");
-
-            this.size = this.$store.state.queue.size;
-            this.pending = this.$store.state.queue.pending;
-            this.isPaused = this.$store.state.queue.isPaused;
-        }, 5 * 1000);
-    },
-
-    beforeUnmount() {
-        clearInterval(this.updateInterval);
+        QueueStatus,
     },
 };

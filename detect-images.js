@@ -20,7 +20,7 @@ const adapters = getAdaptersIds();
 const queue = createQueue();
 
 // Time counter
-let counter = 0;
+// let counter = 0;
 
 /**
  * Get predictions for given file
@@ -41,11 +41,11 @@ async function getFilePredictions(adapter, itemId, filename) {
         return false;
     }
 
-    // Wait for 10 sec every 60 sec, for memory clear
-    if (counter >= 120) {
-        counter = 0;
-        await sleep(10 * 1000);
-    }
+    // // Wait for 10 sec every 60 sec, for memory clear
+    // if (counter >= 120) {
+    //     counter = 0;
+    //     await sleep(10 * 1000);
+    // }
 
     const filepath = path.resolve(
         options.directory,
@@ -60,6 +60,8 @@ async function getFilePredictions(adapter, itemId, filename) {
     const predictions = await detectImage(image);
 
     if (!predictions) {
+        addPrediction(adapter, itemId, filename, []);
+        // logMsg(`No predictions found for ${filename}`, itemId, adapter);
         return false;
     }
 
@@ -153,7 +155,7 @@ async function processAdapter(adapter) {
         await sleep(1000);
         logQueue(queue);
 
-        counter++;
+        // counter++;
     }
 
     return true;
