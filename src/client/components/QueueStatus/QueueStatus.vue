@@ -4,7 +4,7 @@
     .status-item Pending {{ pending }}
     .status-item Paused {{  isPaused }}
 
-    .status-item(v-for="(priority, id) in priorities" v-key="id") {{ id }} {{ values[id] }}
+    .status-item(v-for="(priority, id) in priorities" :key="id") {{ id }} {{ values[id] }}
 </template>
 
 <script src="./QueueStatus.js"></script>

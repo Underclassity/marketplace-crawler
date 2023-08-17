@@ -23,7 +23,7 @@
 
     .item-info
         router-link.span(:to='{ name:"ItemView", params: { itemId: itemId } }') ID: {{ itemId }}
-        span Brand: {{ brand }}
+        span.link(v-on:click="goToBrand") Brand: {{ brandName }}
         span {{ item.reviews }} reviews
         span {{ item.files || 0 }} files
         span {{ pretty(item.size) }} size

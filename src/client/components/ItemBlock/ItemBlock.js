@@ -1,3 +1,4 @@
+import is from "is_js";
 import prettyBytes from "pretty-bytes";
 // import axios from "axios";
 
@@ -69,7 +70,7 @@ export default {
             return this.images.length || 0;
         },
 
-        brand() {
+        brandName() {
             const brands = this.$store.state.brands[this.adapter];
             const { brand } = this.item;
 
@@ -78,6 +79,10 @@ export default {
             }
 
             return brand;
+        },
+
+        brand() {
+            return this.item.brand;
         },
     },
 
@@ -195,6 +200,31 @@ export default {
             }
 
             return "green";
+        },
+
+        goToBrand() {
+            const { brand } = this;
+
+            if (!is.string(brand) && !is.number(brand)) {
+                return false;
+            }
+
+            let { limit, photos, sort, prediction, tag, favorite } =
+                this.$route.query;
+
+            this.$router.push({
+                query: {
+                    brand,
+                    limit,
+                    photos,
+                    sort,
+                    prediction,
+                    tag,
+                    favorite,
+                },
+            });
+
+            return true;
         },
     },
 

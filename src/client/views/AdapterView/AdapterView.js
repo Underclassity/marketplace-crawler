@@ -134,7 +134,7 @@ export default {
             this.isPhotos = photos == "true";
             this.isFavorite = favorite == "true";
             this.sortId = sort || false;
-            this.brand = brand || false;
+            this.brand = brand == "false" ? false : brand;
             this.prediction = prediction || false;
             this.tag = tag || false;
 
@@ -164,7 +164,9 @@ export default {
                 adapter,
             });
 
-            console.log(`Update items on page result: ${result}`);
+            console.log(
+                `Update items on page result: ${JSON.stringify(result)}`
+            );
 
             this.emitter.emit("triggerSpinner", false);
 
