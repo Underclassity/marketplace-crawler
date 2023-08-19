@@ -10,6 +10,7 @@ let ids = [
     "onliner",
     "ozon",
     "wildberries",
+    "wiggle",
 ];
 
 /**

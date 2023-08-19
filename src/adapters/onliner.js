@@ -22,7 +22,15 @@ import priorities from "../helpers/priorities.js";
 
 const prefix = "onliner";
 
-function log(msg, itemId) {
+/**
+ * Log message helper
+ *
+ * @param   {String}  msg      Message
+ * @param   {String}  itemI    Item ID
+ *
+ * @return  {Boolean}          Result
+ */
+function log(msg, itemId = false) {
     return logMsg(msg, itemId, prefix);
 }
 

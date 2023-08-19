@@ -187,17 +187,7 @@ export async function getUserReviews(username, browser) {
 export async function processCookiesAndSession() {
     log("Try to save cache");
 
-    const puppeteerPath = path.resolve("./puppeteer/");
-
-    if (!fs.existsSync(puppeteerPath)) {
-        fs.mkdirSync(puppeteerPath);
-    }
-
-    const browser = await puppeteer.launch({
-        headless: false,
-        devtools: true,
-        userDataDir: path.resolve(options.directory, "puppeteer"),
-    });
+    const browser = await puppeteer.launch(browserConfig);
 
     const page = await browser.newPage();
 

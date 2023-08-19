@@ -38,8 +38,16 @@ puppeteer.use(
 
 puppeteer.use(StealthPlugin());
 
-function log(msg, id) {
-    return logMsg(msg, id, prefix);
+/**
+ * Log message helper
+ *
+ * @param   {String}  msg      Message
+ * @param   {String}  itemI    Item ID
+ *
+ * @return  {Boolean}          Result
+ */
+function log(msg, itemId = false) {
+    return logMsg(msg, itemId, prefix);
 }
 
 /**

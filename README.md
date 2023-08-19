@@ -12,6 +12,7 @@ Supported sites:
 - [onliner.by](https://onliner.by)
 - [ozon.ru](https://ozon.ru)
 - [wildberries.ru](https://wildberries.ru)
+- [wiggle.com](https://wiggle.com)
 
 ***
 

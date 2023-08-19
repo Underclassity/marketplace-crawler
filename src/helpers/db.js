@@ -608,9 +608,9 @@ export function addReview(prefix, itemId, reviewId, review, write = true) {
     loadDB(dbReviewsPrefix);
     loadDB(dbProductsPrefix);
 
-    if (!dbItemCheck(dbReviewsPrefix, itemId, prefix)) {
-        return false;
-    }
+    // if (!dbItemCheck(dbReviewsPrefix, itemId, prefix)) {
+    //     return false;
+    // }
 
     if (!review || !reviewId) {
         logMsg("Review not defined!", itemId, prefix);

@@ -1,4 +1,3 @@
-import fs from "node:fs";
 import path from "node:path";
 
 import axios from "axios";
@@ -19,12 +18,6 @@ import options from "../options.js";
 import priorities from "../helpers/priorities.js";
 
 const prefix = "kufar";
-
-const dbPath = path.resolve(options.directory, "db");
-
-if (!fs.existsSync(dbPath)) {
-    fs.mkdirSync(dbPath);
-}
 
 const downloadDirPath = path.resolve(options.directory, "download", prefix);
 
