@@ -109,7 +109,11 @@ export async function getProxyList(url) {
  *
  * @return  {Array}                 Filtered proxies array
  */
-export async function filterProxyList(data = getProxyList(), delay = 500) {
+export async function filterProxyList(data, delay = 500) {
+    if (!data) {
+        data = await getProxyList();
+    }
+
     const resultData = [];
     const actions = [];
 

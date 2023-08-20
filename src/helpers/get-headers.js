@@ -3,10 +3,10 @@ import getUserAgent from "./get-user-agent.js";
 /**
  * Generate headers
  *
- * @param   {Boolean}  proxy       Use proxy flag
- * @param   {Object}  proxyAgent  Proxy agent
+ * @param   {Boolean}  proxy        Use proxy flag
+ * @param   {Object}   proxyAgent   Proxy agent
  *
- * @return  {Object}              Headers
+ * @return  {Object}                Headers
  */
 export function getHeaders(proxy = false, proxyAgent = false) {
     return {

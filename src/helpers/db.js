@@ -4,6 +4,8 @@ import path from "node:path";
 import { LowSync } from "lowdb";
 import { JSONFileSync } from "lowdb/node";
 
+import is from "is_js";
+
 import logMsg from "./log-msg.js";
 import { getFiles as getFilesFromFolder } from "./get-files.js";
 
@@ -23,6 +25,7 @@ const dbCache = {};
  */
 export function loadDB(dbPrefix) {
     if (!dbPrefix || !dbPrefix.length) {
+        logMsg("DB prefix not defined!");
         return false;
     }
 
@@ -57,10 +60,11 @@ export function loadDB(dbPrefix) {
  */
 export function dbWrite(dbPrefix, write = true, prefix = false) {
     if (!dbPrefix || !dbPrefix.length) {
+        logMsg("DB prefix not defined!");
         return false;
     }
 
-    if (typeof dbPrefix != "string") {
+    if (!is.string(dbPrefix)) {
         console.trace();
         logMsg(`Input DB prefix ${dbPrefix} is not a string!`, false, prefix);
         return false;
@@ -80,7 +84,7 @@ export function dbWrite(dbPrefix, write = true, prefix = false) {
     }
 
     if (dbPrefix && dbPrefix in writeCache && writeCache[dbPrefix]) {
-        logMsg(`Already writing in DB`, false, prefix);
+        logMsg(`Already writing in DB ${dbPrefix}`, false, prefix);
         return false;
     }
 
@@ -91,7 +95,11 @@ export function dbWrite(dbPrefix, write = true, prefix = false) {
 
         const startTime = Date.now();
 
-        db.write();
+        try {
+            db.write();
+        } catch (error) {
+            logMsg(`Write in DB ${dbPrefix} error: ${error}`, false, prefix);
+        }
 
         const endTime = Date.now();
 
@@ -101,8 +109,11 @@ export function dbWrite(dbPrefix, write = true, prefix = false) {
             prefix
         );
 
+        // Add sleep tick
         if (dbPrefix) {
-            writeCache[dbPrefix] = false;
+            setTimeout(() => {
+                writeCache[dbPrefix] = false;
+            }, 10);
         }
     } catch (error) {
         logMsg(`Write DB error: ${error.message}`, false, prefix);
@@ -124,12 +135,19 @@ export function dbWrite(dbPrefix, write = true, prefix = false) {
  *
  * @return  {Boolean}            Result
  */
-export function dbItemCheck(dbPrefix, itemId, prefix = false) {
+export function dbItemCheck(dbPrefix, itemId, prefix) {
     if (!dbPrefix || !dbPrefix.length) {
+        logMsg("DB prefix not defined!");
         return false;
     }
 
-    if (itemId == undefined) {
+    if (!is.string(itemId) && !is.number(itemId)) {
+        logMsg("Item ID not defined!");
+        return false;
+    }
+
+    if (!prefix || !prefix.length) {
+        logMsg("Prefix not defined!");
         return false;
     }
 
@@ -139,11 +157,6 @@ export function dbItemCheck(dbPrefix, itemId, prefix = false) {
 
     if (!db || !db.write) {
         logMsg("DB not defined!");
-        return false;
-    }
-
-    if (!itemId) {
-        logMsg("Item ID not defined!");
         return false;
     }
 
@@ -180,7 +193,22 @@ export function dbItemCheck(dbPrefix, itemId, prefix = false) {
  *
  * @return  {Boolean}          Result
  */
-export function addItem(prefix, itemId, data) {
+export function addItem(prefix, itemId, data = {}) {
+    if (!prefix || !prefix.length) {
+        logMsg("Prefix not defined!");
+        return false;
+    }
+
+    if (!is.string(itemId) && !is.number(itemId)) {
+        logMsg("Item ID not defined!");
+        return false;
+    }
+
+    if (!is.object(data)) {
+        logMsg("Input data is not an object!");
+        return false;
+    }
+
     const dbPrefix = `${prefix}-products`;
 
     loadDB(dbPrefix);
@@ -216,6 +244,16 @@ export function addItem(prefix, itemId, data) {
  * @return  {Boolean}          Result
  */
 export function deleteItem(prefix, itemId) {
+    if (!prefix || !prefix.length) {
+        logMsg("Prefix not defined!");
+        return false;
+    }
+
+    if (!is.string(itemId) && !is.number(itemId)) {
+        logMsg("Item ID not defined!");
+        return false;
+    }
+
     const dbItem = getItem(prefix, itemId);
 
     if (!dbItem) {
@@ -232,6 +270,32 @@ export function deleteItem(prefix, itemId) {
     db.data[itemId].deleted = true;
     dbWrite(dbPrefix, true, prefix);
 
+    const thumbnailFilePath = path.resolve(
+        options.directory,
+        "thumbnails",
+        prefix,
+        `${itemId}.webp`
+    );
+
+    const itemDownloadFolder = path.resolve(
+        options.directory,
+        "download",
+        prefix,
+        itemId
+    );
+
+    // delete thumbnail
+    if (fs.existsSync(thumbnailFilePath)) {
+        logMsg("Delete thumbnail", itemId, prefix);
+        fs.unlinkSync(thumbnailFilePath);
+    }
+
+    // delete item dir if exist
+    if (fs.existsSync(itemDownloadFolder)) {
+        logMsg("Delete folder", itemId, prefix);
+        fs.rmSync(itemDownloadFolder, { recursive: true });
+    }
+
     return true;
 }
 
@@ -246,6 +310,21 @@ export function deleteItem(prefix, itemId) {
  * @return  {Boolean}          Result
  */
 export function updateItem(prefix, itemId, data, write = true) {
+    if (!prefix || !prefix.length) {
+        logMsg("Prefix not defined!");
+        return false;
+    }
+
+    if (!is.string(itemId) && !is.number(itemId)) {
+        logMsg("Item ID not defined!");
+        return false;
+    }
+
+    if (!is.object(data)) {
+        logMsg("Input data is not an object!");
+        return false;
+    }
+
     const dbPrefix = `${prefix}-products`;
 
     loadDB(dbPrefix);
@@ -275,6 +354,16 @@ export function updateItem(prefix, itemId, data, write = true) {
  * @return  {Object}          DB item
  */
 export function getItem(prefix, itemId) {
+    if (!prefix || !prefix.length) {
+        logMsg("Prefix not defined!");
+        return false;
+    }
+
+    if (!itemId) {
+        logMsg("Item ID not defined!");
+        return false;
+    }
+
     const dbPrefix = `${prefix}-products`;
 
     loadDB(dbPrefix);
@@ -297,6 +386,16 @@ export function getItem(prefix, itemId) {
  * @return  {Boolean}         Result
  */
 export function updateTime(prefix, itemId, time = Date.now()) {
+    if (!prefix || !prefix.length) {
+        logMsg("Prefix not defined!");
+        return false;
+    }
+
+    if (!itemId) {
+        logMsg("Item ID not defined!");
+        return false;
+    }
+
     const dbPrefix = `${prefix}-products`;
 
     loadDB(dbPrefix);
@@ -322,6 +421,21 @@ export function updateTime(prefix, itemId, time = Date.now()) {
  * @return  {Boolean}         Result
  */
 export function updateTags(prefix, itemId, tag) {
+    if (!prefix || !prefix.length) {
+        logMsg("Prefix not defined!");
+        return false;
+    }
+
+    if (!itemId) {
+        logMsg("Item ID not defined!");
+        return false;
+    }
+
+    if (!tag || !tag.length) {
+        logMsg("Tag not defined!");
+        return false;
+    }
+
     const dbPrefix = `${prefix}-products`;
 
     loadDB(dbPrefix);
@@ -362,6 +476,21 @@ export function updateTags(prefix, itemId, tag) {
  * @return  {Boolean}         Result
  */
 export function updateBrand(prefix, itemId, brand) {
+    if (!prefix || !prefix.length) {
+        logMsg("Prefix not defined!");
+        return false;
+    }
+
+    if (!itemId) {
+        logMsg("Item ID not defined!");
+        return false;
+    }
+
+    if (!brand) {
+        logMsg("Brand not defined!");
+        return false;
+    }
+
     const dbPrefix = `${prefix}-products`;
 
     loadDB(dbPrefix);
@@ -404,6 +533,11 @@ export function getItems(
     force = options.force,
     deleted = false
 ) {
+    if (!prefix || !prefix.length) {
+        logMsg("Prefix not defined!");
+        return false;
+    }
+
     const dbPrefix = `${prefix}-products`;
 
     loadDB(dbPrefix);
@@ -463,6 +597,11 @@ export function getItems(
  * @return  {Array}               Array of brands
  */
 export function getBrands(prefix, withNames = false) {
+    if (!prefix || !prefix.length) {
+        logMsg("Prefix not defined!");
+        return false;
+    }
+
     const dbPrefix = `${prefix}-products`;
 
     loadDB(dbPrefix);
@@ -476,7 +615,7 @@ export function getBrands(prefix, withNames = false) {
 
     db.read();
 
-    let brands = withNames ? {} : [];
+    const brands = withNames ? {} : [];
 
     for (const itemId in db.data) {
         const item = db.data[itemId];
@@ -489,6 +628,7 @@ export function getBrands(prefix, withNames = false) {
             brands[item.brand] = { id: item.brand, name: undefined };
         }
 
+        // Wildberries names support
         if (item?.ids && withNames) {
             const firstItem = item.ids[0];
 
@@ -501,17 +641,25 @@ export function getBrands(prefix, withNames = false) {
                         name: firstItem.brandName,
                     };
                 }
-            } else {
-                if (!(firstItem.brand in brands)) {
-                    brands[firstItem.brand] = { id: firstItem.brand };
-                }
+            } else if (!(firstItem.brand in brands)) {
+                brands[firstItem.brand] = { id: firstItem.brand };
             }
+        }
+
+        // Wiggle names support
+        if (item.info?.Brand && withNames && !(item.info.Brand.Id in brands)) {
+            const { Id, Name } = item.info.Brand;
+
+            brands[Id] = {
+                id: Id,
+                name: Name,
+            };
         }
     }
 
     // fitler brands
     if (!withNames) {
-        brands = brands
+        return brands
             .filter((item) => item)
             .map((item) => item.trim())
             .filter((item, index, array) => array.indexOf(item) === index);
@@ -527,7 +675,12 @@ export function getBrands(prefix, withNames = false) {
  *
  * @return  {Array}           Array of tags
  */
-export function getTags(prefix = false) {
+export function getTags(prefix) {
+    if (!prefix || !prefix.length) {
+        logMsg("Prefix not defined!");
+        return false;
+    }
+
     const dbPrefix = `${prefix}-products`;
 
     loadDB(dbPrefix);
@@ -574,6 +727,21 @@ export function getTags(prefix = false) {
  * @return  {Object}            Review item
  */
 export function getReview(prefix, itemId, reviewId) {
+    if (!prefix || !prefix.length) {
+        logMsg("Prefix not defined!");
+        return false;
+    }
+
+    if (!itemId) {
+        logMsg("Item ID not defined!");
+        return false;
+    }
+
+    if (!reviewId) {
+        logMsg("Review ID not defined!");
+        return false;
+    }
+
     const item = getItem(prefix, itemId);
 
     if (!item) {
@@ -602,15 +770,31 @@ export function getReview(prefix, itemId, reviewId) {
  * @return  {Boolean}               Result
  */
 export function addReview(prefix, itemId, reviewId, review, write = true) {
+    if (!prefix || !prefix.length) {
+        logMsg("Prefix not defined!");
+        return false;
+    }
+
+    if (!itemId) {
+        logMsg("Item ID not defined!");
+        return false;
+    }
+
+    if (!reviewId) {
+        logMsg("Review ID not defined!");
+        return false;
+    }
+
+    if (!review || !is.object(review)) {
+        logMsg("Input review is not an object!");
+        return false;
+    }
+
     const dbReviewsPrefix = `${prefix}-reviews`;
     const dbProductsPrefix = `${prefix}-products`;
 
     loadDB(dbReviewsPrefix);
     loadDB(dbProductsPrefix);
-
-    // if (!dbItemCheck(dbReviewsPrefix, itemId, prefix)) {
-    //     return false;
-    // }
 
     if (!review || !reviewId) {
         logMsg("Review not defined!", itemId, prefix);
@@ -621,7 +805,7 @@ export function addReview(prefix, itemId, reviewId, review, write = true) {
         dbCache[dbReviewsPrefix].data[reviewId] = review;
         dbWrite(dbReviewsPrefix, true, prefix);
 
-        logMsg(`Update review ${reviewId} in DB`, itemId, prefix);
+        logMsg(`Force update review ${reviewId} in DB`, itemId, prefix);
 
         return true;
     }
@@ -692,6 +876,16 @@ export function addReview(prefix, itemId, reviewId, review, write = true) {
  * @return  {Boolean}         Result
  */
 export function updateFiles(prefix, itemId) {
+    if (!prefix || !prefix.length) {
+        logMsg("Prefix not defined!");
+        return false;
+    }
+
+    if (!itemId) {
+        logMsg("Item ID not defined!");
+        return false;
+    }
+
     const folderPath = path.resolve(
         options.directory,
         "download",
@@ -730,6 +924,16 @@ export function updateFiles(prefix, itemId) {
  * @return  {Array}           Array of filenames
  */
 export function getFiles(prefix, itemId) {
+    if (!prefix || !prefix.length) {
+        logMsg("Prefix not defined!");
+        return false;
+    }
+
+    if (!itemId) {
+        logMsg("Item ID not defined!");
+        return false;
+    }
+
     const dbPrefix = `${prefix}-files`;
 
     loadDB(dbPrefix);
@@ -750,6 +954,16 @@ export function getFiles(prefix, itemId) {
  * @return  {Number}          Files size
  */
 export function getFilesSize(prefix, itemId) {
+    if (!prefix || !prefix.length) {
+        logMsg("Prefix not defined!");
+        return false;
+    }
+
+    if (!itemId) {
+        logMsg("Item ID not defined!");
+        return false;
+    }
+
     const files = getFiles(prefix, itemId);
 
     if (!files || !files.length || !Array.isArray(files)) {
@@ -786,6 +1000,16 @@ export function getFilesSize(prefix, itemId) {
  * @return  {Boolean}              Result
  */
 export function addPrediction(prefix, itemId, filename, predictions) {
+    if (!prefix || !prefix.length) {
+        logMsg("Prefix not defined!");
+        return false;
+    }
+
+    if (!itemId) {
+        logMsg("Item ID not defined!");
+        return false;
+    }
+
     if (!filename) {
         logMsg("Filename not defined!", itemId, prefix);
         return false;
@@ -826,9 +1050,19 @@ export function addPrediction(prefix, itemId, filename, predictions) {
  * @param   {String}  itemId    Item ID
  * @param   {String}  filename  Filename
  *
- * @return  {Array}             Predictions
+ * @return  {Array|Boolean}     Predictions
  */
 export function getItemPredictions(prefix, itemId, filename) {
+    if (!prefix || !prefix.length) {
+        logMsg("Prefix not defined!");
+        return false;
+    }
+
+    if (!itemId) {
+        logMsg("Item ID not defined!");
+        return false;
+    }
+
     if (!filename) {
         logMsg("Filename not defined!", itemId, prefix);
         return false;
@@ -859,6 +1093,11 @@ export function getItemPredictions(prefix, itemId, filename) {
  * @return  {Object}          Predictions object
  */
 export function getPredictions(prefix) {
+    if (!prefix || !prefix.length) {
+        logMsg("Prefix not defined!");
+        return false;
+    }
+
     const dbPrefix = `${prefix}-predictions`;
 
     loadDB(dbPrefix);
@@ -874,10 +1113,10 @@ export function getPredictions(prefix) {
             const predictions = item[filename];
 
             for (const prediction of predictions) {
-                if (!(prediction.class in allPredictions)) {
-                    allPredictions[prediction.class] = [prediction.score];
-                } else {
+                if (prediction.class in allPredictions) {
                     allPredictions[prediction.class].push(prediction.score);
+                } else {
+                    allPredictions[prediction.class] = [prediction.score];
                 }
             }
         }
@@ -911,6 +1150,16 @@ export function getPredictions(prefix) {
  * @return  {Boolean}         Result
  */
 export function addToFavorite(prefix, itemId) {
+    if (!prefix || !prefix.length) {
+        logMsg("Prefix not defined!");
+        return false;
+    }
+
+    if (!itemId) {
+        logMsg("Item ID not defined!");
+        return false;
+    }
+
     const dbPrefix = `${prefix}-favorites`;
 
     loadDB(dbPrefix);
@@ -935,6 +1184,16 @@ export function addToFavorite(prefix, itemId) {
  * @return  {Boolean}         Result
  */
 export function removeFromFavorite(prefix, itemId) {
+    if (!prefix || !prefix.length) {
+        logMsg("Prefix not defined!");
+        return false;
+    }
+
+    if (!itemId) {
+        logMsg("Item ID not defined!");
+        return false;
+    }
+
     const dbPrefix = `${prefix}-favorites`;
 
     loadDB(dbPrefix);
@@ -959,6 +1218,16 @@ export function removeFromFavorite(prefix, itemId) {
  * @return  {Boolean}         Result
  */
 export function toggleFavorite(prefix, itemId) {
+    if (!prefix || !prefix.length) {
+        logMsg("Prefix not defined!");
+        return false;
+    }
+
+    if (!itemId) {
+        logMsg("Item ID not defined!");
+        return false;
+    }
+
     const dbPrefix = `${prefix}-favorites`;
 
     loadDB(dbPrefix);
@@ -979,12 +1248,23 @@ export function toggleFavorite(prefix, itemId) {
  * @return  {Boolean}         Result
  */
 export function isFavorite(prefix, itemId) {
+    if (!prefix || !prefix.length) {
+        logMsg("Prefix not defined!");
+        return false;
+    }
+
+    if (!itemId) {
+        logMsg("Item ID not defined!");
+        return false;
+    }
+
     const dbPrefix = `${prefix}-favorites`;
 
     loadDB(dbPrefix);
 
     const db = dbCache[dbPrefix];
 
+    // Check and return result
     if (itemId in db.data && db.data[itemId]) {
         return true;
     }

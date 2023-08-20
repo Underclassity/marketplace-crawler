@@ -38,7 +38,15 @@ puppeteer.use(
 
 puppeteer.use(StealthPlugin());
 
-function log(msg, itemId) {
+/**
+ * Log helper
+ *
+ * @param   {String}  msg             Message
+ * @param   {String}  [itemId=false]  Item ID
+ *
+ * @return  {Boolean}                 Result
+ */
+function log(msg, itemId = false) {
     return logMsg(msg, itemId, prefix);
 }
 
@@ -119,7 +127,7 @@ export function updateItems(queue) {
     log(`Update ${items.length} items`);
 
     items.forEach((itemId) => {
-        queue.add(() => getItem(itemId, queue), {
+        queue.add(() => getItemById(itemId, queue), {
             priority: priorities.item,
         });
 
@@ -185,6 +193,13 @@ export function updateReviews(queue) {
  */
 export async function updateWithTags(queue) {
     const tags = await getTags(prefix);
+
+    if (!tags || !tags.length) {
+        log("Tags not found!");
+        return false;
+    }
+
+    log(`Get items with tags ${tags.join("-")}`);
 
     for (const tag of tags) {
         await getItemsByQuery(queue, tag);

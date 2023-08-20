@@ -24,31 +24,7 @@ async function checkDeleted() {
             const item = getItem(adapter, itemId);
 
             if (item?.deleted) {
-                const thumbnailFilePath = path.resolve(
-                    options.directory,
-                    "thumbnails",
-                    adapter,
-                    `${itemId}.webp`
-                );
-
-                const itemDownloadFolder = path.resolve(
-                    options.directory,
-                    "download",
-                    adapter,
-                    itemId
-                );
-
-                // delete thumbnail
-                if (fs.existsSync(thumbnailFilePath)) {
-                    logMsg("Delete thumbnail", itemId, adapter);
-                    fs.unlinkSync(thumbnailFilePath);
-                }
-
-                // delete item dir if exist
-                if (fs.existsSync(itemDownloadFolder)) {
-                    logMsg("Delete folder", itemId, adapter);
-                    fs.rmSync(itemDownloadFolder, { recursive: true });
-                }
+                deleteItem(adapter, itemId);
             }
         }
     }
@@ -116,32 +92,8 @@ async function deleteItemFromDBs(id) {
 
     const dbId = foundInIds[0];
 
-    const thumbnailFilePath = path.resolve(
-        options.directory,
-        "thumbnails",
-        dbId,
-        `${id}.webp`
-    );
-
-    const itemDownloadFolder = path.resolve(
-        options.directory,
-        "download",
-        dbId,
-        id
-    );
-
     // found db item and set delete param to true
     deleteItem(dbId, id);
-
-    // delete thumbnail
-    if (fs.existsSync(thumbnailFilePath)) {
-        fs.unlinkSync(thumbnailFilePath);
-    }
-
-    // delete item dir if exist
-    if (fs.existsSync(itemDownloadFolder)) {
-        fs.rmSync(itemDownloadFolder, { recursive: true });
-    }
 
     return true;
 }
@@ -154,31 +106,7 @@ async function deleteBrand(brandId) {
             const item = getItem(adapter, itemId);
 
             if (item.brand == brandId && !item.deleted) {
-                const thumbnailFilePath = path.resolve(
-                    options.directory,
-                    "thumbnails",
-                    adapter,
-                    `${itemId}.webp`
-                );
-
-                const itemDownloadFolder = path.resolve(
-                    options.directory,
-                    "download",
-                    adapter,
-                    itemId
-                );
-
-                // delete thumbnail
-                if (fs.existsSync(thumbnailFilePath)) {
-                    logMsg("Delete thumbnail", itemId, adapter);
-                    fs.unlinkSync(thumbnailFilePath);
-                }
-
-                // delete item dir if exist
-                if (fs.existsSync(itemDownloadFolder)) {
-                    logMsg("Delete folder", itemId, adapter);
-                    fs.rmSync(itemDownloadFolder, { recursive: true });
-                }
+                deleteItem(adapter, itemId);
 
                 return true;
             }

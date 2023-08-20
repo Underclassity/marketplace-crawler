@@ -52,21 +52,27 @@ function log(msg, itemId = false) {
 }
 
 /**
- * Process page with query
+ * Process page with query or brand ID
  *
  * @param   {Number}  pageNumber  Page number
  * @param   {String}  query       Query
  * @param   {Object}  browser     Puppeteer instance
+ * @param   {String}  brandID     Brand ID
  *
  * @return  {Object}              Results
  */
-async function processPage(pageNumber, query = options.query, browser) {
+async function processPage(
+    pageNumber,
+    query = options.query,
+    browser,
+    brandID
+) {
     if (pageNumber == undefined) {
         log("Page ID not defined!");
         return false;
     }
 
-    if (!query || !query.length) {
+    if ((!query || !query.length) && !brandID) {
         log("Query not defined!");
         return false;
     }
@@ -75,7 +81,9 @@ async function processPage(pageNumber, query = options.query, browser) {
 
     const page = await createPage(browser, true);
 
-    const url = `https://www.wiggle.com/search?query=${query}&page=${pageNumber}`;
+    const url = brandID
+        ? `https://www.wiggle.com/b/${brandID}&page=${pageNumber}`
+        : `https://www.wiggle.com/search?query=${query}&page=${pageNumber}`;
 
     await page.goto(url, goSettings);
 
@@ -255,6 +263,7 @@ async function updateProductInfo(data, itemId, queue) {
                         itemId,
                         {
                             info: item,
+                            brand: item.Brand.Name,
                         },
                         true
                     );
@@ -535,9 +544,13 @@ async function processLinks(links, browser, queue) {
  * @return  {Boolean}        Result
  */
 export async function updateBrands(queue) {
-    const brandIDs = getBrands(prefix);
+    const brands = getBrands(prefix, true);
 
-    console.log(brandIDs);
+    for (const brandId in brands) {
+        const brandItem = brands[brandId];
+
+        await getBrandItemsByID(brandItem.name, queue);
+    }
 
     return true;
 }
@@ -653,7 +666,65 @@ export async function updateReviews(queue) {
  *
  * @return  {Array}            Brand IDs array
  */
-export async function getBrandItemsByID(brandID, queue) {}
+export async function getBrandItemsByID(brandID = options.brand, queue) {
+    log(`Get items call by brand ${brandID}`);
+
+    const browser = await puppeteer.launch(browserConfig);
+
+    let count = 0;
+    let ended = false;
+
+    for (let page = options.start; page <= options.pages; page++) {
+        await queue.add(
+            async () => {
+                if (ended) {
+                    return false;
+                }
+
+                const { links, next } = await processPage(
+                    page,
+                    null,
+                    browser,
+                    brandID
+                );
+
+                if (!links) {
+                    log(`Error process page ${page}`);
+
+                    await sleep(600000);
+                    return false;
+                }
+
+                log(`Found ${links.length} on page ${page}`);
+
+                count += links.length;
+
+                await processLinks(links, browser, queue);
+
+                if (!next) {
+                    page = options.pages + 1;
+                    ended = true;
+                }
+            },
+            { priority: priorities.page }
+        );
+    }
+
+    while (queue.size || queue.pending) {
+        await sleep(1000);
+        logQueue(queue);
+    }
+
+    log(`Found ${count} items for brand ${brandID}`);
+
+    const pages = await browser.pages();
+
+    await Promise.all(pages.map((page) => page.close()));
+
+    await browser.close();
+
+    return true;
+}
 
 /**
  * Get items by brand
@@ -663,7 +734,9 @@ export async function getBrandItemsByID(brandID, queue) {}
  *
  * @return  {Boolean}        Result
  */
-export async function getItemsByBrand(queue, brand = options.brand) {}
+export async function getItemsByBrand(queue, brand = options.brand) {
+    return await getBrandItemsByID(brand, queue);
+}
 
 /**
  * Get items by query

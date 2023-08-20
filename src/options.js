@@ -76,7 +76,7 @@ export const options = yargs(hideBin(process.argv))
     })
     .option("throat", {
         describe: "Throat number",
-        default: 1,
+        default: 3,
         type: "number",
     })
     .option("pages", {
@@ -91,7 +91,7 @@ export const options = yargs(hideBin(process.argv))
     })
     .option("timeout", {
         describe: "XHR timeout",
-        default: 30000,
+        default: 10000,
         type: "number",
     })
     .option("force", {

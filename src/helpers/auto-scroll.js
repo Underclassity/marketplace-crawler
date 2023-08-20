@@ -3,16 +3,16 @@ import sleep from "./sleep.js";
 /**
  * Autoscroll puppeteer page
  *
- * @param   {Object}  page  Puppeteer page
+ * @param   {Object}          page  Puppeteer page
  *
- * @return  {Object}        Promise
+ * @return  {Object|Boolean}        Promise
  */
 export async function autoScroll(page) {
     if (!page) {
         return false;
     }
 
-    await page.evaluate(async () => {
+    return await page.evaluate(async () => {
         await new Promise((resolve) => {
             let totalHeight = 0;
             const distance = Math.floor(document.body.offsetHeight / 2);
@@ -54,6 +54,8 @@ export async function scrollTick(page) {
     });
 
     await sleep(50);
+
+    return true;
 }
 
 export default autoScroll;

@@ -1,0 +1,243 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        // Aliexpress
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Aliexpress Tags",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}\\index.js",
+            "args": ["--thumbnail false", "--time", "24", "--include", "aliexpress", "--tags", "true", "--headless", "false", "--throat", "10"]
+        }, {
+            "type": "node",
+            "request": "launch",
+            "name": "Aliexpress Update",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}\\index.js",
+            "args": ["--thumbnail false", "--time", "24", "--include", "aliexpress", "--update", "true", "--headless", "false", "--throat", "10"]
+        }, {
+            "type": "node",
+            "request": "launch",
+            "name": "Aliexpress Reviews",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}\\index.js",
+            "args": ["--thumbnail false", "--time", "24", "--include", "aliexpress", "--reviews", "true"]
+        },
+
+        // Amazon
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Amazon Tags",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}\\index.js",
+            "args": ["--thumbnail false", "--time", "24", "--include", "amazon", "--tags", "true"]
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Amazon Update",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}\\index.js",
+            "args": ["--thumbnail false", "--time", "24", "--include", "amazon", "--update", "true"]
+        },
+
+        // Ebay
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Ebay Tags",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}\\index.js",
+            "args": ["--thumbnail false", "--time", "24", "--include", "ebay", "--tags", "true"]
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Ebay Update",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}\\index.js",
+            "args": ["--thumbnail false", "--time", "24", "--include", "ebay", "--update", "true"]
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Ebay Reviews",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}\\index.js",
+            "args": ["--thumbnail false", "--time", "24", "--include", "ebay", "--reviews", "true"]
+        },
+
+        // Joom
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Joom Tags",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}\\index.js",
+            "args": ["--thumbnail false", "--time", "24", "--include", "joom", "--tags", "true"]
+        }, {
+            "type": "node",
+            "request": "launch",
+            "name": "Joom Update",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}\\index.js",
+            "args": ["--thumbnail false", "--time", "24", "--include", "joom", "--update", "true"]
+        }, {
+            "type": "node",
+            "request": "launch",
+            "name": "Joom Reviews",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}\\index.js",
+            "args": ["--thumbnail false", "--time", "24", "--include", "joom", "--reviews", "true"]
+        },
+
+        // Kufar
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Kufar Tags",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}\\index.js",
+            "args": ["--thumbnail false", "--time", "24", "--include", "kufar", "--tags", "true"]
+        },
+
+        // Ozon
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Ozon Update",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}\\index.js",
+            "args": ["--thumbnail false", "--time", "24", "--include", "ozon", "--update", "true"]
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Ozon Tags",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}\\index.js",
+            "args": ["--thumbnail false", "--time", "24", "--include", "ozon", "--tags", "true"]
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Ozon Reviews",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}\\index.js",
+            "args": ["--thumbnail false", "--time", "24", "--include", "ozon", "--reviews", "true"]
+        },
+
+        // Wildberries
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Wildberries Brands",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}\\index.js",
+            "args": ["--thumbnail false", "--time", "24", "--include", "wildberries", "--brands", "true"]
+        }, {
+            "type": "node",
+            "request": "launch",
+            "name": "Wildberries Tags",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}\\index.js",
+            "args": ["--thumbnail false", "--time", "24", "--include", "wildberries", "--tags", "true"]
+        }, {
+            "type": "node",
+            "request": "launch",
+            "name": "Wildberries Update",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}\\index.js",
+            "args": ["--thumbnail false", "--time", "24", "--include", "wildberries", "--update", "true"]
+        }, {
+            "type": "node",
+            "request": "launch",
+            "name": "Wildberries Reviews",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}\\index.js",
+            "args": ["--thumbnail false", "--time", "24", "--include", "wildberries", "--reviews", "true"]
+        },
+
+        // Wiggle
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Wiggle Brands",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}\\index.js",
+            "args": ["--thumbnail false", "--time", "24", "--include", "wiggle", "--brands", "true"]
+        }, {
+            "type": "node",
+            "request": "launch",
+            "name": "Wiggle Tags",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}\\index.js",
+            "args": ["--thumbnail false", "--time", "24", "--include", "wiggle", "--tags", "true"]
+        }, {
+            "type": "node",
+            "request": "launch",
+            "name": "Wiggle Update",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}\\index.js",
+            "args": ["--thumbnail false", "--time", "24", "--include", "wiggle", "--update", "true"]
+        }, {
+            "type": "node",
+            "request": "launch",
+            "name": "Wiggle Reviews",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}\\index.js",
+            "args": ["--thumbnail false", "--time", "24", "--include", "wiggle", "--reviews", "true"]
+        },
+    ]
+}

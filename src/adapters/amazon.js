@@ -26,7 +26,15 @@ import priorities from "../helpers/priorities.js";
 
 const prefix = "amazon";
 
-function log(msg, itemId) {
+/**
+ * Log helper
+ *
+ * @param   {String}  msg             Message
+ * @param   {String}  [itemId=false]  Item ID
+ *
+ * @return  {Boolean}                 Result
+ */
+function log(msg, itemId = false) {
     return logMsg(msg, itemId, prefix);
 }
 
@@ -205,6 +213,13 @@ export async function updateReviews(queue) {
  */
 export async function updateWithTags(queue) {
     const tags = await getTags(prefix);
+
+    if (!tags || !tags.length) {
+        log("Tags not found!");
+        return false;
+    }
+
+    log(`Get items with tags ${tags.join("-")}`);
 
     for (const tag of tags) {
         await getItemsByQuery(queue, tag);

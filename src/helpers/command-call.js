@@ -7,7 +7,7 @@ import spawn from "cross-spawn";
  *
  * @param   {String}  command  Command
  *
- * @return  {Object}           Promise
+ * @return  {Object}           Result object
  */
 export async function commandCall(command) {
     if (!command || !command.length) {

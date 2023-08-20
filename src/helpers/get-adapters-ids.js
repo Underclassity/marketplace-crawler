@@ -1,6 +1,11 @@
 import options from "../options.js";
 
-let ids = [
+/**
+ * Adapters IDs storage
+ *
+ * @var {Array}
+ */
+export let ids = [
     "aliexpress",
     "amazon",
     "decathlon",

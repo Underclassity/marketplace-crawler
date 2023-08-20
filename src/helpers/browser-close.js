@@ -3,7 +3,7 @@
  *
  * @param   {Object}  browser  Puppeteer browser
  *
- * @return  {Object}           Promise
+ * @return  {Boolean}          Result
  */
 export async function browserClose(browser) {
     if (!browser) {

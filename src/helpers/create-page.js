@@ -40,10 +40,10 @@ export async function createPage(
             return types.includes(req.resourceType())
                 ? Promise.resolve()
                       .then(() => req.abort())
-                      .catch((e) => {})
+                      .catch(() => {})
                 : Promise.resolve()
                       .then(() => req.continue())
-                      .catch((e) => {});
+                      .catch(() => {});
         });
     }
 

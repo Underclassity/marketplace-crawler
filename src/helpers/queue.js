@@ -1,3 +1,5 @@
+import is from "is_js";
+
 import guid from "./guid.js";
 
 export class PreloadQueue {
@@ -97,7 +99,7 @@ export class PreloadQueue {
      * @param {Function} func     Task function
      */
     add(priority, func) {
-        if (!this.queue.hasOwnProperty(priority)) {
+        if (!(priority in this.queue)) {
             this.queue[priority] = [];
         }
 
@@ -128,7 +130,7 @@ export class PreloadQueue {
         if (!task) {
             this.isRunning = false;
 
-            if (isFunction(this.endCb) && this._downloaded == this._length) {
+            if (is.function(this.endCb) && this._downloaded == this._length) {
                 this.endCb(this);
             }
 

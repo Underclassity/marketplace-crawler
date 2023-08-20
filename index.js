@@ -113,6 +113,8 @@ puppeteer.use(StealthPlugin());
 
             if (updateReviews) {
                 updateReviews(queue);
+            } else {
+                logMsg("Update reviews not found!", false, id);
             }
         }
 
@@ -136,6 +138,8 @@ puppeteer.use(StealthPlugin());
 
             if (updateItems) {
                 updateItems(queue);
+            } else {
+                logMsg("Update items not found!", false, id);
             }
         }
 
@@ -159,6 +163,8 @@ puppeteer.use(StealthPlugin());
 
             if (getItemsByBrand) {
                 getItemsByBrand(queue);
+            } else {
+                logMsg("Get items by brand not found!", false, id);
             }
         }
 
@@ -182,6 +188,8 @@ puppeteer.use(StealthPlugin());
 
             if (updateBrands) {
                 updateBrands(queue);
+            } else {
+                logMsg("Update with brands not found!", false, id);
             }
         }
 
@@ -205,6 +213,8 @@ puppeteer.use(StealthPlugin());
 
             if (updateWithTags) {
                 updateWithTags(queue);
+            } else {
+                logMsg("Update with tags not found!", false, id);
             }
         }
 

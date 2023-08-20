@@ -1,11 +1,8 @@
-import path from "node:path";
 import process from "node:process";
 
 import inquirer from "inquirer";
 
-import { LowSync } from "lowdb";
-import { JSONFileSync } from "lowdb/node";
-
+import { addItem } from "./src/helpers/db.js";
 import getAdaptersIds from "./src/helpers/get-adapters-ids.js";
 import logMsg from "./src/helpers/log-msg.js";
 
@@ -18,35 +15,7 @@ if (ids.length > 1) {
     process.exit();
 }
 
-const dbAdapter = new JSONFileSync(
-    path.resolve(path.resolve("./db/"), `${ids[0]}.json`)
-);
-
-const db = new LowSync(dbAdapter);
-
-/**
- * Delete item by ID
- *
- * @param   {String}  id   Item ID
- *
- * @return  {Boolean}      Result
- */
-async function addItem(id) {
-    // convert id to string
-    id = id.toString();
-
-    if (id in db.data) {
-        logMsg(`Item ${id} already in DB`, id, false);
-    } else {
-        logMsg(`Add new item ${id} to ${ids[0]}`, id, false);
-
-        db.data[id] = {
-            reviews: {},
-        };
-    }
-
-    return true;
-}
+const adapter = ids[0];
 
 (async () => {
     if (options.id) {
@@ -69,7 +38,7 @@ async function addItem(id) {
         if (answer.itemId == 0) {
             stoped = true;
         } else {
-            await addItem(answer.itemId);
+            addItem(adapter, answer.itemId);
         }
     }
 })();

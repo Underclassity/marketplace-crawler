@@ -29,6 +29,14 @@ if (!sizeDb.data) {
     sizeDb.write();
 }
 
+/**
+ * Get random files for item ID
+ *
+ * @param   {String}  adapter  Adapter
+ * @param   {String}  itemId   Item ID
+ *
+ * @return  {Array}            Files array
+ */
 function getRandomFilesIds(adapter, itemId) {
     if (!adapter || !itemId) {
         return [];
