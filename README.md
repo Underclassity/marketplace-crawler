@@ -11,6 +11,7 @@ Supported sites:
 - [kufar.by](https://kufar.by)
 - [onliner.by](https://onliner.by)
 - [ozon.ru](https://ozon.ru)
+- [trendyol.com](https://www.trendyol.com)
 - [wildberries.ru](https://wildberries.ru)
 - [wiggle.com](https://wiggle.com)
 

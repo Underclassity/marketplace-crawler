@@ -14,6 +14,8 @@ export let ids = [
     "kufar",
     "onliner",
     "ozon",
+    "trendyol",
+    "wiggle",
     "wildberries",
     "wiggle",
 ];

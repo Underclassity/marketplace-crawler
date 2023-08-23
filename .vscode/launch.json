@@ -162,6 +162,38 @@
             "args": ["--thumbnail false", "--time", "24", "--include", "ozon", "--reviews", "true"]
         },
 
+        // Trendyol
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Trendyol Update",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}\\index.js",
+            "args": ["--thumbnail false", "--time", "24", "--include", "trendyol", "--update", "true"]
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Trendyol Tags",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}\\index.js",
+            "args": ["--thumbnail false", "--time", "24", "--include", "trendyol", "--tags", "true"]
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Trendyol Reviews",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}\\index.js",
+            "args": ["--thumbnail false", "--time", "24", "--include", "trendyol", "--reviews", "true"]
+        },
+
         // Wildberries
         {
             "type": "node",

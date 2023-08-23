@@ -3,16 +3,17 @@ import sleep from "./sleep.js";
 /**
  * Autoscroll puppeteer page
  *
- * @param   {Object}          page  Puppeteer page
+ * @param   {Object}           page   Puppeteer page
+ * @param   {Number}           delay  Scroll delay value
  *
- * @return  {Object|Boolean}        Promise
+ * @return  {Object|Boolean}          Promise
  */
-export async function autoScroll(page) {
+export async function autoScroll(page, delay = 100) {
     if (!page) {
         return false;
     }
 
-    return await page.evaluate(async () => {
+    return await page.evaluate(async (d) => {
         await new Promise((resolve) => {
             let totalHeight = 0;
             const distance = Math.floor(document.body.offsetHeight / 2);
@@ -27,9 +28,9 @@ export async function autoScroll(page) {
                     clearInterval(timer);
                     resolve();
                 }
-            }, 100);
+            }, d);
         });
-    });
+    }, delay);
 }
 
 /**

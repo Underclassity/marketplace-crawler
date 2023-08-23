@@ -52,13 +52,19 @@ export function loadDB(dbPrefix) {
 /**
  * Write in DB helper
  *
- * @param   {String}   dbPrefix    DB prefix
- * @param   {Boolean}  write       Write flag
- * @param   {String}   prefix      Prefix
+ * @param   {String}    dbPrefix       DB prefix
+ * @param   {Boolean}   write          Write flag
+ * @param   {String}    prefix         Prefix
+ * @param   {Boolean}   waitTimeout    Wait for write timeout
  *
- * @return  {Boolean}              Result
+ * @return  {Boolean}                  Result
  */
-export function dbWrite(dbPrefix, write = true, prefix = false) {
+export function dbWrite(
+    dbPrefix,
+    write = true,
+    prefix = false,
+    waitTimeout = false
+) {
     if (!dbPrefix || !dbPrefix.length) {
         logMsg("DB prefix not defined!");
         return false;
@@ -110,10 +116,12 @@ export function dbWrite(dbPrefix, write = true, prefix = false) {
         );
 
         // Add sleep tick
-        if (dbPrefix) {
+        if (dbPrefix && waitTimeout) {
             setTimeout(() => {
                 writeCache[dbPrefix] = false;
             }, 10);
+        } else {
+            writeCache[dbPrefix] = false;
         }
     } catch (error) {
         logMsg(`Write DB error: ${error.message}`, false, prefix);
