@@ -768,6 +768,44 @@ export function getReview(prefix, itemId, reviewId) {
 }
 
 /**
+ * Get reviews from DB by query
+ *
+ * @param   {String}  prefix  Prefix
+ * @param   {String}  query   Query
+ *
+ * @return  {Array}           Review items array
+ */
+export function getReviews(prefix, query) {
+    if (!prefix || !prefix.length) {
+        logMsg("Prefix not defined!");
+        return false;
+    }
+
+    if (!query || !is.object(query)) {
+        logMsg("Query not defined!");
+        return false;
+    }
+
+    const dbReviewsPrefix = `${prefix}-reviews`;
+
+    loadDB(dbReviewsPrefix);
+
+    const results = [];
+
+    for (const reviewId in dbCache[dbReviewsPrefix].data) {
+        const reviewItem = dbCache[dbReviewsPrefix].data[reviewId];
+
+        for (const queryId in query) {
+            if (reviewItem[queryId] == query[queryId]) {
+                results.push(reviewItem);
+            }
+        }
+    }
+
+    return results;
+}
+
+/**
  * Add review to DB
  *
  * @param   {String}   prefix       Prefix

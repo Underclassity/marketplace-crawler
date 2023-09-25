@@ -412,11 +412,12 @@ export async function getPriceInfo(itemId) {
  * Get feedbacks for item
  *
  * @param   {Number}  itemId     Item ID
+ * @param   {String}  query      Query
  * @param   {Object}  queue      Queue
  *
  * @return  {Boolean}            Result
  */
-export async function getFeedbacks(itemId, queue) {
+export async function getFeedbacks(itemId, query = false, queue) {
     log("Feedbacks get", itemId);
 
     // const feedbacks = [];
@@ -514,13 +515,16 @@ export async function getFeedbacks(itemId, queue) {
 
     if (isResult) {
         updateTime(prefix, itemId);
-        updateTags(prefix, itemId, options.query);
+
+        if (query) {
+            updateTags(prefix, itemId, query);
+        }
     }
 
     log(`End get: result ${isResult}`, itemId);
 
     if (!isResult) {
-        queue.add(() => getFeedbacks(itemId, queue), {
+        queue.add(() => getFeedbacks(itemId, false, queue), {
             priority: priorities.item,
         });
     }
@@ -716,7 +720,7 @@ export async function processItems(items, brand = options.brand, queue) {
             });
         }
 
-        queue.add(() => getFeedbacks(itemId, queue), {
+        queue.add(() => getFeedbacks(itemId, false, queue), {
             priority: priorities.item,
         });
     }
@@ -781,7 +785,7 @@ export async function updateWithTags(queue) {
  * @return  {Boolean}         Result
  */
 export async function updateItemById(itemId, queue) {
-    return await queue.add(async () => getFeedbacks(itemId, queue), {
+    return await queue.add(async () => getFeedbacks(itemId, false, queue), {
         priority: priorities.item,
     });
 }
@@ -799,7 +803,7 @@ export function updateItems(queue) {
     log(`Update ${items.length} items`);
 
     items.forEach((itemId) =>
-        queue.add(() => getFeedbacks(itemId, queue), {
+        queue.add(() => getFeedbacks(itemId, false, queue), {
             priority: priorities.item,
         })
     );
@@ -1041,7 +1045,7 @@ export async function getItemsByQuery(queue, query = options.query) {
     log(`Found ${items.length}(${count}) items on all pages`);
 
     for (const itemId of items) {
-        queue.add(() => getFeedbacks(itemId, queue), {
+        queue.add(() => getFeedbacks(itemId, query, queue), {
             priority: priorities.item,
         });
     }

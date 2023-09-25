@@ -76,19 +76,16 @@ export function logQueue(queue) {
         return false;
     }
 
-    logMsg(
-        `Queue size: page-${queue.sizeBy({
-            priority: priorities.page,
-        })} items-${queue.sizeBy({
-            priority: priorities.item,
-        })} reviews-${queue.sizeBy({
-            priority: priorities.review,
-        })} download-${queue.sizeBy({
-            priority: priorities.download,
-        })}`,
-        false,
-        false
-    );
+    const queueLogString = `Queue size: ${Object.keys(priorities)
+        .map(
+            (priority) =>
+                `${priority}-${queue.sizeBy({
+                    priority: priorities[priority],
+                })}`
+        )
+        .join(", ")}`;
+
+    logMsg(queueLogString, false, false);
 
     return true;
 }

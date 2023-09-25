@@ -14,10 +14,10 @@ export let ids = [
     "kufar",
     "onliner",
     "ozon",
+    "tokopedia",
     "trendyol",
     "wiggle",
     "wildberries",
-    "wiggle",
 ];
 
 /**

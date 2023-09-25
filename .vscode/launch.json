@@ -55,6 +55,17 @@
             "program": "${workspaceFolder}\\index.js",
             "args": ["--thumbnail false", "--time", "24", "--include", "amazon", "--update", "true"]
         },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Amazon Reviews",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}\\index.js",
+            "args": ["--thumbnail false", "--time", "24", "--include", "amazon", "--reviews", "true"]
+        },
+
 
         // Ebay
         {
@@ -160,6 +171,38 @@
             ],
             "program": "${workspaceFolder}\\index.js",
             "args": ["--thumbnail false", "--time", "24", "--include", "ozon", "--reviews", "true"]
+        },
+
+        // Tokopedia
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Tokopedia Update",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}\\index.js",
+            "args": ["--thumbnail false", "--time", "24", "--include", "tokopedia", "--update", "true"]
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Tokopedia Tags",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}\\index.js",
+            "args": ["--thumbnail false", "--time", "24", "--include", "tokopedia", "--tags", "true"]
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Tokopedia Reviews",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}\\index.js",
+            "args": ["--thumbnail false", "--time", "24", "--include", "tokopedia", "--reviews", "true"]
         },
 
         // Trendyol
