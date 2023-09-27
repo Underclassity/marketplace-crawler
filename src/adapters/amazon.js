@@ -92,33 +92,49 @@ async function processPage(pageNumber, query) {
 
         const $ = cheerio.load(request.data);
 
-        const searchResults = $(
-            'span[data-component-type="s-search-results"] a'
-        );
-
         let ids = [];
 
-        searchResults.each((index, element) => {
-            ids.push($(element).attr("href"));
+        $("[data-asin]").each((index, element) => {
+            ids.push($(element).attr("data-asin"));
         });
 
         ids = ids
-            .filter((element) => element.includes("/dp/"))
-            .map((element) => element.slice(0, element.indexOf("/ref")))
-            .map((element) => {
-                if (element.length > 10) {
-                    return element.slice(0, element.indexOf("/"));
-                }
-
-                return element;
-            })
+            .filter((item) => item.length)
             .filter((element, index, array) => array.indexOf(element) === index)
-            .map((element) => {
+            .map((asin) => {
                 return {
-                    asin: element.slice(element.indexOf("/dp/") + 4),
-                    link: element,
+                    asin,
+                    link: `https://www.amazon.com/dp/${asin}`,
                 };
             });
+
+        // const searchResults = $(
+        //     'span[data-component-type="s-search-results"] a'
+        // );
+
+        // let ids = [];
+
+        // searchResults.each((index, element) => {
+        //     ids.push($(element).attr("href"));
+        // });
+
+        // ids = ids
+        //     .filter((element) => element.includes("/dp/"))
+        //     .map((element) => element.slice(0, element.indexOf("/ref")))
+        //     .map((element) => {
+        //         if (element.length > 10) {
+        //             return element.slice(0, element.indexOf("/"));
+        //         }
+
+        //         return element;
+        //     })
+        //     .filter((element, index, array) => array.indexOf(element) === index)
+        //     .map((element) => {
+        //         return {
+        //             asin: element.slice(element.indexOf("/dp/") + 4),
+        //             link: element,
+        //         };
+        //     });
 
         log(`Found ${ids.length} items on page ${pageNumber}`);
 
