@@ -707,7 +707,7 @@ export function getTags(prefix) {
     for (const itemId in db.data) {
         const item = db.data[itemId];
 
-        if (item?.tags?.length) {
+        if (item?.tags?.length && !item?.deleted) {
             item.tags.forEach((tag) => {
                 if (!tags.includes(tag)) {
                     tags.push(tag);
