@@ -203,6 +203,27 @@ async function getTags(adapter) {
 }
 
 /**
+ * Get categories for adapter
+ *
+ * @param   {String}  adapter  Adapter
+ *
+ * @return  {Object}           Tags
+ */
+async function getCategories(adapter) {
+    try {
+        const request = await axios(`/categories/${adapter}`);
+
+        let { categories } = request.data;
+
+        return categories;
+    } catch (error) {
+        console.error(error.message);
+    }
+
+    return false;
+}
+
+/**
  * Get predictions for adapter
  *
  * @param   {String}  adapter  Adapter
@@ -233,7 +254,10 @@ export default createStore({
 
         brands: {},
         tags: {},
+        categories: {},
         predictions: {},
+
+        model: undefined,
     },
     getters: {},
     mutations: {},
@@ -270,10 +294,36 @@ export default createStore({
 
             return context.state.tags[adapter];
         },
+        async getCategories(context, adapter) {
+            context.state.categories[adapter] = await getCategories(adapter);
+
+            return context.state.categories[adapter];
+        },
         async getPredictions(context, adapter) {
             context.state.predictions[adapter] = await getPredictions(adapter);
 
             return context.state.predictions[adapter];
+        },
+
+        async loadModel(context) {
+            const model = await window.mobilenet.load({
+                version: 2,
+                alpha: 1.0,
+                // modelUrl: "/models/ssd_mobilenet_v2/model.json",
+            });
+
+            context.state.model = model;
+
+            console.log("Model loaded");
+        },
+
+        async analyzeImage(context, image) {
+            if (!context.state.model) {
+                console.log("No model found");
+                return false;
+            }
+
+            return await context.state.model.classify(image);
         },
     },
     modules: {},

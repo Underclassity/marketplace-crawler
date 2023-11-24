@@ -8,9 +8,10 @@
         "node": "^12.20.0 || ^14.13.1 || >=16.0.0"
     },
     "scripts": {
-        "dev": "nodemon src/server/server.js -w src/server",
+        "dev:server": "nodemon src/server/server.js -w src/server",
+        "dev:client": "vite",
         "start": "NODE_ENV=production node src/server/server.js",
-        "build": "vite build",
+        "build:client": "vite build",
         "lint": "vue-cli-service lint",
         "serve": "vue-cli-service serve",
         "start:client": "npm run serve --prefix '../client/'",
@@ -21,7 +22,6 @@
     "author": "Ivan Gornovskiy",
     "license": "ISC",
     "dependencies": {
-        "@tensorflow-models/coco-ssd": "^2.2.2",
         "amazon-buddy": "^2.2.45",
         "axios": "^1.3.4",
         "body-parser": "^1.20.2",
@@ -65,7 +65,8 @@
     "devDependencies": {
         "@babel/core": "^7.12.16",
         "@babel/eslint-parser": "^7.12.16",
-        "@tensorflow/tfjs": "^4.10.0",
+        "@tensorflow-models/coco-ssd": "^2.2.3",
+        "@tensorflow-models/mobilenet": "^2.1.1",
         "@vitejs/plugin-vue": "^4.0.0",
         "@vue/cli-plugin-babel": "~5.0.0",
         "@vue/cli-plugin-eslint": "~5.0.0",
@@ -86,6 +87,7 @@
         "nodemon": "^2.0.20",
         "prettier": "^2.4.1",
         "pretty-bytes": "^6.1.0",
+        "simple-eta": "^3.0.2",
         "stylus": "^0.55.0",
         "stylus-loader": "^6.1.0",
         "vite": "^4.0.4",

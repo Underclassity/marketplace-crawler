@@ -50,6 +50,13 @@
                 option(value="no-prediction") No prediction
                 option(v-for="(prediction, id) in predictions" :key="id" :value="id") {{ id }} ({{ prediction.min.toFixed(2) }}-{{ prediction.avg.toFixed(2) }}-{{ prediction.max.toFixed(2) }})
 
+        .filter-item(v-if="Object.keys(categories).length")
+            label(for="categories-select") Categories
+            select(v-model="category" id="categories-select" v-on:change="changeFilter")
+                option(value="") None
+                option(value="no-category") No category
+                option(v-for="categoryItem of categoriesItems" :key="categoryItem.title" :value="categoryItem.subject_id") {{ categoryItem.title }}({{ categoryItem.count }})
+
         .filter-item
             button(v-on:click.prevent.stop="updateAllOnPage") Update all on page
 

@@ -1,5 +1,7 @@
-import path from "node:path";
 import fs from "node:fs";
+import path from "node:path";
+
+import makeEta from "simple-eta";
 
 import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
@@ -75,6 +77,45 @@ puppeteer.use(StealthPlugin());
     logMsg(`Process with adapters: ${ids.join(",")}`);
 
     const queue = createQueue();
+    queue.min = 0;
+    queue.max = 0;
+    queue.eta = makeEta({ min: 0, max: 0 });
+
+    // queue.on("completed", () => {
+    //     logMsg("Completed");
+    // });
+
+    // queue.on("idle", () => {
+    //     logMsg(
+    //         `Queue is idle.  Size: ${queue.size}  Pending: ${queue.pending}`,
+    //         false,
+    //         false
+    //     );
+    // });
+
+    queue.on("add", () => {
+        // logMsg(
+        //     `Task is added.  Size: ${queue.size}  Pending: ${queue.pending}`,
+        //     false,
+        //     false
+        // );
+
+        queue.max++;
+
+        queue.eta = makeEta({ min: 0, max: queue.max });
+        queue.eta.report(queue.min);
+    });
+
+    queue.on("next", () => {
+        // logMsg(
+        //     `Task is completed.  Size: ${queue.size}  Pending: ${queue.pending}`,
+        //     false,
+        //     false
+        // );
+
+        queue.min++;
+        queue.eta.report(queue.min);
+    });
 
     // if (options.id) {
     //     const browser = await puppeteer.launch({
@@ -226,6 +267,27 @@ puppeteer.use(StealthPlugin());
         return true;
     }
 
+    if (options.stats) {
+        for (const id of ids) {
+            const { logStats } = await import(`./src/adapters/${id}.js`);
+
+            if (logStats) {
+                logStats(queue);
+            } else {
+                logMsg("Log stats not found!", false, id);
+            }
+        }
+
+        logQueue(queue);
+
+        while (queue.size || queue.pending) {
+            await sleep(1000);
+            logQueue(queue);
+        }
+
+        return true;
+    }
+
     if (!options.query) {
         logMsg("Query not defined!");
 
@@ -233,34 +295,6 @@ puppeteer.use(StealthPlugin());
     }
 
     logMsg(`Get items for query: ${options.query}`);
-
-    // queue.on("completed", () => {
-    //     logMsg("Completed");
-    // });
-
-    // queue.on("idle", () => {
-    //     logMsg(
-    //         `Queue is idle.  Size: ${queue.size}  Pending: ${queue.pending}`,
-    //         false,
-    //         false
-    //     );
-    // });
-
-    // queue.on("add", () => {
-    //     logMsg(
-    //         `Task is added.  Size: ${queue.size}  Pending: ${queue.pending}`,
-    //         false,
-    //         false
-    //     );
-    // });
-
-    // queue.on("next", () => {
-    //     logMsg(
-    //         `Task is completed.  Size: ${queue.size}  Pending: ${queue.pending}`,
-    //         false,
-    //         false
-    //     );
-    // });
 
     for (const id of ids) {
         const { getItemsByQuery } = await import(`./src/adapters/${id}.js`);

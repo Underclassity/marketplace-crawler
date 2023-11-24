@@ -18,11 +18,12 @@ import {
     updateTime,
 } from "../helpers/db.js";
 
+import { logMsg, logQueue } from "../helpers/log-msg.js";
 import downloadItem from "../helpers/image-process.js";
 import getHeaders from "../helpers/get-headers.js";
-import logMsg from "../helpers/log-msg.js";
 import options from "../options.js";
 import priorities from "../helpers/priorities.js";
+import sleep from "../helpers/sleep.js";
 
 const prefix = "wildberries";
 
@@ -818,12 +819,12 @@ export function updateItems(queue) {
  *
  * @return  {Boolean}        Result
  */
-export function updateReviews(queue) {
+export async function updateReviews(queue) {
     const items = getItems(prefix, true);
 
     log(`Update ${items.length} items reviews`);
 
-    items.forEach((itemId) => {
+    for (const itemId of items) {
         const item = getItem(prefix, itemId);
 
         if (!item?.reviews?.length) {
@@ -860,7 +861,85 @@ export function updateReviews(queue) {
                 downloadItem(photo, filepath, queue);
             }
         }
-    });
+    }
+
+    logQueue(queue);
+
+    while (queue.size || queue.pending) {
+        await sleep(1000);
+        logQueue(queue);
+    }
+
+    return true;
+}
+
+/**
+ * Analyze products and log stats
+ *
+ * @param   {Object}  queue  Queue
+ *
+ * @return  {Boolean}        Result
+ */
+export function logStats(queue) {
+    log("Start analyze products");
+
+    const items = getItems(prefix, true);
+
+    if (!items.length) {
+        log("Items not found");
+        return false;
+    }
+
+    const tags = getTags(prefix);
+
+    log(`Tags: ${tags.join(", ")}`);
+
+    queue.add(
+        () => {
+            const cache = {};
+
+            for (const itemId of items) {
+                const product = getItem(prefix, itemId);
+
+                if (!product.info) {
+                    continue;
+                }
+
+                const { info } = product;
+
+                if (!cache[info.subj_root_name]) {
+                    cache[info.subj_root_name] = {};
+                }
+
+                if (!cache[info.subj_root_name][info.subj_name]) {
+                    cache[info.subj_root_name][info.subj_name] = {
+                        count: 0,
+                        subject_id: info.data.subject_id,
+                        subject_root_id: info.data.subject_root_id,
+                    };
+                }
+
+                cache[info.subj_root_name][info.subj_name].count++;
+
+                if (
+                    info.data.subject_id !=
+                    cache[info.subj_root_name][info.subj_name].subject_id
+                ) {
+                    console.log(info);
+                }
+
+                if (
+                    info.data.subject_root_id !=
+                    cache[info.subj_root_name][info.subj_name].subject_root_id
+                ) {
+                    console.log(info);
+                }
+            }
+
+            log(JSON.stringify(cache, null, 4));
+        },
+        { priority: priorities.item }
+    );
 
     return true;
 }

@@ -76,7 +76,11 @@ export function logQueue(queue) {
         return false;
     }
 
-    const queueLogString = `Queue size: ${Object.keys(priorities)
+    const { size } = queue;
+
+    const queueLogString = `Queue size ${size} ${
+        `${queue?.eta?.estimate().toFixed(2)}s` || ""
+    }: ${Object.keys(priorities)
         .map(
             (priority) =>
                 `${priority}-${queue.sizeBy({

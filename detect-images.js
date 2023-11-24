@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 
 import {
@@ -13,14 +14,14 @@ import createQueue from "./src/helpers/create-queue.js";
 import sleep from "./src/helpers/sleep.js";
 
 import options from "./src/options.js";
-import priorities from "./src/helpers/priorities.js";
+// import priorities from "./src/helpers/priorities.js";
 
 const adapters = getAdaptersIds();
 
 const queue = createQueue();
 
 // Time counter
-// let counter = 0;
+let counter = 0;
 
 /**
  * Get predictions for given file
@@ -32,8 +33,6 @@ const queue = createQueue();
  * @return  {Boolean}           Result
  */
 async function getFilePredictions(adapter, itemId, filename) {
-    // logMsg(`Process file ${filename}`, itemId, adapter);
-
     const dbPredictions = getItemPredictions(adapter, itemId, filename);
 
     if (Array.isArray(dbPredictions) && !options.force) {
@@ -41,11 +40,11 @@ async function getFilePredictions(adapter, itemId, filename) {
         return false;
     }
 
-    // // Wait for 10 sec every 60 sec, for memory clear
-    // if (counter >= 120) {
-    //     counter = 0;
-    //     await sleep(10 * 1000);
-    // }
+    // Wait for 10 sec every 60 sec, for memory clear
+    if (counter >= 120) {
+        counter = 0;
+        await sleep(10 * 1000);
+    }
 
     const filepath = path.resolve(
         options.directory,
@@ -55,13 +54,20 @@ async function getFilePredictions(adapter, itemId, filename) {
         filename
     );
 
+    if (!fs.existsSync(filepath)) {
+        // logMsg(`File ${filename} not found`, itemId, adapter);
+        return false;
+    }
+
+    logMsg(`Process file ${filename}`, itemId, adapter);
+
     let image = await readImage(filepath);
 
     const predictions = await detectImage(image);
 
     if (!predictions) {
         addPrediction(adapter, itemId, filename, []);
-        // logMsg(`No predictions found for ${filename}`, itemId, adapter);
+        logMsg(`No predictions found for ${filename}`, itemId, adapter);
         return false;
     }
 
@@ -109,12 +115,29 @@ async function processItem(adapter, itemId) {
         return false;
     }
 
-    // logMsg(`Process ${filenames.length} files`, itemId, adapter);
+    filenames = filenames.filter((filename) => {
+        const dbPredictions = getItemPredictions(adapter, itemId, filename);
+
+        if (Array.isArray(dbPredictions) && !options.force) {
+            // logMsg(
+            //     `Predictions for ${filename} already in DB`,
+            //     itemId,
+            //     adapter
+            // );
+            return false;
+        }
+
+        return true;
+    });
+
+    logMsg(`Process ${filenames.length} files`, itemId, adapter);
 
     for (const filename of filenames) {
-        queue.add(() => getFilePredictions(adapter, itemId, filename), {
-            priority: priorities.download,
-        });
+        await getFilePredictions(adapter, itemId, filename);
+
+        // queue.add(() => getFilePredictions(adapter, itemId, filename), {
+        //     priority: priorities.download,
+        // });
     }
 
     return true;
@@ -131,14 +154,14 @@ async function processAdapter(adapter) {
     const items = getItems(adapter, true);
 
     if (!items?.length) {
-        // logMsg("Items not found in adapter", false, adapter);
+        logMsg("Items not found in adapter", false, adapter);
         return false;
     }
 
     logMsg(`Start process ${items.length} items`, false, adapter);
 
     for (const itemId of items) {
-        processItem(adapter, itemId);
+        await processItem(adapter, itemId);
     }
 
     return true;

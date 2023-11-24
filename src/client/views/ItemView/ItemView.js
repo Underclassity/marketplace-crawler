@@ -1,3 +1,5 @@
+import { mapState } from "vuex";
+
 import axios from "axios";
 import prettyBytes from "pretty-bytes";
 
@@ -13,6 +15,8 @@ export default {
     },
 
     computed: {
+        ...mapState(["categories"]),
+
         adapter() {
             return this.$route.params.id;
         },
@@ -54,6 +58,25 @@ export default {
             } catch (error) {
                 console.log(error.message);
             }
+        },
+
+        async analyze(file) {
+            const { adapter, itemId } = this;
+
+            if (!this.$store.state.model) {
+                return false;
+            }
+
+            const image = this.$refs[file][0];
+
+            console.log(image);
+
+            const predictions = await this.$store.dispatch(
+                "analyzeImage",
+                image
+            );
+
+            console.log(`${adapter}-${itemId}-${file}: ${predictions}`);
         },
     },
 

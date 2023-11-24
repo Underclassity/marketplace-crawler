@@ -138,6 +138,11 @@ export const options = yargs(hideBin(process.argv))
         type: "number",
         describe: "Scrape item page size",
         default: 100,
+    })
+    .option("stats", {
+        describe: "Show products stats",
+        default: false,
+        type: "boolean",
     }).argv;
 
 console.log("Options:");

@@ -7,8 +7,10 @@ import express from "express";
 
 import {
     deleteItem,
+    getFiles,
     getFilesSize,
     getItem,
+    getItems,
     isFavorite,
     loadDB,
 } from "../helpers/db.js";
@@ -64,7 +66,25 @@ function getRandomFilesIds(adapter, itemId) {
 export const adapterRouter = express.Router();
 
 adapterRouter.get("/", (req, res) => {
-    return res.json({ adapters });
+    const data = adapters.map((adapter) => {
+        const items = getItems(adapter, true);
+        const files = items
+            .map((itemId) => getFiles(adapter, itemId)?.length || 0)
+            .reduce((a, b) => a + b, 0);
+        const reviews = items.reduce((prev, current) => {
+            prev += getItem(adapter, current)?.reviews?.length || 0;
+            return prev;
+        }, 0);
+
+        return {
+            id: adapter,
+            items: items.length,
+            files,
+            reviews,
+        };
+    });
+
+    return res.json({ adapters: data });
 });
 
 adapterRouter.get("/:adapter", (req, res) => {
@@ -77,6 +97,7 @@ adapterRouter.get("/:adapter", (req, res) => {
     const sortId = req.query.sort || false;
     let brand = req.query.brand || false;
     let tag = req.query.tag || false;
+    let category = req.query.category || false;
 
     if (brand == "false" || brand == "true") {
         brand = false;
@@ -84,6 +105,10 @@ adapterRouter.get("/:adapter", (req, res) => {
 
     if (tag == "false") {
         tag = false;
+    }
+
+    if (category == "false") {
+        category = false;
     }
 
     if (!adapters.includes(adapter)) {
@@ -136,6 +161,23 @@ adapterRouter.get("/:adapter", (req, res) => {
             }
 
             return dbFiles.data[itemId].length;
+        })
+        .filter((itemId) => {
+            if (!category) {
+                return true;
+            }
+
+            if (category == "no-category") {
+                return !db.data[itemId]?.info;
+            }
+
+            const { info } = db.data[itemId];
+
+            if (info?.data?.subject_id == category) {
+                return true;
+            }
+
+            return false;
         });
 
     if (brand) {
@@ -218,6 +260,10 @@ adapterRouter.get("/:adapter", (req, res) => {
     for (const itemId of resultItemsIDs) {
         const resultItem = { ...db.data[itemId] };
 
+        delete resultItem.info;
+        delete resultItem.ids;
+        delete resultItem.prices;
+
         resultItem.id = itemId;
         resultItem.reviews = db.data[itemId]?.reviews?.length || 0;
         resultItem.images = getRandomFilesIds(adapter, itemId).sort();
@@ -226,6 +272,7 @@ adapterRouter.get("/:adapter", (req, res) => {
 
         resultItem.size = sizeDb.data[`${adapter}-${itemId}`];
         resultItem.favorite = isFavorite(adapter, itemId);
+        resultItem.category = db.data[itemId]?.info?.data?.subject_id;
 
         items.push(resultItem);
     }
@@ -250,15 +297,13 @@ adapterRouter.get("/:adapter/:itemId", (req, res) => {
         });
     }
 
-    const dbPrefix = `${adapter}-products`;
     const dbFilesPrefix = `${adapter}-files`;
     const dbReviewsPrefix = `${adapter}-reviews`;
 
-    const db = loadDB(dbPrefix);
     const dbFiles = loadDB(dbFilesPrefix);
     const dbReviews = loadDB(dbReviewsPrefix);
 
-    const info = db.data[itemId];
+    const info = getItem(adapter, itemId);
 
     const files = itemId in dbFiles.data ? dbFiles.data[itemId].sort() : [];
     const filesNames = files.map((filename) => path.parse(filename).name);
@@ -318,7 +363,7 @@ adapterRouter.get("/:adapter/:itemId", (req, res) => {
             };
         });
 
-    delete info.reviews;
+    // delete info.reviews;
 
     const size = files
         .filter((filename) =>
@@ -346,7 +391,11 @@ adapterRouter.get("/:adapter/:itemId", (req, res) => {
         }, 0);
 
     return res.json({
-        info,
+        info: {
+            id: info.id,
+            tags: info.tags,
+            time: info.time,
+        },
         reviews,
         count: files.length,
         size,

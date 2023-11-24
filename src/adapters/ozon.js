@@ -120,7 +120,7 @@ export async function getOzonItem(link, itemId, queue, browser) {
     //     devtools: options.headless ? false : true,
     // });
 
-    let page = await createPage(browser, false);
+    let page = await createPage(browser, true);
 
     await page.setRequestInterception(true);
 
@@ -198,6 +198,9 @@ export async function getOzonItem(link, itemId, queue, browser) {
     });
 
     try {
+        // await page.goto(`${link}/?oos_search=false`, goSettings);
+        // await autoScroll(page);
+
         await page.goto(`${link}/reviews/?reviewsVariantMode=2`, goSettings);
 
         reviews = await page.evaluate(() => {

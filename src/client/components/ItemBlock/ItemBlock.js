@@ -1,3 +1,5 @@
+import { mapState } from "vuex";
+
 import is from "is_js";
 import prettyBytes from "pretty-bytes";
 // import axios from "axios";
@@ -34,11 +36,42 @@ export default {
     },
 
     computed: {
+        ...mapState(["categories"]),
+
         // images() {
         //     let { files, count } = this;
 
         //     return count >= 9 ? getRandom(files, 9) : files;
         // },
+
+        category() {
+            const { adapter, categories, item } = this;
+
+            if (!categories[adapter]) {
+                return "None";
+            }
+
+            if (!item?.category) {
+                return "None";
+            }
+
+            const adapterCategories = categories[adapter];
+
+            let category = "";
+
+            for (const rootCategory in adapterCategories) {
+                for (const categoryItem in adapterCategories[rootCategory]) {
+                    if (
+                        adapterCategories[rootCategory][categoryItem]
+                            .subject_id == item.category
+                    ) {
+                        category = `${rootCategory}-${categoryItem}`;
+                    }
+                }
+            }
+
+            return category;
+        },
 
         isFavorite() {
             return this.item.favorite || false;

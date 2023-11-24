@@ -15,7 +15,9 @@ export default {
 
             const { adapters } = request.data;
 
-            console.log(`Adapters: ${adapters.join(", ")}`);
+            console.log(
+                `Adapters: ${adapters.map((item) => item.id).join(", ")}`
+            );
 
             this.adapters = adapters;
         } catch (error) {

@@ -19,6 +19,7 @@ export default {
             items: [],
             brands: [],
             tags: [],
+            categories: {},
             predictions: {},
             count: 0,
 
@@ -27,6 +28,7 @@ export default {
             sortId: false,
             brand: false,
             tag: false,
+            category: false,
             prediction: false,
 
             query: "",
@@ -38,6 +40,33 @@ export default {
         };
     },
 
+    computed: {
+        categoriesItems() {
+            const { categories } = this;
+
+            if (!categories || !Object.keys(categories).length) {
+                return [];
+            }
+
+            const results = [];
+
+            for (const categoryId in categories) {
+                for (const subCategoryId in categories[categoryId]) {
+                    const item = categories[categoryId][subCategoryId];
+
+                    results.push({
+                        title: `${categoryId}-${subCategoryId}`,
+                        ...item,
+                    });
+                }
+            }
+
+            results.sort((a, b) => a.title.localeCompare(b.title));
+
+            return results;
+        },
+    },
+
     methods: {
         async getBrands() {
             this.brands = await this.$store.dispatch("getBrands", this.adapter);
@@ -45,6 +74,13 @@ export default {
 
         async getTags() {
             this.tags = await this.$store.dispatch("getTags", this.adapter);
+        },
+
+        async getCategories() {
+            this.categories = await this.$store.dispatch(
+                "getCategories",
+                this.adapter
+            );
         },
 
         async getPredictions() {
@@ -57,8 +93,16 @@ export default {
         async getItems() {
             this.emitter.emit("triggerSpinner", true);
 
-            let { page, limit, isPhotos, sortId, brand, tag, isFavorite } =
-                this;
+            let {
+                page,
+                limit,
+                isPhotos,
+                sortId,
+                category,
+                brand,
+                tag,
+                isFavorite,
+            } = this;
 
             try {
                 const request = await axios(`/adapters/${this.adapter}`, {
@@ -68,6 +112,7 @@ export default {
                         photos: isPhotos,
                         favorite: isFavorite,
                         sort: sortId,
+                        category,
                         brand,
                         tag,
                     },
@@ -98,6 +143,7 @@ export default {
                 isPhotos,
                 sortId,
                 brand,
+                category,
                 prediction,
                 tag,
                 isFavorite,
@@ -111,6 +157,7 @@ export default {
                     favorite: isFavorite,
                     sort: sortId,
                     brand,
+                    category,
                     prediction,
                     tag,
                 },
@@ -124,6 +171,7 @@ export default {
                 photos,
                 sort,
                 brand,
+                category,
                 prediction,
                 tag,
                 favorite,
@@ -137,6 +185,7 @@ export default {
             this.brand = brand == "false" ? false : brand;
             this.prediction = prediction || false;
             this.tag = tag || false;
+            this.category = category || false;
 
             // Reset items
             this.itemsForDelete = [];
@@ -220,6 +269,7 @@ export default {
         await this.getItems();
         await this.getBrands();
         await this.getTags();
+        await this.getCategories();
         await this.getPredictions();
     },
 

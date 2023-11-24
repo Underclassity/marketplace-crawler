@@ -1036,7 +1036,10 @@ export async function loadStartPage(browser) {
         const url = response.url();
         const method = response.request().method();
 
-        if (!url.includes("slide?slidedata")) {
+        if (
+            !url.includes("slide?slidedata") &&
+            !url.includes("newslidevalidate")
+        ) {
             return false;
         }
 

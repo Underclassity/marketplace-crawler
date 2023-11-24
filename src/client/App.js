@@ -10,4 +10,10 @@ export default {
         OverlayBlock,
         QueueStatus,
     },
+
+    mounted() {
+        this.emitter.on("analyze", this.analyze);
+
+        this.$store.dispatch("loadModel");
+    },
 };

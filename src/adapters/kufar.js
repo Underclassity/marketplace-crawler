@@ -4,7 +4,7 @@ import axios from "axios";
 
 import downloadItem from "../helpers/image-process.js";
 
-import { logMsg } from "../helpers/log-msg.js";
+import { logMsg, logQueue } from "../helpers/log-msg.js";
 import {
     addItem,
     getItem,
@@ -14,6 +14,7 @@ import {
     // updateTime,
 } from "../helpers/db.js";
 import getHeaders from "../helpers/get-headers.js";
+import sleep from "../helpers/sleep.js";
 import options from "../options.js";
 import priorities from "../helpers/priorities.js";
 
@@ -101,6 +102,11 @@ export async function updateItems(queue) {
     log(`Update ${items.length} items`);
 
     items.forEach((itemId) => processItem(itemId, queue));
+
+    while (queue.size || queue.pending) {
+        await sleep(1000);
+        logQueue(queue);
+    }
 
     return true;
 }

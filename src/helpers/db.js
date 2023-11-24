@@ -63,7 +63,7 @@ export function dbWrite(
     dbPrefix,
     write = true,
     prefix = false,
-    waitTimeout = false
+    waitTimeout = true
 ) {
     if (!dbPrefix || !dbPrefix.length) {
         logMsg("DB prefix not defined!");
@@ -119,7 +119,7 @@ export function dbWrite(
         if (dbPrefix && waitTimeout) {
             setTimeout(() => {
                 writeCache[dbPrefix] = false;
-            }, 10);
+            }, 500);
         } else {
             writeCache[dbPrefix] = false;
         }

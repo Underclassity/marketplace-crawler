@@ -1,7 +1,7 @@
 import path from "node:path";
 import process from "node:process";
 
-import ViteExpress from "vite-express";
+// import ViteExpress from "vite-express";
 
 import "dotenv/config";
 
@@ -11,11 +11,18 @@ import bodyParser from "body-parser";
 import compression from "compression";
 import cors from "cors";
 import express from "express";
-// import morgan from "morgan";
+import morgan from "morgan";
 
 import { LowSync, MemorySync } from "lowdb";
 
-import { getBrands, getPredictions, getTags, loadDB } from "../helpers/db.js";
+import {
+    getBrands,
+    getItem,
+    getItems,
+    getPredictions,
+    getTags,
+    loadDB,
+} from "../helpers/db.js";
 import getAdaptersIds from "../helpers/get-adapters-ids.js";
 import logMsg from "../helpers/log-msg.js";
 
@@ -38,15 +45,17 @@ const app = express();
 const port = process.env.port || 3000;
 
 const downloadFolderPath = path.resolve(options.directory, "download");
+const modelsFolder = path.resolve(options.directory, "models");
 
 app.use(bodyParser.json());
 app.use(compression());
 app.use(cors());
 app.use(express.static(downloadFolderPath));
+app.use(express.static(modelsFolder));
 app.use("/queue", queueRouter);
 app.use("/adapters", adapterRouter);
 app.use("/favorite", favoriteRouter);
-// app.use(morgan("combined"));
+app.use(morgan("combined"));
 
 const adapters = getAdaptersIds();
 
@@ -127,10 +136,62 @@ app.get("/predictions/:adapter", (req, res) => {
     });
 });
 
-// app.listen(port, () => {
-//     logMsg(`Example app listening on port ${port}`);
-// });
+app.get("/categories/:adapter", (req, res) => {
+    const { adapter } = req.params;
 
-ViteExpress.listen(app, port, () => {
+    const items = getItems(adapter, true);
+
+    if (adapter != "wildberries" || !items.length) {
+        return res.json({ categories: {} });
+    }
+
+    const cache = {};
+
+    for (const itemId of items) {
+        const product = getItem(adapter, itemId);
+
+        if (!product.info) {
+            continue;
+        }
+
+        const { info } = product;
+
+        if (!cache[info.subj_root_name]) {
+            cache[info.subj_root_name] = {};
+        }
+
+        if (!cache[info.subj_root_name][info.subj_name]) {
+            cache[info.subj_root_name][info.subj_name] = {
+                count: 0,
+                subject_id: info.data.subject_id,
+                subject_root_id: info.data.subject_root_id,
+            };
+        }
+
+        cache[info.subj_root_name][info.subj_name].count++;
+
+        if (
+            info.data.subject_id !=
+            cache[info.subj_root_name][info.subj_name].subject_id
+        ) {
+            console.log(info);
+        }
+
+        if (
+            info.data.subject_root_id !=
+            cache[info.subj_root_name][info.subj_name].subject_root_id
+        ) {
+            console.log(info);
+        }
+    }
+
+    return res.json({ categories: cache });
+});
+
+app.listen(port, () => {
     logMsg(`Example app listening on port ${port}`);
 });
+
+// ViteExpress.listen(app, port, () => {
+//     logMsg(`Example app listening on port ${port}`);
+// });

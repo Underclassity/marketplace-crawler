@@ -32,15 +32,19 @@ puppeteer.use(
 
 puppeteer.use(StealthPlugin());
 
-export const browser = await puppeteer.launch({
-    ...browserConfig,
-    headless: false,
-    devtools: true,
-});
+let browser;
 
 export const queue = createQueue();
 
 export const queueRouter = express.Router();
+
+async function launchBrowser() {
+    return await puppeteer.launch({
+        ...browserConfig,
+        headless: false,
+        devtools: true,
+    });
+}
 
 queueRouter.get("/", (req, res) => {
     const { size, pending, isPaused } = queue;
@@ -69,6 +73,10 @@ queueRouter.post("/:adapter", async (req, res) => {
     const { items, brand, query } = req.body;
 
     const result = {};
+
+    if (!browser) {
+        browser = await launchBrowser();
+    }
 
     if (Array.isArray(items)) {
         const { updateItemById } = await import(`../adapters/${adapter}.js`);

@@ -4,8 +4,8 @@ import process from "node:process";
 
 import tf from "@tensorflow/tfjs-node";
 
-// import mobilenet from '@tensorflow-models/mobilenet';
-import cocoSsd from "@tensorflow-models/coco-ssd";
+import mobilenet from "@tensorflow-models/mobilenet";
+// import cocoSsd from "@tensorflow-models/coco-ssd";
 
 import commandCall from "./command-call.js";
 import logMsg from "./log-msg.js";
@@ -39,10 +39,16 @@ export async function loadModel() {
         logMsg("Start model load");
 
         // Load the model.
-        // mobilenetModel = await mobilenet.load();
-        model = await cocoSsd.load({
-            base: "mobilenet_v2",
+        model = await mobilenet.load({
+            version: 2,
+            alpha: 1.0,
+            modelUrl: `file://${path.resolve(
+                "../../public/models/ssd_mobilenet_v2/model.json"
+            )}`,
         });
+        // model = await cocoSsd.load({
+        //     base: "mobilenet_v2",
+        // });
 
         const endTime = Date.now();
         isModelLoading = false;
@@ -78,9 +84,14 @@ export async function readImage(filepath) {
 
     const parsedPath = path.parse(filepath);
 
+    const tempDirPath = path.resolve(options.directory, "temp");
+
+    if (!fs.existsSync(tempDirPath)) {
+        fs.mkdirSync(tempDirPath);
+    }
+
     const tempJpegFilepath = path.join(
-        options.directory,
-        "temp",
+        tempDirPath,
         `${path.basename(filepath, path.extname(filepath))}-temp.jpeg`
     );
 
@@ -94,11 +105,14 @@ export async function readImage(filepath) {
         readFilepath = tempJpegFilepath;
     }
 
-    //reads the entire contents of a file.
-    //readFileSync() is synchronous and blocks execution until finished.
-    let imageBuffer = fs.readFileSync(readFilepath);
-    //Given the encoded bytes of an image,
-    //it returns a 3D or 4D tensor of the decoded image. Supports BMP, GIF, JPEG and PNG formats.
+    console.dir(tf);
+    debugger;
+
+    // reads the entire contents of a file.
+    // readFileSync() is synchronous and blocks execution until finished.
+    let imageBuffer = fs.readFileSync(readFilepath || filepath);
+    // Given the encoded bytes of an image,
+    // it returns a 3D or 4D tensor of the decoded image. Supports BMP, GIF, JPEG and PNG formats.
     const tfimage = tf.node.decodeImage(imageBuffer);
 
     imageBuffer = null;
@@ -132,8 +146,8 @@ export async function detectImage(image, model) {
         // tf.engine().startScope();
 
         // Classify the image.
-        // const predictions = await mobilenetModel.classify(image);
-        const predictions = await model.detect(image);
+        const predictions = await model.classify(image);
+        // const predictions = await model.detect(image);
 
         image = null;
 
