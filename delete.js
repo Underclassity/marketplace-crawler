@@ -3,7 +3,13 @@ import path from "node:path";
 
 import inquirer from "inquirer";
 
-import { getItem, deleteItem, getItems } from "./src/helpers/db.js";
+import {
+    getItem,
+    deleteItem,
+    getItems,
+    updateItem,
+    dbWrite,
+} from "./src/helpers/db.js";
 import getAdaptersIds from "./src/helpers/get-adapters-ids.js";
 import logMsg from "./src/helpers/log-msg.js";
 
@@ -98,6 +104,49 @@ async function deleteItemFromDBs(id) {
     return true;
 }
 
+/**
+ * Delete tag from items
+ *
+ * @param   {String}   tag  Tag
+ *
+ * @return  {Boolean}       Result
+ */
+async function deleteTag(tag) {
+    if (!tag || !tag.length) {
+        logMsg("Tag not defined!");
+        return false;
+    }
+
+    for (const adapter of ids) {
+        const items = getItems(adapter, true);
+
+        for (const itemId of items) {
+            let { tags } = getItem(adapter, itemId);
+
+            if (!tags.includes(tag)) {
+                continue;
+            }
+
+            tags = tags.filter((item) => item != tag);
+
+            updateItem(adapter, itemId, { tags }, false);
+
+            logMsg(`Delete tag ${tag} from item`, itemId, adapter);
+        }
+
+        dbWrite(`${adapter}-products`, true, adapter, false);
+    }
+
+    return true;
+}
+
+/**
+ * Delete items by brand ID
+ *
+ * @param   {String}  brandId  Brand ID
+ *
+ * @return  {Boolean}          Result
+ */
 async function deleteBrand(brandId) {
     for (const adapter of ids) {
         let items = getItems(adapter, true);
@@ -126,6 +175,11 @@ async function deleteBrand(brandId) {
 
     if (options.brand) {
         await deleteBrand(options.id);
+        return true;
+    }
+
+    if (options.tag) {
+        await deleteTag(options.tag);
         return true;
     }
 
