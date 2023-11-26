@@ -828,13 +828,15 @@ export async function updateReviews(queue) {
         const item = getItem(prefix, itemId);
 
         if (!item?.reviews?.length) {
-            return false;
+            log("No reviews found", itemId);
+            continue;
         }
 
         for (const reviewId of item.reviews) {
             const feedback = getReview(prefix, itemId, reviewId);
 
             if (!feedback?.photos?.length) {
+                // log("No photos found!", itemId);
                 continue;
             }
 
@@ -843,7 +845,7 @@ export async function updateReviews(queue) {
                     `https://feedbackphotos.wbstatic.net/${item.fullSizeUri}`
             );
 
-            log(`Get ${photos.length} photos`, itemId);
+            log(`Get ${photos.length} photos for review ${reviewId}`, itemId);
 
             const itemFolderPath = path.resolve(
                 path.resolve(options.directory, "./download", "wildberries"),

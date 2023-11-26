@@ -34,7 +34,7 @@ export async function autoScroll(page, delay = 100) {
 }
 
 /**
- * Scroll ticj for page
+ * Scroll tick for page
  *
  * @param   {Object}  page  Puppeteer page
  *
