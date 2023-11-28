@@ -679,7 +679,7 @@ export function getBrands(prefix, withNames = false) {
 /**
  * Get items tags from DB
  *
- * @param   {String}  prefix  Log prefix
+ * @param   {String}  prefix  Prefix
  *
  * @return  {Array}           Array of tags
  */
@@ -723,6 +723,76 @@ export function getTags(prefix) {
         .filter((item, index, array) => array.indexOf(item) === index);
 
     return tags;
+}
+
+/**
+ * Get users IDs and reviews for adapter
+ *
+ * @param   {String}  prefix  Prefix
+ *
+ * @return  {Object}          Users data
+ */
+export function getUsers(prefix) {
+    if (!prefix || !prefix.length) {
+        logMsg("Prefix not defined!");
+        return false;
+    }
+
+    const dbReviewsPrefix = `${prefix}-reviews`;
+
+    loadDB(dbReviewsPrefix);
+
+    const results = {};
+
+    for (const reviewId in dbCache[dbReviewsPrefix].data) {
+        const reviewItem = dbCache[dbReviewsPrefix].data[reviewId];
+
+        if (prefix == "wildberries") {
+            const { wbUserId } = reviewItem;
+
+            if (!wbUserId) {
+                continue;
+            }
+
+            if (wbUserId in results) {
+                results[wbUserId].push(reviewId);
+            } else {
+                results[wbUserId] = [reviewId];
+            }
+        }
+    }
+
+    return results;
+}
+
+/**
+ * Get user info by adapter and id
+ *
+ * @param   {String}   prefix  Prefix
+ * @param   {Sttring}  id      User ID
+ *
+ * @return  {Object}           User info
+ */
+export function getUser(prefix, id) {
+    const reviews = getReviews(prefix);
+
+    let info = false;
+
+    if (prefix == "wildberries") {
+        for (const reviewId in reviews) {
+            if (info) {
+                continue;
+            }
+
+            const reviewItem = reviews[reviewId];
+
+            if (reviewItem?.wbUserId && reviewItem.wbUserId == id) {
+                info = reviewItem;
+            }
+        }
+    }
+
+    return info;
 }
 
 /**
@@ -775,20 +845,21 @@ export function getReview(prefix, itemId, reviewId) {
  *
  * @return  {Array}           Review items array
  */
-export function getReviews(prefix, query) {
+export function getReviews(prefix, query = false) {
     if (!prefix || !prefix.length) {
         logMsg("Prefix not defined!");
-        return false;
-    }
-
-    if (!query || !is.object(query)) {
-        logMsg("Query not defined!");
         return false;
     }
 
     const dbReviewsPrefix = `${prefix}-reviews`;
 
     loadDB(dbReviewsPrefix);
+
+    if (!query || !is.object(query)) {
+        return dbCache[dbReviewsPrefix].data;
+        // logMsg("Query not defined!");
+        // return false;
+    }
 
     const results = [];
 

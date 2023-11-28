@@ -595,7 +595,7 @@ export async function itemsRequest(page = 1, query = options.query) {
                     curr: "byn",
                     locale: "by",
                     lang: "ru",
-                    dest: -59208,
+                    dest: -59_208,
                     regions: [
                         1, 4, 22, 30, 31, 33, 40, 48, 66, 68, 69, 70, 80, 83,
                         114, 115,
@@ -645,7 +645,7 @@ export async function brandItemsRequest(brand = options.brand, page = 1) {
                     curr: "byn",
                     locale: "by",
                     lang: "ru",
-                    dest: -59208,
+                    dest: -59_208,
                     regions: [
                         1, 4, 22, 30, 31, 33, 40, 48, 66, 68, 69, 70, 80, 83,
                         114, 115,
@@ -927,14 +927,14 @@ export function logStats(queue) {
                     info.data.subject_id !=
                     cache[info.subj_root_name][info.subj_name].subject_id
                 ) {
-                    console.log(info);
+                    log(info);
                 }
 
                 if (
                     info.data.subject_root_id !=
                     cache[info.subj_root_name][info.subj_name].subject_root_id
                 ) {
-                    console.log(info);
+                    log(info);
                 }
             }
 

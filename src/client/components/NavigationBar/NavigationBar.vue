@@ -2,6 +2,7 @@
 nav
     router-link(to="/") Home
     router-link(to="/adapters") Adapters
+    router-link(to="/users") Users
 </template>
 
 <script src="./NavigationBar.js"></script>

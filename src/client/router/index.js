@@ -18,6 +18,24 @@ const routes = [
     },
 
     {
+        path: "/users",
+        name: "Users",
+        component: () =>
+            import(
+                /* webpackChunkName: "adapters" */ "../views/UsersView/UsersView.vue"
+            ),
+    },
+
+    {
+        path: "/users/:id",
+        name: "UsersView",
+        component: () =>
+            import(
+                /* webpackChunkName: "adapters" */ "../views/UserView/UserView.vue"
+            ),
+    },
+
+    {
         path: "/adapter/:id",
         name: "AdapterView",
         component: () =>

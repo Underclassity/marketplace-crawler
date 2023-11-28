@@ -1,4 +1,4 @@
-import { getItems, getItem } from "./src/helpers/db.js";
+import { getItems, getItem, getReviews } from "./src/helpers/db.js";
 import getAdaptersIds from "./src/helpers/get-adapters-ids.js";
 import logMsg from "./src/helpers/log-msg.js";
 
@@ -22,5 +22,24 @@ const ids = getAdaptersIds();
         );
 
         logMsg(`Tags: ${tags.join(",")}`, false, adapter);
+
+        // Create users cache
+        if (adapter == "wildberries") {
+            const reviews = getReviews(adapter, false);
+
+            const usersCache = {};
+
+            for (const reviewId in reviews) {
+                const review = reviews[reviewId];
+
+                const { wbUserId } = review;
+
+                if (wbUserId in usersCache) {
+                    usersCache[wbUserId].push(reviewId);
+                } else {
+                    usersCache[wbUserId] = [reviewId];
+                }
+            }
+        }
     }
 })();
