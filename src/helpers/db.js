@@ -787,12 +787,38 @@ export function getUser(prefix, id) {
             const reviewItem = reviews[reviewId];
 
             if (reviewItem?.wbUserId && reviewItem.wbUserId == id) {
-                info = reviewItem;
+                info = reviewItem.wbUserDetails;
             }
         }
     }
 
     return info;
+}
+
+/**
+ * Get user reviews by user ID
+ *
+ * @param   {String}  prefix  Prefix
+ * @param   {String}  id      User ID
+ *
+ * @return  {Array}           User reviews
+ */
+export function getUserReviews(prefix, id) {
+    const reviews = getReviews(prefix);
+
+    const results = [];
+
+    if (prefix == "wildberries") {
+        for (const reviewId in reviews) {
+            const reviewItem = reviews[reviewId];
+
+            if (reviewItem?.wbUserId && reviewItem.wbUserId == id) {
+                results.push(reviewItem);
+            }
+        }
+    }
+
+    return results;
 }
 
 /**

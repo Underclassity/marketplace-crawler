@@ -1,5 +1,14 @@
 <template lang="pug">
 .main
+    .filters
+        .filter-item
+            input(type="checkbox" id="photos" v-model="isPhotos" v-on:change="changeFilter")
+            label(for="photos") With photos
+
+        .filter-item
+            input(type="checkbox" id="favorite" v-model="isFavorite" v-on:change="changeFilter")
+            label(for="favorite") Favorites
+
     .users
         .users-item(v-for="user of users")
             .users-item--name(v-show="user.info") {{ user.info.name || "Anonymous" }} - {{ user.info.country }}

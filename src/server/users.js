@@ -1,6 +1,6 @@
 import express from "express";
 
-import { getUsers, getUser } from "../helpers/db.js";
+import { getUsers, getUser, getUserReviews } from "../helpers/db.js";
 import getAdaptersIds from "../helpers/get-adapters-ids.js";
 
 const adapters = getAdaptersIds();
@@ -55,14 +55,27 @@ usersRouter.get("/:adapter", (req, res) => {
     let users = getUsers(adapter);
     const count = Object.keys(users).length;
 
-    // Cut items
-    users = Object.keys(users)
+    users = Object.keys(users).filter((userId) => {
+        if (!("photos" in req.query)) {
+            return true;
+        }
+
+        let userReviews = getUserReviews(adapter, userId);
+
+        userReviews = isPhotos
+            ? userReviews.filter((item) => item?.photos?.length)
+            : userReviews.filter((item) => !item?.photos?.length);
+
+        return userReviews.length;
+    });
+
+    users = users
         .slice((page - 1) * limit, (page - 1) * limit + limit)
         .map((userId) => {
             return {
                 id: userId,
                 reviews: users[userId].length,
-                info: getUser(adapter, userId)?.wbUserDetails,
+                info: getUser(adapter, userId),
             };
         });
 

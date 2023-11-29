@@ -28,6 +28,11 @@ export default {
     },
 
     methods: {
+        changeFilter() {
+            this.page = 1;
+            this.changeRoute();
+        },
+
         changeRoute() {
             console.log("Change route call");
 

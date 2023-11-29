@@ -69,14 +69,12 @@ export default {
 
             const image = this.$refs[file][0];
 
-            console.log(image);
-
             const predictions = await this.$store.dispatch(
                 "analyzeImage",
                 image
             );
 
-            console.log(`${adapter}-${itemId}-${file}: ${predictions}`);
+            console.log(`${adapter}-${itemId}-${file}: `, predictions);
         },
     },
 

@@ -490,6 +490,14 @@
                 "true"
             ]
         },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Wildberries Log",
+            "skipFiles": ["<node_internals>/**"],
+            "program": "${workspaceFolder}\\log.js",
+            "args": ["--include", "wildberries"]
+        },
 
         // Wiggle
         {

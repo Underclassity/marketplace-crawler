@@ -2,6 +2,12 @@ import { createStore } from "vuex";
 
 import axios from "axios";
 
+import "@tensorflow/tfjs-backend-cpu";
+import "@tensorflow/tfjs-backend-webgl";
+
+// import * as mobilenet from "@tensorflow-models/mobilenet";
+import * as cocoSSD from "@tensorflow-models/coco-ssd";
+
 /**
  * Get queue status
  *
@@ -306,15 +312,34 @@ export default createStore({
         },
 
         async loadModel(context) {
-            const model = await window.mobilenet.load({
-                version: 2,
-                alpha: 1.0,
-                // modelUrl: "/models/ssd_mobilenet_v2/model.json",
-            });
+            if (context.state.model) {
+                return false;
+            }
+
+            console.debug("[Store]", "Start model load");
+
+            const startTime = Date.now();
+
+            // const model = await mobilenet.load({
+            //     version: 2,
+            //     alpha: 1.0,
+            //     // modelUrl: "/models/ssd_mobilenet_v2/model.json",
+            // });
+
+            const model = Object.freeze(await cocoSSD.load());
 
             context.state.model = model;
 
-            console.log("Model loaded");
+            const endTime = Date.now();
+
+            console.debug(
+                "[Store]",
+                "Model loaded",
+                Math.round(endTime - startTime),
+                "sec"
+            );
+
+            return true;
         },
 
         async analyzeImage(context, image) {
@@ -323,7 +348,8 @@ export default createStore({
                 return false;
             }
 
-            return await context.state.model.classify(image);
+            // return await context.state.model.classify(image);
+            return await context.state.model.detect(image);
         },
     },
     modules: {},
