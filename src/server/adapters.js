@@ -284,6 +284,53 @@ adapterRouter.get("/:adapter", (req, res) => {
     return res.json({ items, count: allItemsIDs.length, error: false });
 });
 
+adapterRouter.get("/:adapter/files", (req, res) => {
+    const { adapter } = req.params;
+
+    const dbFilesPrefix = `${adapter}-files`;
+    const dbPredictionsPrefix = `${adapter}-predictions`;
+    const dbProductsPrefix = `${adapter}-products`;
+
+    const dbFiles = loadDB(dbFilesPrefix);
+    const dbPredictions = loadDB(dbPredictionsPrefix);
+    const dbProducts = loadDB(dbProductsPrefix);
+
+    const files = {};
+
+    for (const itemId in dbFiles.data) {
+        if (!(itemId in dbFiles.data)) {
+            continue;
+        }
+
+        if (dbProducts.data[itemId]?.deleted) {
+            continue;
+        }
+
+        let itemFiles = dbFiles.data[itemId];
+
+        if (!Array.isArray(itemFiles) || !itemFiles?.length) {
+            continue;
+        }
+
+        itemFiles = itemFiles.filter((item) => !item.includes(".mp4"));
+
+        for (const filename of itemFiles) {
+            if (
+                !dbPredictions.data[itemId] ||
+                !(filename in dbPredictions.data[itemId])
+            ) {
+                if (!(itemId in files)) {
+                    files[itemId] = [];
+                }
+
+                files[itemId].push(filename);
+            }
+        }
+    }
+
+    return res.json({ files });
+});
+
 adapterRouter.get("/:adapter/:itemId", (req, res) => {
     const { adapter, itemId } = req.params;
 

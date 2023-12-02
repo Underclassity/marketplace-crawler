@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { LowSync } from "lowdb";
+import { LowSync, MemorySync } from "lowdb";
 import { JSONFileSync } from "lowdb/node";
 
 import is from "is_js";
@@ -24,6 +24,8 @@ const dbCache = {};
  * @return  {Object}            DB instance
  */
 export function loadDB(dbPrefix) {
+    const dbMemoryPrefix = `${dbPrefix}-memory`;
+
     if (!dbPrefix || !dbPrefix.length) {
         logMsg("DB prefix not defined!");
         return false;
@@ -42,6 +44,13 @@ export function loadDB(dbPrefix) {
             db.data = {};
             db.write();
         }
+
+        // Create memory DB instance
+        const memoryDB = new LowSync(new MemorySync());
+        memoryDB.data = db.data;
+        memoryDB.write();
+
+        dbCache[dbMemoryPrefix] = memoryDB;
     }
 
     // dbCache[dbPrefix].read();
@@ -1282,6 +1291,68 @@ export function getPredictions(prefix) {
     }
 
     return allPredictions;
+}
+
+/**
+ * Get predictions for filename by adapter and item ID
+ *
+ * @param   {String}  prefix    Prefix
+ * @param   {String}  itemId    Item ID
+ * @param   {String}  filename  Filename
+ *
+ * @return  {Array}             Predictions
+ */
+export function getPredictionsForFile(prefix, itemId, filename) {
+    if (!prefix || !prefix.length) {
+        logMsg("Prefix not defined!");
+        return false;
+    }
+
+    const dbPrefix = `${prefix}-predictions`;
+
+    loadDB(dbPrefix);
+
+    const db = dbCache[dbPrefix];
+
+    if (!(itemId in db.data)) {
+        logMsg("Predictions for item not found!", itemId, prefix);
+        return false;
+    }
+
+    if (!(filename in db.data[itemId])) {
+        logMsg(`Predictions for file ${filename} not found!`, itemId, prefix);
+        return false;
+    }
+
+    return db.data[itemId][filename];
+}
+
+/**
+ * Get all predictions for item by item ID
+ *
+ * @param   {String}  prefix  Prefix
+ * @param   {String}  itemId  Item ID
+ *
+ * @return  {Object}          Predictions object
+ */
+export function getPredictionsForItem(prefix, itemId) {
+    if (!prefix || !prefix.length) {
+        logMsg("Prefix not defined!");
+        return false;
+    }
+
+    const dbPrefix = `${prefix}-predictions`;
+
+    loadDB(dbPrefix);
+
+    const db = dbCache[dbPrefix];
+
+    if (!(itemId in db.data)) {
+        logMsg("Predictions for item not found!", itemId, prefix);
+        return false;
+    }
+
+    return db.data[itemId];
 }
 
 /**

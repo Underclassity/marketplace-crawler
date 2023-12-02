@@ -32,6 +32,7 @@ import adapterRouter from "./adapters.js";
 import favoriteRouter from "./favorite.js";
 import queueRouter from "./queue.js";
 import usersRouter from "./users.js";
+import predictionsRouter from "./predictions.js";
 
 const sizeDb = new LowSync(new MemorySync(), {});
 
@@ -57,6 +58,7 @@ app.use("/queue", queueRouter);
 app.use("/adapters", adapterRouter);
 app.use("/favorite", favoriteRouter);
 app.use("/users", usersRouter);
+app.use("/predictions", predictionsRouter);
 app.use(morgan("combined"));
 
 const adapters = getAdaptersIds();

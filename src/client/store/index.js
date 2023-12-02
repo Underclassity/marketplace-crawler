@@ -265,7 +265,11 @@ export default createStore({
 
         model: undefined,
     },
-    getters: {},
+    getters: {
+        isModel(state) {
+            return state.model != undefined;
+        },
+    },
     mutations: {},
     actions: {
         async getQueueStatus(context) {
