@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import cheerio from "cheerio";
+
 import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import AdblockerPlugin from "puppeteer-extra-plugin-adblocker";
@@ -10,22 +12,26 @@ import { logQueue } from "../helpers/log-msg.js";
 import {
     addItem,
     addReview,
+    dbWrite,
     getItem,
     getItems,
     getReview,
     getTags,
+    isDBWriting,
     updateTags,
     updateTime,
 } from "../helpers/db.js";
 import autoScroll from "../helpers/auto-scroll.js";
 import createPage from "../helpers/create-page.js";
 import downloadItem from "../helpers/image-process.js";
+import getHeaders from "../helpers/get-headers.js";
 import goSettings from "../helpers/go-settings.js";
 import logMsg from "../helpers/log-msg.js";
 import sleep from "../helpers/sleep.js";
 
 import options from "../options.js";
 import priorities from "../helpers/priorities.js";
+import axios from "axios";
 
 const prefix = "ozon";
 
@@ -53,7 +59,7 @@ function log(msg, itemId = false) {
 /**
  * Download helper
  *
- * @param   {String}  itemid   Item ID
+ * @param   {String}  itemId   Item ID
  * @param   {Object}  queue    Queue instance
  * @param   {String}  url      URL to download
  * @param   {String}  type     Download item type
@@ -61,7 +67,7 @@ function log(msg, itemId = false) {
  *
  * @return  {Boolean}          Result
  */
-async function download(itemid, queue, url, type = "photo", uuid) {
+async function download(itemId, queue, url, type = "photo", uuid) {
     if (url.includes(".m3u8")) {
         type = "video";
     }
@@ -70,7 +76,7 @@ async function download(itemid, queue, url, type = "photo", uuid) {
         options.directory,
         "download",
         "ozon",
-        itemid.toString()
+        itemId.toString()
     );
 
     if (!fs.existsSync(dirPath)) {
@@ -83,6 +89,126 @@ async function download(itemid, queue, url, type = "photo", uuid) {
     downloadItem(url, itemPath, queue, type == "video");
 
     return false;
+}
+
+/**
+ * Get ozon item by link with XHR
+ *
+ * @param   {String}  link    Item link
+ * @param   {String}  itemId  Item ID
+ * @param   {Object}  queue   Queue instance
+ *
+ * @return  {Boolean}         Result
+ */
+export async function getOzonItemByXHR(link, itemId, queue) {
+    log("Try to get reviews with XHR", itemId);
+
+    if (!link) {
+        const dbItem = getItem(prefix, itemId);
+
+        if (dbItem?.link) {
+            link = dbItem.link;
+            log("Link found in DB", itemId);
+        } else {
+            log(`${itemId} not found in db`);
+            return false;
+        }
+    }
+
+    const maxPage = options.pages;
+
+    let getInfo = false;
+
+    for (let page = 1; page <= maxPage; page++) {
+        try {
+            const reviewsPageRequest = await axios(
+                `${link}/reviews/?reviewsVariantMode=2&page=${page}`,
+                {
+                    method: "GET",
+                    headers: getHeaders(),
+                    responseType: "document",
+                }
+            );
+
+            getInfo = true;
+
+            const $ = cheerio.load(reviewsPageRequest.data);
+
+            const reviewsLength = $("[data-review-uuid]").length;
+
+            if (!reviewsLength) {
+                log(`Reviews not found on page ${page}`, itemId);
+                page = maxPage + 1;
+                continue;
+            }
+
+            log(
+                `Found reviews on page ${page}: ${reviewsLength} items`,
+                itemId
+            );
+
+            $("[data-state]").each((index, element) => {
+                const reviewsData = JSON.parse($(element).attr("data-state"));
+
+                if (!reviewsData.reviews) {
+                    return false;
+                }
+
+                for (const reviewItem of reviewsData.reviews) {
+                    addReview(
+                        prefix,
+                        itemId,
+                        reviewItem.uuid,
+                        reviewItem,
+                        false
+                    );
+
+                    if (reviewItem.content.photos.length) {
+                        for (const photoItem of reviewItem.content.photos) {
+                            download(
+                                reviewItem.itemId,
+                                queue,
+                                photoItem.url,
+                                "photo",
+                                photoItem.uuid || photoItem.UUID
+                            );
+                        }
+                    }
+
+                    if (reviewItem.content.videos.length) {
+                        for (const videoItem of reviewItem.content.videos) {
+                            download(
+                                reviewItem.itemId,
+                                queue,
+                                videoItem.url,
+                                "video",
+                                videoItem.uuid || videoItem.UUID
+                            );
+                        }
+                    }
+                }
+            });
+        } catch (error) {
+            log(`Get reviews page ${page} error: ${error.message}`, itemId);
+
+            page = maxPage + 1;
+        }
+    }
+
+    if (getInfo) {
+        // Write all reviews changes
+        while (!isDBWriting(`${prefix}-reviews`)) {
+            dbWrite(`${prefix}-reviews`, true, prefix);
+            await sleep(10);
+        }
+
+        // Update item time
+        updateTime(prefix, itemId);
+    } else {
+        log(`No info get`, itemId);
+    }
+
+    return true;
 }
 
 /**
@@ -388,11 +514,6 @@ export async function updateItemById(itemId, queue, browser) {
  * @return  {Boolean}        Result
  */
 export async function updateItems(queue) {
-    const browser = await puppeteer.launch({
-        headless: options.headless,
-        devtools: options.headless ? false : true,
-    });
-
     const items = getItems(prefix);
 
     log(`Update ${items.length} items`);
@@ -404,7 +525,7 @@ export async function updateItems(queue) {
             return false;
         }
 
-        queue.add(() => getOzonItem(item.link, itemId, queue, browser), {
+        queue.add(() => getOzonItemByXHR(item.link, itemId, queue), {
             priority: priorities.item,
         });
     });
@@ -441,7 +562,7 @@ export async function updateReviews(queue) {
                         queue,
                         photoItem.url,
                         "photo",
-                        photoItem.uuid
+                        photoItem.uuid || photoItem.UUID
                     );
                 }
             }
@@ -453,7 +574,7 @@ export async function updateReviews(queue) {
                         queue,
                         videoItem.url,
                         "video",
-                        videoItem.uuid
+                        videoItem.uuid || videoItem.UUID
                     );
                 }
             }

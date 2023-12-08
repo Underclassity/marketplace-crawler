@@ -17,6 +17,27 @@ const writeCache = {};
 const dbCache = {};
 
 /**
+ * Check is DB writing
+ *
+ * @return  {Boolean}  DB write flag
+ */
+export function isDBWriting(dbPrefix = false) {
+    let isWriting = false;
+
+    for (const id in writeCache) {
+        if (dbPrefix && id != dbPrefix) {
+            continue;
+        }
+
+        if (writeCache[id]) {
+            isWriting = true;
+        }
+    }
+
+    return isWriting;
+}
+
+/**
  * Load DB by prefix
  *
  * @param   {String}  dbPrefix  DB prefix
@@ -72,7 +93,7 @@ export function dbWrite(
     dbPrefix,
     write = true,
     prefix = false,
-    waitTimeout = false
+    waitTimeout = true
 ) {
     if (!dbPrefix || !dbPrefix.length) {
         logMsg("DB prefix not defined!");

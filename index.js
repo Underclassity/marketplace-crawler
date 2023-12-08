@@ -9,6 +9,7 @@ import AdblockerPlugin from "puppeteer-extra-plugin-adblocker";
 
 import options from "./src/options.js";
 
+import { isDBWriting } from "./src/helpers/db.js";
 import { logQueue, logMsg } from "./src/helpers/log-msg.js";
 import createQueue from "./src/helpers/create-queue.js";
 import getAdaptersIds from "./src/helpers/get-adapters-ids.js";
@@ -159,7 +160,7 @@ puppeteer.use(StealthPlugin());
             }
         }
 
-        while (queue.size || queue.pending) {
+        while (queue.size || queue.pending || isDBWriting()) {
             await sleep(1000);
             logQueue(queue);
         }
@@ -184,7 +185,7 @@ puppeteer.use(StealthPlugin());
             }
         }
 
-        while (queue.size || queue.pending) {
+        while (queue.size || queue.pending || isDBWriting()) {
             await sleep(1000);
             logQueue(queue);
         }
@@ -209,7 +210,7 @@ puppeteer.use(StealthPlugin());
             }
         }
 
-        while (queue.size || queue.pending) {
+        while (queue.size || queue.pending || isDBWriting()) {
             await sleep(1000);
             logQueue(queue);
         }
@@ -234,7 +235,7 @@ puppeteer.use(StealthPlugin());
             }
         }
 
-        while (queue.size || queue.pending) {
+        while (queue.size || queue.pending || isDBWriting()) {
             await sleep(1000);
             logQueue(queue);
         }
@@ -259,7 +260,7 @@ puppeteer.use(StealthPlugin());
             }
         }
 
-        while (queue.size || queue.pending) {
+        while (queue.size || queue.pending || isDBWriting()) {
             await sleep(1000);
             logQueue(queue);
         }
@@ -280,7 +281,7 @@ puppeteer.use(StealthPlugin());
 
         logQueue(queue);
 
-        while (queue.size || queue.pending) {
+        while (queue.size || queue.pending || isDBWriting()) {
             await sleep(1000);
             logQueue(queue);
         }
@@ -304,7 +305,7 @@ puppeteer.use(StealthPlugin());
         }
     }
 
-    while (queue.size || queue.pending) {
+    while (queue.size || queue.pending || isDBWriting()) {
         await sleep(1000);
         logQueue(queue);
     }
