@@ -8,6 +8,7 @@ import {
     addReview,
     dbWrite,
     getBrands,
+    getFiles,
     getItem,
     getItems,
     getReview,
@@ -39,6 +40,106 @@ function log(msg, itemId = false) {
     return logMsg(msg, itemId, prefix);
 }
 
+const FEEDBACK_PHOTO_SHARD_RANGE = [431, 863, 1199, 1535];
+
+/**
+ * Get host id by volume ID and range
+ *
+ * @param   {Number}  vol_id  Volume ID
+ * @param   {Number}  range   Range number
+ *
+ * @return  {Number}          Host ID number
+ */
+export function getHostId(vol_id, range) {
+    for (let i = 0; i < range.length; i++) {
+        if (vol_id <= range[i]) {
+            return i + 1;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Get feedback image URL by photoId
+ *
+ * @param   {Number}  photoId   Photo ID
+ *
+ * @return  {String}            Photo URL
+ */
+export function feedBackPhotoPath(photoId) {
+    const vol_id = Math.floor(photoId / 100_000);
+    const host = getHostId(vol_id, FEEDBACK_PHOTO_SHARD_RANGE);
+    const part_id = Math.floor(photoId / 1000);
+    return `https://feedback${
+        host && host >= 10 ? host : `0${host}`
+    }.wb.ru/vol${vol_id}/part${part_id}/${photoId}/photos/fs.webp`;
+}
+
+/**
+ * Get photos from feedback by `photos` property
+ *
+ * @param   {Object}  feedback    Feedback object
+ * @param   {String}  folderPath  Item folder path
+ *
+ * @return  {Array}               Photos array
+ */
+export function getFeedbackPhotosByPhotos(feedback, folderPath) {
+    if (!Array.isArray(feedback.photos)) {
+        return [];
+    }
+
+    const result = [];
+
+    feedback.photos.map((item, index) => {
+        const name = path.parse(item.fullSizeUri).name;
+        const filename = path.parse(item.fullSizeUri).base;
+        const webpFilename = `${name}.webp`;
+        const filepath = path.resolve(folderPath, filename);
+        const webpFilepath = path.resolve(folderPath, webpFilename);
+
+        result.push({
+            url: `https://feedbackphotos.wbstatic.net/${item.fullSizeUri}`,
+            filename,
+            filepath,
+            webpFilename,
+            webpFilepath,
+            index,
+        });
+    });
+
+    return result;
+}
+
+/**
+ * Get photos from feedback by `photo` property
+ *
+ * @param   {Object}  feedback    Feedback object
+ * @param   {String}  folderPath  Item folder path
+ *
+ * @return  {Array}               Photos array
+ */
+export function getFeedbackPhotosByPhoto(feedback, folderPath) {
+    if (!Array.isArray(feedback.photo)) {
+        return [];
+    }
+
+    const result = [];
+
+    feedback.photo.map((photoId) => {
+        const filename = `${photoId}.webp`;
+        const filepath = path.resolve(folderPath, filename);
+
+        result.push({
+            url: feedBackPhotoPath(photoId),
+            filename,
+            filepath,
+        });
+    });
+
+    return result;
+}
+
 /**
  * Get feedback by ID
  *
@@ -65,15 +166,9 @@ export async function getFeedback(itemId, feedback, queue) {
         return true;
     }
 
-    if (!feedback?.photos?.length) {
+    if (!feedback?.photos?.length && !feedback?.photo?.length) {
         return true;
     }
-
-    const photos = feedback.photos.map(
-        (item) => `https://feedbackphotos.wbstatic.net/${item.fullSizeUri}`
-    );
-
-    log(`Try to download ${photos.length} photos`, itemId);
 
     const itemFolderPath = path.resolve(
         path.resolve(options.directory, "./download", "wildberries"),
@@ -84,11 +179,40 @@ export async function getFeedback(itemId, feedback, queue) {
         fs.mkdirSync(itemFolderPath, { recursive: true });
     }
 
-    for (const photo of photos) {
-        const filename = path.parse(photo).base;
-        const filepath = path.resolve(itemFolderPath, filename);
+    let photos = [];
 
-        downloadItem(photo, filepath, queue);
+    // If two params exists - download photos for extra quality
+    // if (feedback.photos && feedback.photo) {
+    //     photos.push(...getFeedbackPhotosByPhotos(feedback, itemFolderPath));
+    // } else {
+    //     photos.push(...getFeedbackPhotosByPhotos(feedback, itemFolderPath));
+    //     photos.push(...getFeedbackPhotosByPhoto(feedback, itemFolderPath));
+    // }
+
+    photos.push(...getFeedbackPhotosByPhoto(feedback, itemFolderPath));
+
+    photos = photos.filter(({ filename, webpFilename }) => {
+        const dbFiles = getFiles(prefix, itemId);
+
+        if (!dbFiles) {
+            return true;
+        }
+
+        if (dbFiles.includes(filename) || dbFiles.includes(webpFilename)) {
+            return false;
+        }
+
+        return true;
+    });
+
+    if (photos.length) {
+        log(`Get ${photos.length} photos for review ${feedback.id}`, itemId);
+
+        for (const { url, filepath } of photos) {
+            downloadItem(url, filepath, queue);
+        }
+    } else {
+        log(`No photos for download for review ${feedback.id}`, itemId);
     }
 
     return true;
@@ -349,9 +473,36 @@ export async function getFeedbackByXhr(itemId) {
 
     log("Get all reviews by XHR", itemId);
 
+    function toUintArray(input) {
+        const result = new Uint8Array(8);
+        for (let n = 0; n < 8; n++) {
+            result[n] = input % 256;
+            input = Math.floor(input / 256);
+        }
+        return result;
+    }
+
+    function crc16(input) {
+        const t = toUintArray(input);
+        let result = 0;
+        for (const element of t) {
+            result ^= element;
+            for (let r = 0; r < 8; r++) {
+                if ((1 & result) > 0) {
+                    result = (result >> 1) ^ 40_961;
+                } else {
+                    result >>= 1;
+                }
+            }
+        }
+        return result;
+    }
+
+    const checksum = crc16(+(itemId || 0)) % 100 >= 50 ? "2" : "1";
+
     try {
         const request = await axios(
-            `https://feedbacks2.wb.ru/feedbacks/v1/${itemId}`,
+            `https://feedbacks${checksum}.wb.ru/feedbacks/v1/${itemId}`,
             {
                 headers: getHeaders(),
                 timeout: options.timeout,
@@ -621,6 +772,97 @@ export async function itemsRequest(page = 1, query = options.query) {
     return false;
 }
 
+let categoriesData = null;
+
+/**
+ * Get items from page by query
+ *
+ * @param   {Number}  page          Page number
+ * @param   {String}  categoryId    Query
+ *
+ * @return  {Object}                Result
+ */
+export async function categoryRequest(page = 1, categoryId = options.category) {
+    log(`Page ${page} items get`);
+
+    if (!categoriesData) {
+        try {
+            log("Try to get categories");
+
+            const categoriesRequest = await axios(
+                "https://catalog.wb.ru/menu/v10/api?lang=ru&locale=by&location=by",
+                {
+                    method: "GET",
+                    headers: getHeaders(),
+                    timeout: options.timeout,
+                }
+            );
+
+            categoriesData = categoriesRequest.data.data;
+        } catch (error) {
+            log(`Get categories error: ${error.message}`);
+        }
+    }
+
+    if (!categoriesData) {
+        log("Categories not found, no request for data");
+
+        return false;
+    }
+
+    function categoriesReducer(prev, curr) {
+        if (Array.isArray(curr.nodes)) {
+            prev.push(...curr.nodes.reduce(categoriesReducer, []));
+        } else {
+            prev.push(curr);
+        }
+
+        return prev;
+    }
+
+    const categories = categoriesData.reduce(categoriesReducer, []);
+
+    const category = categories.find((item) => item.id == categoryId);
+
+    try {
+        const getItemsRequest = await axios(
+            `https://catalog.wb.ru/catalog/${category.shardKey}/v1/catalog`,
+            {
+                params: {
+                    cat: categoryId,
+                    limit: 100,
+                    sort: "popular",
+                    page,
+                    appType: 12,
+                    curr: "byn",
+                    locale: "by",
+                    lang: "ru",
+                    dest: -59_208,
+                    regions: [
+                        1, 4, 22, 30, 31, 33, 40, 48, 66, 68, 69, 70, 80, 83,
+                        114, 115,
+                    ],
+                    emp: 0,
+                    reg: 1,
+                    pricemarginCoeff: "1.0",
+                    offlineBonus: 0,
+                    onlineBonus: 0,
+                    spp: 0,
+                },
+
+                headers: getHeaders(),
+                timeout: options.timeout,
+            }
+        );
+
+        return getItemsRequest.data;
+    } catch (error) {
+        log(`Error: ${error.message}`);
+    }
+
+    return false;
+}
+
 /**
  * Get items for brand
  *
@@ -761,6 +1003,90 @@ export async function updateBrands(queue) {
 }
 
 /**
+ * Update items by category ID
+ *
+ * @param   {String}  categoryId  Category ID
+ * @param   {Object}  queue       Queue instance
+ *
+ * @return  {Boolean}             Result
+ */
+export async function updateItemsByCategory(categoryId, queue) {
+    log(`Update items by category: ${categoryId}`);
+
+    const items = [];
+    let count = 0;
+
+    for (let page = 1; page <= options.pages; page++) {
+        const getItemsData = await queue.add(
+            () => categoryRequest(page, categoryId),
+            {
+                priority: priorities.page,
+            }
+        );
+
+        if (!getItemsData || !getItemsData.data) {
+            log(`No items left`);
+            page = options.pages;
+            continue;
+        }
+
+        if (!getItemsData.data.products.length) {
+            log(`No items left`);
+            page = options.pages;
+            continue;
+        }
+
+        log(
+            `Page ${page} found ${getItemsData.data.products.length} items before filter`
+        );
+
+        count += getItemsData.data.products.length;
+
+        addInfoToProducts(getItemsData.data.products);
+
+        dbWrite(`${prefix}-products`, true, prefix);
+
+        const results = getItemsData.data.products
+            .map((item) => item.root)
+            .filter((item, index, array) => array.indexOf(item) === index)
+            .map((item) => (item = parseInt(item, 10)))
+            .filter((item) => {
+                const dbReviewItem = getItem(prefix, item);
+                const time = options.time * 60 * 60 * 1000;
+
+                if (
+                    dbReviewItem?.time &&
+                    Date.now() - dbReviewItem.time <= time &&
+                    !options.force
+                ) {
+                    return false;
+                }
+
+                if (dbReviewItem?.deleted) {
+                    return false;
+                }
+
+                return true;
+            })
+            .sort((a, b) => a - b);
+
+        log(`Page ${page} found ${results.length} items`);
+
+        items.push(...results);
+    }
+
+    log(`Found ${items.length}(${count}) items on all pages`);
+
+    for (const itemId of items) {
+        queue.add(() => getFeedbacks(itemId, false, queue), {
+            priority: priorities.item,
+        });
+    }
+
+    return true;
+}
+
+/**
  * Update items with tags
  *
  * @param   {Object}  queue  Queue instance
@@ -835,33 +1161,10 @@ export async function updateReviews(queue) {
         for (const reviewId of item.reviews) {
             const feedback = getReview(prefix, itemId, reviewId);
 
-            if (!feedback?.photos?.length) {
-                // log("No photos found!", itemId);
-                continue;
-            }
-
-            const photos = feedback.photos.map(
-                (item) =>
-                    `https://feedbackphotos.wbstatic.net/${item.fullSizeUri}`
-            );
-
-            log(`Get ${photos.length} photos for review ${reviewId}`, itemId);
-
-            const itemFolderPath = path.resolve(
-                path.resolve(options.directory, "./download", "wildberries"),
-                itemId.toString()
-            );
-
-            if (!fs.existsSync(itemFolderPath)) {
-                fs.mkdirSync(itemFolderPath, { recursive: true });
-            }
-
-            for (const photo of photos) {
-                const filename = path.parse(photo).base;
-                const filepath = path.resolve(itemFolderPath, filename);
-
-                downloadItem(photo, filepath, queue);
-            }
+            getFeedback(itemId, feedback, queue);
+            // queue.add(async () => getFeedback(itemId, feedback, queue), {
+            //     priority: priorities.review,
+            // });
         }
     }
 

@@ -364,9 +364,11 @@ export async function downloadFile(url, filepath, queue, itemId, prefix) {
     );
 
     // wait for file
-    while (result && !fs.existsSync(filepath)) {
-        logMsg(`Wait for file ${filename}`, itemId, prefix);
-        await sleep(1000);
+    if (result && !fs.existsSync(filepath)) {
+        while (result && !fs.existsSync(filepath)) {
+            logMsg(`Wait for file ${filename}`, itemId, prefix);
+            await sleep(1000);
+        }
     }
 
     return result;
@@ -437,6 +439,52 @@ export async function downloadVideo(url, filepath, queue, itemId, prefix) {
     }
 
     return commandResult.result;
+}
+
+/**
+ * Check if file exists on remote server and return size
+ *
+ * @param   {String}  url    URL
+ * @param   {Object}  queue  Queue instance
+ *
+ * @return  {Object}         Result object
+ */
+export async function isExist(url, queue) {
+    let result;
+
+    await queue.add(
+        async () => {
+            try {
+                const headRequest = await axios(url, {
+                    method: "head",
+                    timeout: 5000,
+                    headers: getHeaders(),
+                });
+                const { headers } = headRequest;
+
+                const contentLength = parseInt(headers["content-length"]);
+
+                result = {
+                    size: contentLength,
+                    exists: true,
+                    error: false,
+                };
+            } catch (error) {
+                result = {
+                    size: false,
+                    exists: false,
+                    error,
+                };
+            }
+        },
+        { priority: priorities.checkSize }
+    );
+
+    while (!result) {
+        await sleep(10);
+    }
+
+    return result;
 }
 
 /**
@@ -594,14 +642,21 @@ export async function downloadItem(url, filepath, queue, isVideo = false) {
         return true;
     }
 
-    const isSizeEqual = await checkSize(
-        url,
-        filepath,
-        queue,
-        id,
-        prefix,
-        isVideo
-    );
+    const { exists, size } = await isExist(url, queue);
+
+    const isSizeEqual =
+        fs.existsSync(filepath) && size && size == fs.statSync(filepath).size
+            ? true
+            : false;
+
+    // const isSizeEqual = await checkSize(
+    //     url,
+    //     filepath,
+    //     queue,
+    //     id,
+    //     prefix,
+    //     isVideo
+    // );
 
     if (!fs.existsSync(tempDirPath)) {
         fs.mkdirSync(tempDirPath);
@@ -610,7 +665,7 @@ export async function downloadItem(url, filepath, queue, isVideo = false) {
     const tempFilepath = path.resolve(tempDirPath, path.basename(filepath));
     let isDownloaded = false;
 
-    if (isSizeEqual) {
+    if (isSizeEqual || !exists) {
         isDownloaded = true;
     } else {
         downloadCache[url] = true;

@@ -258,6 +258,25 @@
                 "--include",
                 "ozon",
                 "--update",
+                "true",
+                "--throat",
+                "3"
+            ]
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Ozon Info",
+            "skipFiles": ["<node_internals>/**"],
+            "program": "${workspaceFolder}\\index.js",
+            "args": [
+                "--thumbnail",
+                "false",
+                "--time",
+                "24",
+                "--include",
+                "ozon",
+                "--info",
                 "true"
             ]
         },

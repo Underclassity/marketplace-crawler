@@ -18,6 +18,7 @@ import {
     getReview,
     getTags,
     isDBWriting,
+    updateItem,
     updateTags,
     updateTime,
 } from "../helpers/db.js";
@@ -89,6 +90,105 @@ async function download(itemId, queue, url, type = "photo", uuid) {
     downloadItem(url, itemPath, queue, type == "video");
 
     return false;
+}
+
+/**
+ * Get ozon item info with XHR
+ *
+ * @param   {String}  link    Item link
+ * @param   {String}  itemId  Item ID
+ * @param   {Object}  queue   Queue instance
+ *
+ * @return  {Object}          Result
+ */
+export async function getOzonItemInfo(link, itemId, queue) {
+    if (!link || !itemId) {
+        return false;
+    }
+
+    await queue.add(
+        async () => {
+            try {
+                log("Try to get info params with XHR", itemId);
+
+                const request = await axios(`${link}/?oos_search=false`, {
+                    method: "GET",
+                    responseType: "document",
+                    timeout: options.timeout,
+                });
+
+                log("Item info params loaded", itemId);
+
+                const $ = cheerio.load(request.data);
+
+                const cache = { info: {} };
+
+                $("[data-state]").each((index, element) => {
+                    const dataText = $(element).attr("data-state");
+                    const id = $(element).attr("id");
+
+                    const data = JSON.parse(dataText);
+
+                    if (id.includes("webBrand")) {
+                        const { id, name, link } = data;
+                        cache.info.brand = {
+                            id,
+                            name,
+                            link,
+                        };
+                    }
+
+                    if (id.includes("webReviewProductScore")) {
+                        const { score, reviewsCount, itemId, totalScore, url } =
+                            data;
+                        cache.info.reviews = {
+                            score,
+                            reviewsCount,
+                            itemId,
+                            totalScore,
+                            url,
+                        };
+                    }
+
+                    if (id.includes("webDetailSKU")) {
+                        const { sku } = data;
+                        cache.info.sku = sku;
+                    }
+
+                    if (id.includes("webCollections")) {
+                        let { tiles } = data;
+                        tiles = tiles.map((item) => item.sku);
+                        cache.info.tiles = tiles;
+                    }
+
+                    if (id.includes("webCharacteristics")) {
+                        const { characteristics } = data;
+                        cache.info.characteristics = characteristics;
+                    }
+                });
+
+                if (Object.keys(cache.info).length) {
+                    log(
+                        `Found ${Object.keys(cache.info).length} info params`,
+                        itemId
+                    );
+                } else {
+                    log("Info params not found", itemId);
+                }
+
+                updateItem(prefix, itemId, cache, true);
+
+                return true;
+            } catch (error) {
+                log(`Get info params with xhr error: ${error.message}`, itemId);
+
+                return false;
+            }
+        },
+        { priority: priorities.item }
+    );
+
+    return true;
 }
 
 /**
@@ -504,6 +604,31 @@ export async function updateItemById(itemId, queue, browser) {
             priority: priorities.item,
         }
     );
+}
+
+/**
+ * Update info for all items
+ *
+ * @param   {Object}  queue  Queue instance
+ *
+ * @return  {Boolean}        Result
+ */
+export async function updateInfo(queue) {
+    const items = getItems(prefix);
+
+    log(`Update info for ${items.length} items`);
+
+    items.forEach((itemId) => {
+        const item = getItem(prefix, itemId);
+
+        if (!item || (item?.info && !options.force)) {
+            return false;
+        }
+
+        getOzonItemInfo(item.link, itemId, queue);
+    });
+
+    return true;
 }
 
 /**

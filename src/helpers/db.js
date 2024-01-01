@@ -9,6 +9,8 @@ import is from "is_js";
 import logMsg from "./log-msg.js";
 import { getFiles as getFilesFromFolder } from "./get-files.js";
 
+import deepEqual from "./deep-equal.js";
+
 import options from "../options.js";
 
 const dbPath = path.resolve(options.directory, "db");
@@ -129,27 +131,33 @@ export function dbWrite(
             writeCache[dbPrefix] = true;
         }
 
-        const startTime = Date.now();
+        setTimeout(() => {
+            const startTime = Date.now();
 
-        try {
-            db.write();
-        } catch (error) {
-            logMsg(`Write in DB ${dbPrefix} error: ${error}`, false, prefix);
-        }
+            try {
+                db.write();
+            } catch (error) {
+                logMsg(
+                    `Write in DB ${dbPrefix} error: ${error}`,
+                    false,
+                    prefix
+                );
+            }
 
-        const endTime = Date.now();
+            const endTime = Date.now();
 
-        logMsg(
-            `Write in DB ${dbPrefix}: ${endTime - startTime}ms`,
-            false,
-            prefix
-        );
+            logMsg(
+                `Write in DB ${dbPrefix}: ${endTime - startTime}ms`,
+                false,
+                prefix
+            );
+        }, 0);
 
         // Add sleep tick
         if (dbPrefix && waitTimeout) {
             setTimeout(() => {
                 writeCache[dbPrefix] = false;
-            }, 500);
+            }, 10_000);
         } else {
             writeCache[dbPrefix] = false;
         }
@@ -338,7 +346,7 @@ export function deleteItem(prefix, itemId) {
 }
 
 /**
- * Update item data`
+ * Update item data
  *
  * @param   {String}   prefix  Prefix
  * @param   {String}   itemId  Item ID
@@ -373,12 +381,12 @@ export function updateItem(prefix, itemId, data, write = true) {
         return false;
     }
 
-    dbCache[dbPrefix].data[itemId] = {
-        ...item,
-        ...data,
-    };
+    const newObject = { ...item, ...data };
 
-    dbWrite(dbPrefix, write, prefix);
+    if (!deepEqual(newObject, item)) {
+        dbCache[dbPrefix].data[itemId] = newObject;
+        dbWrite(dbPrefix, write, prefix);
+    }
 
     return true;
 }
@@ -1025,9 +1033,7 @@ export function addReview(prefix, itemId, reviewId, review, write = true) {
         isWrite = true;
 
         logMsg(`Force add/update review ${reviewId} in DB`, itemId, prefix);
-    } else if (
-        JSON.stringify(reviewsDB.data[reviewId]) == JSON.stringify(review)
-    ) {
+    } else if (deepEqual(reviewsDB.data[reviewId], review)) {
         logMsg(`Review ${reviewId} already saved in DB`, itemId, prefix);
     } else {
         reviewsDB.data[reviewId] = review;

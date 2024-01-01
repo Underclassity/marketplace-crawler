@@ -193,6 +193,31 @@ puppeteer.use(StealthPlugin());
         return true;
     }
 
+    if (options.info) {
+        logMsg("Get info for all items");
+
+        if (ids.includes("aliexpress") && options.cookies) {
+            await processCookiesAndSession();
+        }
+
+        for (const id of ids) {
+            const { updateInfo } = await import(`./src/adapters/${id}.js`);
+
+            if (updateInfo) {
+                updateInfo(queue);
+            } else {
+                logMsg("Get items by brand not found!", false, id);
+            }
+        }
+
+        while (queue.size || queue.pending || isDBWriting()) {
+            await sleep(1000);
+            logQueue(queue);
+        }
+
+        return true;
+    }
+
     if (options.brand) {
         logMsg("Get all brand items");
 
@@ -232,6 +257,29 @@ puppeteer.use(StealthPlugin());
                 updateBrands(queue);
             } else {
                 logMsg("Update with brands not found!", false, id);
+            }
+        }
+
+        while (queue.size || queue.pending || isDBWriting()) {
+            await sleep(1000);
+            logQueue(queue);
+        }
+
+        return true;
+    }
+
+    if (options.category) {
+        logMsg(`Update items by category ${options.category}`);
+
+        for (const id of ids) {
+            const { updateItemsByCategory } = await import(
+                `./src/adapters/${id}.js`
+            );
+
+            if (updateItemsByCategory) {
+                updateItemsByCategory(options.category, queue);
+            } else {
+                logMsg("Update category not found!", false, id);
             }
         }
 

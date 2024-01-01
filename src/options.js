@@ -34,6 +34,11 @@ export const options = yargs(hideBin(process.argv))
         type: "boolean",
         default: false,
     })
+    .option("category", {
+        describe: "Category ID",
+        type: "string",
+        default: false,
+    })
     .option("favorite", {
         describe: "Update only favorite items",
         type: "boolean",
@@ -141,6 +146,11 @@ export const options = yargs(hideBin(process.argv))
     })
     .option("stats", {
         describe: "Show products stats",
+        default: false,
+        type: "boolean",
+    })
+    .option("info", {
+        describe: "Update products info",
         default: false,
         type: "boolean",
     }).argv;

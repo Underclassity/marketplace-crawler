@@ -69,6 +69,8 @@ function getItemId(link) {
  * @return  {Array}           Photos URLs array
  */
 async function getPhotosURLs(itemId) {
+    log("Try to get photos", itemId);
+
     try {
         const request = await axios(
             `http://www.isdntek.com/fetch/fetchpgsource.php?cnt=1&deweb=1&delay=50&pg1=https%3A//www.ebay.com/itm/${itemId}%3Forig_cvip%3Dtrue%26nordt%3Dtrue`,
@@ -85,13 +87,13 @@ async function getPhotosURLs(itemId) {
 
         $ = load($("#pagesourcecode").text());
 
-        const imageUrls = [];
+        let imageUrls = [];
 
         $("img").each((index, image) => {
             imageUrls.push($(image).attr("src"));
         });
 
-        return imageUrls
+        imageUrls = imageUrls
             .filter((item) => item)
             .filter((imageURL) =>
                 imageURL.includes("https://i.ebayimg.com/images/g/")
@@ -107,8 +109,12 @@ async function getPhotosURLs(itemId) {
                 link: imageURL,
                 ext: imageURL.split(".").pop(),
             }));
+
+        log(`Found ${imageUrls.length} photos`, itemId);
+
+        return imageUrls;
     } catch (error) {
-        console.log(error.message);
+        log(`Photos get error: ${error.message}`, itemId);
     }
 
     return false;
