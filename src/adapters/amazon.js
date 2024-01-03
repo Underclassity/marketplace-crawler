@@ -168,7 +168,7 @@ async function downloadImages(asin, queue) {
     }
 
     if (!dbItem.reviews.length) {
-        const reviews = getReviews(prefix, { asin });
+        const reviews = await getReviews(prefix, { asin });
 
         if (reviews.length) {
             updateItem(
@@ -192,7 +192,7 @@ async function downloadImages(asin, queue) {
     log(`Process reviews`, asin);
 
     for (const reviewId of dbItem.reviews) {
-        const reviewItem = getReview(prefix, asin, reviewId);
+        const reviewItem = await getReview(prefix, asin, reviewId);
 
         if (!reviewItem) {
             continue;
@@ -409,7 +409,7 @@ export async function processItem(asin, browser, queue, query = false) {
                             title,
                         };
 
-                        addReview(prefix, asin, id, dbItem, false);
+                        await addReview(prefix, asin, id, dbItem, false);
 
                         if (photos.length) {
                             downloadImages(asin, queue);
@@ -465,7 +465,7 @@ export async function processItem(asin, browser, queue, query = false) {
     //         log(`Found ${reviews.result.length}`, product.asin);
 
     //         for (const reviewItem of reviews.result) {
-    //             addReview(
+    //             await addReview(
     //                 prefix,
     //                 product.asin,
     //                 reviewItem.id,

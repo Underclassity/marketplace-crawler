@@ -159,12 +159,12 @@ async function addReviewItem(review, itemId, queue) {
 
     const { Id } = review;
 
-    const dbReviewItem = getReview(prefix, itemId, Id);
+    const dbReviewItem = await getReview(prefix, itemId, Id);
 
     if (dbReviewItem) {
         log(`Review ${Id} already saved in DB`, itemId);
     } else {
-        addReview(prefix, itemId, Id, review, true);
+        await addReview(prefix, itemId, Id, review, true);
         log(`Add review ${Id}`, itemId);
     }
 
@@ -649,7 +649,7 @@ export async function updateReviews(queue) {
         log(`Found ${item.reviews.length} reviews`, itemId);
 
         for (const reviewId of item.reviews) {
-            const feedback = getReview(prefix, itemId, reviewId);
+            const feedback = await getReview(prefix, itemId, reviewId);
 
             await processReview(feedback, itemId, queue);
         }

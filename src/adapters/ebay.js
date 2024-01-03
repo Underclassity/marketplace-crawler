@@ -150,12 +150,12 @@ export function updateItems(queue) {
  *
  * @return  {Boolean}         Rtsult
  */
-export function updateReviews(queue) {
+export async function updateReviews(queue) {
     const items = getItems(prefix, true);
 
     log(`Update ${items.length} items reviews`);
 
-    items.forEach((itemId) => {
+    for (const itemId of items) {
         const item = getItem(prefix, itemId);
 
         if (!item || !item?.reviews?.length) {
@@ -170,7 +170,7 @@ export function updateReviews(queue) {
         );
 
         for (const reviewId of item.reviews) {
-            const photoObject = getReview(prefix, itemId, reviewId);
+            const photoObject = await getReview(prefix, itemId, reviewId);
 
             if (!photoObject?.id) {
                 continue;
@@ -185,7 +185,7 @@ export function updateReviews(queue) {
 
             downloadItem(photoURL, imagePath, queue);
         }
-    });
+    }
 
     return true;
 }
@@ -241,7 +241,7 @@ export async function getItemById(itemId, queue) {
     updateTime(prefix, itemId);
 
     for (const photoObject of photos) {
-        addReview(prefix, itemId, photoObject.id, photoObject, true);
+        await addReview(prefix, itemId, photoObject.id, photoObject, true);
 
         const photoURL = `https://i.ebayimg.com/images/g/${photoObject.id}/s-l1600.${photoObject.ext}`;
 

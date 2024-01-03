@@ -128,7 +128,7 @@ export async function getReviews(itemId, queue) {
         }
 
         for (const item of reviews) {
-            addReview(prefix, itemId, item.id, item, true);
+            await addReview(prefix, itemId, item.id, item, true);
         }
 
         log(`All reviews get for model ${model_id}`, itemId);
@@ -302,7 +302,7 @@ export async function updateReviews(queue) {
 
     log(`Update ${items.length} items reviews`);
 
-    items.forEach((itemId) => {
+    for (const itemId of items) {
         const item = getItem(prefix, itemId);
 
         if (!item || !item?.reviews?.length) {
@@ -310,13 +310,13 @@ export async function updateReviews(queue) {
         }
 
         for (const reviewId of item.reviews) {
-            const review = getReview(prefix, itemId, reviewId);
+            const review = await getReview(prefix, itemId, reviewId);
 
             if (review?.body_html?.includes("img")) {
                 console.log(review.body_html);
             }
         }
-    });
+    }
 
     while (queue.size) {
         await sleep(100);

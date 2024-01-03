@@ -157,7 +157,7 @@ export async function updateItemReviews(itemId, queue) {
                     log(`${reviews.length} reviews get`, itemId);
 
                     for (const review of reviews) {
-                        addReview(prefix, itemId, review.id, review, true);
+                        await addReview(prefix, itemId, review.id, review, true);
                     }
                 } catch (error) {
                     log(`Get item reviews error: ${error.message}`, itemId);
@@ -212,7 +212,7 @@ export async function updateReviews(queue) {
         }
 
         for (const reviewId of item.reviews) {
-            const review = getReview(prefix, itemId, reviewId);
+            const review = await getReview(prefix, itemId, reviewId);
 
             if (!review?.images?.length) {
                 continue;

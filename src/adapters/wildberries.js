@@ -160,7 +160,7 @@ export async function getFeedback(itemId, feedback, queue) {
         return false;
     }
 
-    // addReview(prefix, id, feedback.id, feedback, true);
+    // await addReview(prefix, id, feedback.id, feedback, true);
 
     if (!options.download) {
         return true;
@@ -599,7 +599,7 @@ export async function getFeedbacks(itemId, query = false, queue) {
         let isWriteCall = false;
 
         for (const feedback of feedbacks) {
-            let { isWrite } = addReview(
+            let { isWrite } = await addReview(
                 prefix,
                 itemId,
                 feedback.id,
@@ -1158,8 +1158,12 @@ export async function updateReviews(queue) {
             continue;
         }
 
+        if (item?.deleted) {
+            continue;
+        }
+
         for (const reviewId of item.reviews) {
-            const feedback = getReview(prefix, itemId, reviewId);
+            const feedback = await getReview(prefix, itemId, reviewId);
 
             getFeedback(itemId, feedback, queue);
             // queue.add(async () => getFeedback(itemId, feedback, queue), {

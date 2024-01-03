@@ -426,7 +426,7 @@ export async function scrapeItem(itemId, queue) {
         log(`Reviews length ${reviews.length}`, itemId);
 
         for (const reviewItem of reviews) {
-            addReview(
+            await addReview(
                 prefix,
                 itemId,
                 reviewItem.evaluationId || reviewItem.id,
@@ -499,7 +499,7 @@ export async function scrapeItemByBrowser(itemId, browser, startPage, queue) {
 
     //         if (data?.reviews?.length) {
     //             for (const reviewItem of data.reviews) {
-    //                 addReview(
+    //                 await addReview(
     //                     aliexpressDb,
     //                     itemId,
     //                     reviewItem.id,
@@ -723,7 +723,7 @@ export async function scrapeItemByBrowser(itemId, browser, startPage, queue) {
                     );
 
                     for (const reviewItem of data.data.reviews) {
-                        addReview(
+                        await addReview(
                             prefix,
                             itemId,
                             reviewItem.id,
@@ -1149,7 +1149,7 @@ export async function updateReviews(queue) {
 
     log(`Update ${items.length} reviews`);
 
-    items.forEach((itemId) => {
+    for (const itemId of items) {
         const item = getItem(prefix, itemId);
 
         if (!item || !item?.reviews?.length) {
@@ -1158,7 +1158,7 @@ export async function updateReviews(queue) {
         }
 
         for (const reviewId of item.reviews) {
-            const reviewItem = getReview(prefix, itemId, reviewId);
+            const reviewItem = await getReview(prefix, itemId, reviewId);
 
             // if ("video" in reviewItem || "videos" in reviewItem) {
             //     console.log(reviewItem);
@@ -1170,7 +1170,7 @@ export async function updateReviews(queue) {
 
             download(reviewItem, itemId, queue);
         }
-    });
+    }
 
     while (queue.size || queue.pending) {
         await sleep(1000);

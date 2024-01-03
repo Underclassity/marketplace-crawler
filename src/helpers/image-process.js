@@ -73,8 +73,8 @@ function deleteHelper(filepath, itemId, prefix) {
  * @param   {String}  videoFilePath  Video file filepath
  * @param   {Number}  fps            FPS to extract
  * @param   {Number}  r              Rate frames per second
- * @param   {String}  id      ID
- * @param   {String}  prefix  Prfix
+ * @param   {String}  id             ID
+ * @param   {String}  prefix         Prefix
  *
  * @return  {Array}                  Frame array
  */

@@ -1,8 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { LowSync, MemorySync } from "lowdb";
+import { LowSync } from "lowdb";
 import { JSONFileSync } from "lowdb/node";
+
+import { QuickDB } from "quick.db";
 
 import is from "is_js";
 
@@ -47,33 +49,30 @@ export function isDBWriting(dbPrefix = false) {
  * @return  {Object}            DB instance
  */
 export function loadDB(dbPrefix) {
-    const dbMemoryPrefix = `${dbPrefix}-memory`;
-
     if (!dbPrefix || !dbPrefix.length) {
         logMsg("DB prefix not defined!");
         return false;
     }
 
     if (!(dbPrefix in dbCache)) {
-        dbCache[dbPrefix] = new LowSync(
-            new JSONFileSync(path.resolve(dbPath, `${dbPrefix}.json`))
-        );
+        if (dbPrefix.includes("-reviews")) {
+            dbCache[dbPrefix] = new QuickDB({
+                filePath: path.resolve(dbPath, `${dbPrefix}.sqlite`),
+            });
+        } else {
+            dbCache[dbPrefix] = new LowSync(
+                new JSONFileSync(path.resolve(dbPath, `${dbPrefix}.json`))
+            );
 
-        const db = dbCache[dbPrefix];
+            const db = dbCache[dbPrefix];
 
-        db.read();
+            db.read();
 
-        if (!db.data) {
-            db.data = {};
-            db.write();
+            if (!db.data) {
+                db.data = {};
+                db.write();
+            }
         }
-
-        // Create memory DB instance
-        const memoryDB = new LowSync(new MemorySync());
-        memoryDB.data = db.data;
-        memoryDB.write();
-
-        dbCache[dbMemoryPrefix] = memoryDB;
     }
 
     // dbCache[dbPrefix].read();
@@ -770,7 +769,7 @@ export function getTags(prefix) {
  *
  * @return  {Object}          Users data
  */
-export function getUsers(prefix) {
+export async function getUsers(prefix) {
     if (!prefix || !prefix.length) {
         logMsg("Prefix not defined!");
         return false;
@@ -782,8 +781,10 @@ export function getUsers(prefix) {
 
     const results = {};
 
-    for (const reviewId in dbCache[dbReviewsPrefix].data) {
-        const reviewItem = dbCache[dbReviewsPrefix].data[reviewId];
+    const reviews = await dbCache[dbReviewsPrefix].all();
+
+    for (const reviewId in reviews) {
+        const reviewItem = reviews[reviewId];
 
         if (prefix == "wildberries") {
             const { wbUserId } = reviewItem;
@@ -811,8 +812,8 @@ export function getUsers(prefix) {
  *
  * @return  {Object}           User info
  */
-export function getUser(prefix, id) {
-    const reviews = getReviews(prefix);
+export async function getUser(prefix, id) {
+    const reviews = await getReviews(prefix);
 
     let info = false;
 
@@ -841,8 +842,8 @@ export function getUser(prefix, id) {
  *
  * @return  {Array}           User reviews
  */
-export function getUserReviews(prefix, id) {
-    const reviews = getReviews(prefix);
+export async function getUserReviews(prefix, id) {
+    const reviews = await getReviews(prefix);
 
     const results = [];
 
@@ -868,7 +869,7 @@ export function getUserReviews(prefix, id) {
  *
  * @return  {Object}            Review item
  */
-export function getReview(prefix, itemId, reviewId) {
+export async function getReview(prefix, itemId, reviewId) {
     if (!prefix || !prefix.length) {
         logMsg("Prefix not defined!");
         return false;
@@ -898,7 +899,7 @@ export function getReview(prefix, itemId, reviewId) {
 
     loadDB(dbReviewsPrefix);
 
-    return dbCache[dbReviewsPrefix].data[reviewId];
+    return await dbCache[dbReviewsPrefix].get(reviewId);
 }
 
 /**
@@ -909,7 +910,7 @@ export function getReview(prefix, itemId, reviewId) {
  *
  * @return  {Array}           Review items array
  */
-export function getReviews(prefix, query = false) {
+export async function getReviews(prefix, query = false) {
     if (!prefix || !prefix.length) {
         logMsg("Prefix not defined!");
         return false;
@@ -919,16 +920,18 @@ export function getReviews(prefix, query = false) {
 
     loadDB(dbReviewsPrefix);
 
+    const reviews = await dbCache[dbReviewsPrefix].all();
+
     if (!query || !is.object(query)) {
-        return dbCache[dbReviewsPrefix].data;
+        return reviews;
         // logMsg("Query not defined!");
         // return false;
     }
 
     const results = [];
 
-    for (const reviewId in dbCache[dbReviewsPrefix].data) {
-        const reviewItem = dbCache[dbReviewsPrefix].data[reviewId];
+    for (const reviewId in reviews) {
+        const reviewItem = reviews[reviewId];
 
         for (const queryId in query) {
             if (reviewItem[queryId] == query[queryId]) {
@@ -950,7 +953,13 @@ export function getReviews(prefix, query = false) {
  * @param   {Boolean}  write        Write flag
  * @return  {Boolean}               Result
  */
-export function addReview(prefix, itemId, reviewId, review, write = true) {
+export async function addReview(
+    prefix,
+    itemId,
+    reviewId,
+    review,
+    write = true
+) {
     if (!prefix || !prefix.length) {
         logMsg("Prefix not defined!");
         return false;
@@ -971,28 +980,27 @@ export function addReview(prefix, itemId, reviewId, review, write = true) {
         return false;
     }
 
-    const dbReviewsPrefix = `${prefix}-reviews`;
-    const dbProductsPrefix = `${prefix}-products`;
-
-    loadDB(dbReviewsPrefix);
-    loadDB(dbProductsPrefix);
-
     if (!review || !reviewId) {
         logMsg("Review not defined!", itemId, prefix);
         return false;
     }
 
+    const dbReviewsPrefix = `${prefix}-reviews`;
+    const dbProductsPrefix = `${prefix}-products`;
+
+    loadDB(dbProductsPrefix);
+    loadDB(dbReviewsPrefix);
+
+    const productsDB = dbCache[dbProductsPrefix];
+    const reviewsDB = dbCache[dbReviewsPrefix];
+
     if (options.force) {
-        dbCache[dbReviewsPrefix].data[reviewId] = review;
-        dbWrite(dbReviewsPrefix, true, prefix);
+        await reviewsDB.set(reviewId, review);
 
         logMsg(`Force update review ${reviewId} in DB`, itemId, prefix);
 
         return true;
     }
-
-    const reviewsDB = dbCache[dbReviewsPrefix];
-    const productsDB = dbCache[dbProductsPrefix];
 
     let isWrite = false;
 
@@ -1017,29 +1025,15 @@ export function addReview(prefix, itemId, reviewId, review, write = true) {
         isWrite = true;
     }
 
-    // console.log(new Array(20).join("-"));
-    // console.log(JSON.stringify(reviewsDB.data[reviewId]));
-    // console.log(new Array(10).join("-"));
-    // console.log(JSON.stringify(review));
-    // console.log(new Array(10).join("-"));
-    // console.log(
-    //     JSON.stringify(reviewsDB.data[reviewId]) == JSON.stringify(review)
-    // );
-    // console.log(new Array(20).join("-"));
+    let reviewItem = await reviewsDB.get(reviewId);
 
-    if (!(reviewId in reviewsDB.data)) {
-        reviewsDB.data[reviewId] = review;
-        dbWrite(dbReviewsPrefix, write, prefix);
-        isWrite = true;
-
+    if (!reviewItem) {
+        reviewItem = await reviewsDB.set(reviewId, review);
         logMsg(`Force add/update review ${reviewId} in DB`, itemId, prefix);
-    } else if (deepEqual(reviewsDB.data[reviewId], review)) {
+    } else if (deepEqual(reviewItem, review)) {
         logMsg(`Review ${reviewId} already saved in DB`, itemId, prefix);
     } else {
-        reviewsDB.data[reviewId] = review;
-        dbWrite(dbReviewsPrefix, write, prefix);
-        isWrite = true;
-
+        reviewItem = await reviewsDB.set(reviewId, review);
         logMsg(`Update review ${reviewId} in DB`, itemId, prefix);
     }
 

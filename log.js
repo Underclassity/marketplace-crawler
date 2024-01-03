@@ -25,7 +25,7 @@ const ids = getAdaptersIds();
 
         // Create users cache
         if (adapter == "wildberries") {
-            const reviews = getReviews(adapter, false);
+            const reviews = await getReviews(adapter, false);
 
             const usersCache = {};
 

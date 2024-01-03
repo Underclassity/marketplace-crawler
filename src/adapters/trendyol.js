@@ -107,7 +107,7 @@ async function processPage(query = options.query, browser) {
  *
  * @return  {Boolean}           Result
  */
-function processReview(itemId, reviewId, queue) {
+async function processReview(itemId, reviewId, queue) {
     if (!itemId || !itemId.length) {
         log("Item ID not defined!");
         return false;
@@ -118,7 +118,7 @@ function processReview(itemId, reviewId, queue) {
         return false;
     }
 
-    const reviewItem = getReview(prefix, itemId, reviewId);
+    const reviewItem = await getReview(prefix, itemId, reviewId);
 
     if (!reviewItem) {
         log(`Review ${reviewId} not found in DB!`, itemId);
@@ -314,7 +314,7 @@ async function scrapeItem(itemId, queue) {
     log(`Get ${results.length}(${totalCount}) reviews`);
 
     for (const result of results) {
-        addReview(prefix, itemId, result.id, result, false);
+        await addReview(prefix, itemId, result.id, result, false);
     }
 
     dbWrite(`${prefix}-reviews`, true, prefix, false);
@@ -323,7 +323,7 @@ async function scrapeItem(itemId, queue) {
     updateTags(prefix, itemId, options.query);
 
     for (const result of results) {
-        processReview(itemId, result.id, queue);
+        await processReview(itemId, result.id, queue);
     }
 
     return true;

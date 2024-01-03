@@ -59,7 +59,7 @@ export async function getFeedback(itemId, feedback) {
         return false;
     }
 
-    addReview(prefix, itemId, feedback.id, feedback, true);
+    await addReview(prefix, itemId, feedback.id, feedback, true);
 
     if (!options.download) {
         return true;
@@ -126,7 +126,13 @@ export async function getItemById(itemId, browser) {
                         continue;
                     }
 
-                    addReview(prefix, itemId, reviewItem.id, reviewItem, true);
+                    await addReview(
+                        prefix,
+                        itemId,
+                        reviewItem.id,
+                        reviewItem,
+                        true
+                    );
                 }
             }
 
@@ -271,12 +277,12 @@ export async function updateItems(queue) {
  *
  * @return  {Boolean}        Result
  */
-export function updateReviews(queue) {
+export async function updateReviews(queue) {
     const items = getItems(prefix, true);
 
     log(`Update ${items.length} items reviews`);
 
-    items.forEach((itemId) => {
+    for (const itemId of items) {
         const item = getItem(prefix, itemId);
 
         if (!item?.reviews?.length) {
@@ -291,7 +297,7 @@ export function updateReviews(queue) {
         );
 
         for (const reviewId of item.reviews) {
-            const feedback = getReview(prefix, itemId, reviewId);
+            const feedback = await getReview(prefix, itemId, reviewId);
 
             if (!feedback?.media?.length) {
                 continue;
@@ -331,7 +337,7 @@ export function updateReviews(queue) {
                 }
             }
         }
-    });
+    }
 
     return true;
 }

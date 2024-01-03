@@ -19,7 +19,7 @@ usersRouter.get("/", (req, res) => {
     const users = {};
 
     for (const adapter of adapters) {
-        users[adapter] = Object.keys(getUsers(adapter)).length;
+        users[adapter] = Object.keys(await getUsers(adapter)).length;
     }
 
     return res.json({
@@ -52,7 +52,7 @@ usersRouter.get("/:adapter", (req, res) => {
         });
     }
 
-    let users = getUsers(adapter);
+    let users = await getUsers(adapter);
     const count = Object.keys(users).length;
 
     users = Object.keys(users).filter((userId) => {
@@ -60,7 +60,7 @@ usersRouter.get("/:adapter", (req, res) => {
             return true;
         }
 
-        let userReviews = getUserReviews(adapter, userId);
+        let userReviews = await getUserReviews(adapter, userId);
 
         userReviews = isPhotos
             ? userReviews.filter((item) => item?.photos?.length)

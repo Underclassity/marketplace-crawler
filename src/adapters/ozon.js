@@ -247,7 +247,7 @@ export async function getOzonItemByXHR(link, itemId, queue) {
                 itemId
             );
 
-            $("[data-state]").each((index, element) => {
+            $("[data-state]").each(async (index, element) => {
                 const reviewsData = JSON.parse($(element).attr("data-state"));
 
                 if (!reviewsData.reviews) {
@@ -255,7 +255,7 @@ export async function getOzonItemByXHR(link, itemId, queue) {
                 }
 
                 for (const reviewItem of reviewsData.reviews) {
-                    addReview(
+                    await addReview(
                         prefix,
                         itemId,
                         reviewItem.uuid,
@@ -408,7 +408,7 @@ export async function getOzonItem(link, itemId, queue, browser) {
 
             resultReviews[reviewId] = reviewItem;
 
-            addReview(prefix, itemId, reviewId, reviewItem, true);
+            await addReview(prefix, itemId, reviewId, reviewItem, true);
         }
 
         if (Object.keys(resultReviews).length == reviews.length) {
@@ -532,7 +532,7 @@ export async function getOzonItem(link, itemId, queue, browser) {
             for (const reviewId in resultReviews) {
                 const reviewItem = resultReviews[reviewId];
 
-                addReview(prefix, itemId, reviewId, reviewItem, true);
+                await addReview(prefix, itemId, reviewId, reviewItem, true);
 
                 if (reviewItem.content.photos.length) {
                     for (const photoItem of reviewItem.content.photos) {
@@ -670,7 +670,7 @@ export async function updateReviews(queue) {
 
     log(`Update ${items.length} items reviews`);
 
-    items.forEach((itemId) => {
+    for (const itemId of items) {
         const item = getItem(prefix, itemId);
 
         if (!item?.reviews?.length) {
@@ -678,7 +678,7 @@ export async function updateReviews(queue) {
         }
 
         for (const reviewId of item.reviews) {
-            const reviewItem = getReview(prefix, itemId, reviewId);
+            const reviewItem = await getReview(prefix, itemId, reviewId);
 
             if (reviewItem?.content?.photos?.length) {
                 for (const photoItem of reviewItem.content.photos) {
@@ -704,7 +704,7 @@ export async function updateReviews(queue) {
                 }
             }
         }
-    });
+    }
 
     return true;
 }
