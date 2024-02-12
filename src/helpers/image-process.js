@@ -635,7 +635,7 @@ export async function downloadItem(url, filepath, queue, isVideo = false) {
         return false;
     }
 
-    if (fs.existsSync(webpFilepath)) {
+    if (fs.existsSync(webpFilepath) && webpFilepath != filepath) {
         deleteHelper(filepath, id, prefix);
 
         // logMsg("Webp file exists", id, prefix);

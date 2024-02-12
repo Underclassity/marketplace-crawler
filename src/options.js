@@ -39,6 +39,11 @@ export const options = yargs(hideBin(process.argv))
         type: "string",
         default: false,
     })
+    .option("subject", {
+        describe: "Category subject",
+        type: "string",
+        default: false,
+    })
     .option("favorite", {
         describe: "Update only favorite items",
         type: "boolean",
@@ -151,6 +156,11 @@ export const options = yargs(hideBin(process.argv))
     })
     .option("info", {
         describe: "Update products info",
+        default: false,
+        type: "boolean",
+    })
+    .option("reverse", {
+        describe: "Reverse priority queue flag",
         default: false,
         type: "boolean",
     }).argv;

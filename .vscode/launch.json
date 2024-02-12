@@ -476,7 +476,7 @@
         {
             "type": "node",
             "request": "launch",
-            "name": "Wildberries Update 10",
+            "name": "Wildberries Update Reverse",
             "skipFiles": ["<node_internals>/**"],
             "program": "${workspaceFolder}\\index.js",
             "args": [
@@ -489,7 +489,9 @@
                 "--update",
                 "true",
                 "--throat",
-                "10"
+                "10",
+                "--reverse",
+                "true"
             ]
         },
         {
@@ -506,6 +508,25 @@
                 "--include",
                 "wildberries",
                 "--reviews",
+                "true"
+            ]
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Wildberries Reviews Reverse",
+            "skipFiles": ["<node_internals>/**"],
+            "program": "${workspaceFolder}\\index.js",
+            "args": [
+                "--thumbnail",
+                "false",
+                "--time",
+                "24",
+                "--include",
+                "wildberries",
+                "--reviews",
+                "true",
+                "--reverse",
                 "true"
             ]
         },

@@ -6,6 +6,7 @@ import axios from "axios";
 import {
     addItem,
     addReview,
+    addUserReview,
     dbWrite,
     getBrands,
     getFiles,
@@ -24,7 +25,7 @@ import downloadItem from "../helpers/image-process.js";
 import getHeaders from "../helpers/get-headers.js";
 import options from "../options.js";
 import priorities from "../helpers/priorities.js";
-import sleep from "../helpers/sleep.js";
+// import sleep from "../helpers/sleep.js";
 
 const prefix = "wildberries";
 
@@ -161,6 +162,13 @@ export async function getFeedback(itemId, feedback, queue) {
     }
 
     // await addReview(prefix, id, feedback.id, feedback, true);
+
+    await addUserReview(
+        prefix,
+        feedback.wbUserId,
+        feedback.id,
+        feedback.wbUserDetails
+    );
 
     if (!options.download) {
         return true;
@@ -613,7 +621,7 @@ export async function getFeedbacks(itemId, query = false, queue) {
         }
 
         if (feedbacks.length && isWriteCall) {
-            dbWrite(`${prefix}-reviews`, true, prefix);
+            // dbWrite(`${prefix}-reviews`, true, prefix);
             dbWrite(`${prefix}-products`, true, prefix);
         }
 
@@ -824,31 +832,36 @@ export async function categoryRequest(page = 1, categoryId = options.category) {
 
     const category = categories.find((item) => item.id == categoryId);
 
+    const params = {
+        cat: categoryId,
+        limit: 100,
+        sort: "popular",
+        page,
+        appType: 12,
+        curr: "byn",
+        locale: "by",
+        lang: "ru",
+        dest: -59_208,
+        regions: [
+            1, 4, 22, 30, 31, 33, 40, 48, 66, 68, 69, 70, 80, 83, 114, 115,
+        ],
+        emp: 0,
+        reg: 1,
+        pricemarginCoeff: "1.0",
+        offlineBonus: 0,
+        onlineBonus: 0,
+        spp: 0,
+    };
+
+    if (options.subject?.length) {
+        params.subject = options.subject;
+    }
+
     try {
         const getItemsRequest = await axios(
             `https://catalog.wb.ru/catalog/${category.shardKey}/v1/catalog`,
             {
-                params: {
-                    cat: categoryId,
-                    limit: 100,
-                    sort: "popular",
-                    page,
-                    appType: 12,
-                    curr: "byn",
-                    locale: "by",
-                    lang: "ru",
-                    dest: -59_208,
-                    regions: [
-                        1, 4, 22, 30, 31, 33, 40, 48, 66, 68, 69, 70, 80, 83,
-                        114, 115,
-                    ],
-                    emp: 0,
-                    reg: 1,
-                    pricemarginCoeff: "1.0",
-                    offlineBonus: 0,
-                    onlineBonus: 0,
-                    spp: 0,
-                },
+                params,
 
                 headers: getHeaders(),
                 timeout: options.timeout,
@@ -1150,11 +1163,19 @@ export async function updateReviews(queue) {
 
     log(`Update ${items.length} items reviews`);
 
+    const logInterval = setInterval(() => {
+        if (queue.size || queue.pending) {
+            logQueue(queue);
+        } else {
+            clearInterval(logInterval);
+        }
+    }, 1000);
+
     for (const itemId of items) {
         const item = getItem(prefix, itemId);
 
         if (!item?.reviews?.length) {
-            log("No reviews found", itemId);
+            // log("No reviews found", itemId);
             continue;
         }
 
@@ -1174,10 +1195,10 @@ export async function updateReviews(queue) {
 
     logQueue(queue);
 
-    while (queue.size || queue.pending) {
-        await sleep(1000);
-        logQueue(queue);
-    }
+    // while (queue.size || queue.pending) {
+    //     await sleep(1000);
+    //     logQueue(queue);
+    // }
 
     return true;
 }

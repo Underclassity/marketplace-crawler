@@ -15,7 +15,7 @@ export const usersRouter = express.Router();
  *
  * @return  {Object}       Response object
  */
-usersRouter.get("/", (req, res) => {
+usersRouter.get("/", async (req, res) => {
     const users = {};
 
     for (const adapter of adapters) {
@@ -36,7 +36,7 @@ usersRouter.get("/", (req, res) => {
  *
  * @return  {Object}       Response object
  */
-usersRouter.get("/:adapter", (req, res) => {
+usersRouter.get("/:adapter", async (req, res) => {
     const { adapter } = req.params;
 
     const page = parseInt(req.query.page || 1, 10);
@@ -55,7 +55,7 @@ usersRouter.get("/:adapter", (req, res) => {
     let users = await getUsers(adapter);
     const count = Object.keys(users).length;
 
-    users = Object.keys(users).filter((userId) => {
+    users = Object.keys(users).filter(async (userId) => {
         if (!("photos" in req.query)) {
             return true;
         }

@@ -263,7 +263,7 @@ export async function getOzonItemByXHR(link, itemId, queue) {
                         false
                     );
 
-                    if (reviewItem.content.photos.length) {
+                    if (reviewItem.content.photos?.length) {
                         for (const photoItem of reviewItem.content.photos) {
                             download(
                                 reviewItem.itemId,
@@ -275,7 +275,7 @@ export async function getOzonItemByXHR(link, itemId, queue) {
                         }
                     }
 
-                    if (reviewItem.content.videos.length) {
+                    if (reviewItem.content.videos?.length) {
                         for (const videoItem of reviewItem.content.videos) {
                             download(
                                 reviewItem.itemId,
@@ -674,7 +674,7 @@ export async function updateReviews(queue) {
         const item = getItem(prefix, itemId);
 
         if (!item?.reviews?.length) {
-            return false;
+            continue;
         }
 
         for (const reviewId of item.reviews) {

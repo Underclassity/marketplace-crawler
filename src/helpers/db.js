@@ -55,7 +55,7 @@ export function loadDB(dbPrefix) {
     }
 
     if (!(dbPrefix in dbCache)) {
-        if (dbPrefix.includes("-reviews")) {
+        if (dbPrefix.includes("-reviews") || dbPrefix.includes("-users")) {
             dbCache[dbPrefix] = new QuickDB({
                 filePath: path.resolve(dbPath, `${dbPrefix}.sqlite`),
             });
@@ -112,6 +112,7 @@ export function dbWrite(
     const db = dbCache[dbPrefix];
 
     if (!db || !db.write) {
+        debugger;
         logMsg("DB not defined!");
         return false;
     }
@@ -130,7 +131,29 @@ export function dbWrite(
             writeCache[dbPrefix] = true;
         }
 
-        setTimeout(() => {
+        if (waitTimeout) {
+            setTimeout(() => {
+                const startTime = Date.now();
+
+                try {
+                    db.write();
+                } catch (error) {
+                    logMsg(
+                        `Write in DB ${dbPrefix} error: ${error}`,
+                        false,
+                        prefix
+                    );
+                }
+
+                const endTime = Date.now();
+
+                logMsg(
+                    `Write in DB ${dbPrefix}: ${endTime - startTime}ms`,
+                    false,
+                    prefix
+                );
+            }, 0);
+        } else {
             const startTime = Date.now();
 
             try {
@@ -150,7 +173,7 @@ export function dbWrite(
                 false,
                 prefix
             );
-        }, 0);
+        }
 
         // Add sleep tick
         if (dbPrefix && waitTimeout) {
@@ -567,16 +590,18 @@ export function updateBrand(prefix, itemId, brand) {
 /**
  * Get items from DB
  *
- * @param   {String}   prefix    Log prefix
- * @param   {Boolean}  force     Force get all flag
- * @param   {Boolean}  deleted   Flag to return with deleted items
+ * @param   {String}   prefix            Log prefix
+ * @param   {Boolean}  force             Force get all flag
+ * @param   {Boolean}  [deleted=false]   Flag to return with deleted items
+ * @param   {Boolean}  [objects=false]   Flag to return objects items
  *
- * @return  {Array}              Items IDs array
+ * @return  {Array}                      Items IDs array or items objects array
  */
 export function getItems(
     prefix = false,
     force = options.force,
-    deleted = false
+    deleted = false,
+    objects = false
 ) {
     if (!prefix || !prefix.length) {
         logMsg("Prefix not defined!");
@@ -596,7 +621,7 @@ export function getItems(
 
     const time = options.time * 60 * 60 * 1000;
 
-    return Object.keys(db.data)
+    const items = Object.keys(db.data)
         .filter((id) => {
             const item = db.data[id];
 
@@ -631,6 +656,12 @@ export function getItems(
 
             return aReviewsCount - bReviewsCount;
         });
+
+    if (objects) {
+        return items.map((id) => db.data[id]);
+    }
+
+    return items;
 }
 
 /**
@@ -769,7 +800,7 @@ export function getTags(prefix) {
  *
  * @return  {Object}          Users data
  */
-export async function getUsers(prefix) {
+export async function getUsersFromReviews(prefix) {
     if (!prefix || !prefix.length) {
         logMsg("Prefix not defined!");
         return false;
@@ -1205,12 +1236,12 @@ export function addPrediction(prefix, itemId, filename, predictions) {
 
     if (!(itemId in db.data)) {
         db.data[itemId] = {};
-        dbWrite(dbPrefix, true, prefix);
+        dbWrite(dbPrefix, true, prefix, false);
     }
 
     if (!(filename in db.data[itemId])) {
         db.data[itemId][filename] = predictions;
-        dbWrite(dbPrefix, true, prefix);
+        dbWrite(dbPrefix, true, prefix, false);
     }
 
     return true;
@@ -1505,6 +1536,113 @@ export function isFavorite(prefix, itemId) {
     }
 
     return false;
+}
+
+/**
+ * Add review for user
+ *
+ * @param   {String}  prefix    Prefix
+ * @param   {String}  id        User ID
+ * @param   {String}  reviewId  Review ID
+ * @param   {Object}  data      User info data
+ *
+ * @return  {Boolean}           Result
+ */
+export async function addUserReview(prefix, id, reviewId, data) {
+    if (!prefix || !prefix.length) {
+        logMsg("Prefix not defined!");
+        return false;
+    }
+
+    if (!id || !reviewId) {
+        return false;
+    }
+
+    const dbPrefix = `${prefix}-users`;
+
+    loadDB(dbPrefix);
+
+    const db = dbCache[dbPrefix];
+
+    const dbItem = await db.get(id.toString());
+
+    // Update user data
+    if (dbItem) {
+        if (!dbItem.reviews.includes(reviewId)) {
+            dbItem.reviews.push(reviewId);
+            await db.set(id.toString(), dbItem);
+        }
+
+        if (!deepEqual(dbItem.info, data)) {
+            for (const dataId in data) {
+                if (dbItem.info[dataId] != data[dataId]) {
+                    if (dataId == "country") {
+                        continue;
+                    }
+
+                    dbItem.info[dataId] = data[dataId];
+
+                    await db.set(id.toString(), dbItem);
+                }
+            }
+        }
+    } else {
+        // Create new user if not defined
+        await db.set(id.toString(), {
+            id,
+            info: { ...data },
+            reviews: [reviewId],
+        });
+    }
+
+    return true;
+}
+
+/**
+ * Get users items
+ *
+ * @param   {String}  prefix  Prefix
+ *
+ * @return  {Array}           User items array
+ */
+export async function getUsers(prefix) {
+    if (!prefix || !prefix.length) {
+        logMsg("Prefix not defined!");
+        return false;
+    }
+
+    const dbPrefix = `${prefix}-users`;
+
+    loadDB(dbPrefix);
+
+    const db = dbCache[dbPrefix];
+
+    return await db.all();
+}
+
+/**
+ * Delete user from DB by user ID
+ *
+ * @param   {String}   prefix  Prefix
+ * @param   {String}   userId  User ID
+ *
+ * @return  {Boolean}          Result
+ */
+export async function deleteUser(prefix, userId) {
+    if (!prefix || !prefix.length) {
+        logMsg("Prefix not defined!");
+        return false;
+    }
+
+    const dbPrefix = `${prefix}-users`;
+
+    loadDB(dbPrefix);
+
+    const db = dbCache[dbPrefix];
+
+    const result = await db.delete(userId);
+
+    return result ? true : false;
 }
 
 export default updateTime;
