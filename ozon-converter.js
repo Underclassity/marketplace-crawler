@@ -32,8 +32,6 @@ async function getItemLink(itemId) {
 
             const { items } = data;
 
-            console.log(items);
-
             for (const item of items) {
                 if (item.action.link) {
                     link = link.action.link;

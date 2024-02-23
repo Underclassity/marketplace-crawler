@@ -83,7 +83,7 @@ export function logQueue(queue) {
     }: ${Object.keys(priorities)
         .map(
             (priority) =>
-                `${priority}-${queue.sizeBy({
+                `${priorities[priority]}-${priority}-${queue.sizeBy({
                     priority: priorities[priority],
                 })}`
         )

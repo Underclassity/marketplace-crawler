@@ -857,6 +857,10 @@ export async function categoryRequest(page = 1, categoryId = options.category) {
         params.subject = options.subject;
     }
 
+    if (options.xsubject?.length) {
+        params.xsubject = options.xsubject;
+    }
+
     try {
         const getItemsRequest = await axios(
             `https://catalog.wb.ru/catalog/${category.shardKey}/v1/catalog`,

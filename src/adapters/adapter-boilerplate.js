@@ -39,18 +39,6 @@ function log(msg, itemId = false) {
 }
 
 /**
- * Log message helper
- *
- * @param   {String}  msg      Message
- * @param   {String}  itemI    Item ID
- *
- * @return  {Boolean}          Result
- */
-function log(msg, itemId = false) {
-    return logMsg(msg, itemId, prefix);
-}
-
-/**
  * Update items with brands helper
  *
  * @param   {Object}  queue  Queue

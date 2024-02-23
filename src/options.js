@@ -44,6 +44,11 @@ export const options = yargs(hideBin(process.argv))
         type: "string",
         default: false,
     })
+    .option("xsubject", {
+        describe: "Category x subject",
+        type: "string",
+        default: false,
+    })
     .option("favorite", {
         describe: "Update only favorite items",
         type: "boolean",

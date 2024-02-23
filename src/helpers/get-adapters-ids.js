@@ -8,6 +8,7 @@ import options from "../options.js";
 export let ids = [
     "aliexpress",
     "amazon",
+    "avito",
     "decathlon",
     "ebay",
     "joom",

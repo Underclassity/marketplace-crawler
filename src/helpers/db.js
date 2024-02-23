@@ -94,7 +94,7 @@ export function dbWrite(
     dbPrefix,
     write = true,
     prefix = false,
-    waitTimeout = true
+    waitTimeout = false
 ) {
     if (!dbPrefix || !dbPrefix.length) {
         logMsg("DB prefix not defined!");
