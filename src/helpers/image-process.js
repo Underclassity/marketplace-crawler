@@ -7,8 +7,8 @@ import which from "which";
 import axios from "axios";
 import prettyBytes from "pretty-bytes";
 
-import { LowSync } from "lowdb";
-import { JSONFileSync } from "lowdb/node";
+// import { LowSync } from "lowdb";
+// import { JSONFileSync } from "lowdb/node";
 
 import { updateFiles } from "./db.js";
 import commandCall from "./command-call.js";
@@ -28,15 +28,15 @@ if (!fs.existsSync(dbPath)) {
     fs.mkdirSync(dbPath);
 }
 
-const convertAdapter = new JSONFileSync(path.resolve(dbPath, "convert.json"));
-const convertDb = new LowSync(convertAdapter);
+// const convertAdapter = new JSONFileSync(path.resolve(dbPath, "convert.json"));
+// const convertDb = new LowSync(convertAdapter);
 
-convertDb.read();
+// convertDb.read();
 
-if (!convertDb.data) {
-    convertDb.data = [];
-    convertDb.write();
-}
+// if (!convertDb.data) {
+//     convertDb.data = [];
+//     convertDb.write();
+// }
 
 const tempDirPath = path.resolve(options.directory, "temp");
 
@@ -230,10 +230,14 @@ export async function processFile(filepath, queue, itemId, prefix) {
         return false;
     }
 
-    if (convertDb.data.includes(filepath)) {
-        logMsg(`File ${filepath} found in convert cache`, itemId, prefix);
-        return false;
-    }
+    // if (!filepath.includes(".")) {
+    //     debugger;
+    // }
+
+    // if (convertDb.data.includes(filepath)) {
+    //     logMsg(`File ${filepath} found in convert cache`, itemId, prefix);
+    //     return false;
+    // }
 
     const parsed = path.parse(filepath);
 
@@ -287,8 +291,8 @@ export async function processFile(filepath, queue, itemId, prefix) {
 
             deleteHelper(tempWebpFilepath, itemId, prefix);
 
-            convertDb.data.push(filepath);
-            convertDb.write();
+            // convertDb.data.push(filepath);
+            // convertDb.write();
         }
 
         return true;
@@ -630,14 +634,23 @@ export async function downloadItem(url, filepath, queue, isVideo = false) {
         return false;
     }
 
-    if (convertDb.data.includes(filepath)) {
-        logMsg(`File ${parsedPath.name} found in convert cache`, id, prefix);
-        return false;
-    }
+    // if (!filepath.includes(".")) {
+    //     debugger;
+    // }
+
+    // if (convertDb.data.includes(filepath)) {
+    //     logMsg(`File ${filepath} found in convert cache`, id, prefix);
+    //     return false;
+    // }
 
     if (fs.existsSync(webpFilepath) && webpFilepath != filepath) {
         deleteHelper(filepath, id, prefix);
 
+        // logMsg("Webp file exists", id, prefix);
+        return true;
+    }
+
+    if (fs.existsSync(webpFilepath) && webpFilepath == filepath) {
         // logMsg("Webp file exists", id, prefix);
         return true;
     }
@@ -664,6 +677,8 @@ export async function downloadItem(url, filepath, queue, isVideo = false) {
 
     const tempFilepath = path.resolve(tempDirPath, path.basename(filepath));
     let isDownloaded = false;
+
+    let isDownload = false;
 
     if (isSizeEqual || !exists) {
         isDownloaded = true;
@@ -700,6 +715,8 @@ export async function downloadItem(url, filepath, queue, isVideo = false) {
                     logMsg(`Error copy: ${error.message}`, id, prefix);
                 }
             }
+
+            isDownload = true;
         } else if (isTempExist) {
             deleteHelper(tempFilepath, id, prefix);
         }
@@ -715,7 +732,9 @@ export async function downloadItem(url, filepath, queue, isVideo = false) {
         delete downloadCache[url];
     }
 
-    updateFiles(prefix, id);
+    if (isDownload) {
+        updateFiles(prefix, id);
+    }
 
     return true;
 }

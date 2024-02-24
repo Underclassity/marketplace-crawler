@@ -503,10 +503,12 @@
             "args": [
                 "--thumbnail",
                 "false",
-                "--time",
-                "24",
                 "--include",
                 "wildberries",
+                "--throat",
+                "10",
+                "--timeout",
+                "10000",
                 "--reviews",
                 "true"
             ]
@@ -520,13 +522,15 @@
             "args": [
                 "--thumbnail",
                 "false",
-                "--time",
-                "24",
                 "--include",
                 "wildberries",
-                "--reviews",
-                "true",
+                "--throat",
+                "10",
+                "--timeout",
+                "10000",
                 "--reverse",
+                "true",
+                "--reviews",
                 "true"
             ]
         },
