@@ -78,7 +78,7 @@ export function logQueue(queue) {
 
     const { size } = queue;
 
-    const queueLogString = `Queue size ${size} ${
+    const queueLogString = `Queue-${options.throat} size ${size} ${
         `${queue?.eta?.estimate().toFixed(2)}s` || ""
     }: ${Object.keys(priorities)
         .map(
