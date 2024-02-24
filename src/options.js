@@ -164,6 +164,11 @@ export const options = yargs(hideBin(process.argv))
         default: false,
         type: "boolean",
     })
+    .option("check", {
+        describe: "Check download status for reviews",
+        default: false,
+        type: "boolean",
+    })
     .option("reverse", {
         describe: "Reverse priority queue flag",
         default: false,

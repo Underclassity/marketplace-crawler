@@ -337,6 +337,27 @@ puppeteer.use(StealthPlugin());
         return true;
     }
 
+    if (options.check) {
+        for (const id of ids) {
+            const { checkReviews } = await import(`./src/adapters/${id}.js`);
+
+            if (checkReviews) {
+                checkReviews(queue);
+            } else {
+                logMsg("Check reviews not found!", false, id);
+            }
+        }
+
+        logQueue(queue);
+
+        while (queue.size || queue.pending || isDBWriting()) {
+            await sleep(1000);
+            logQueue(queue);
+        }
+
+        return true;
+    }
+
     if (!options.query) {
         logMsg("Query not defined!");
 

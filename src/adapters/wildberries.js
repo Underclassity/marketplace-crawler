@@ -11,6 +11,7 @@ import {
     getBrands,
     getFiles,
     getItem,
+    getItemFiles,
     getItems,
     getReview,
     getTags,
@@ -25,7 +26,7 @@ import downloadItem from "../helpers/image-process.js";
 import getHeaders from "../helpers/get-headers.js";
 import options from "../options.js";
 import priorities from "../helpers/priorities.js";
-// import sleep from "../helpers/sleep.js";
+import sleep from "../helpers/sleep.js";
 
 const prefix = "wildberries";
 
@@ -41,24 +42,39 @@ function log(msg, itemId = false) {
     return logMsg(msg, itemId, prefix);
 }
 
-const FEEDBACK_PHOTO_SHARD_RANGE = [431, 863, 1199, 1535];
+// const FEEDBACK_PHOTO_SHARD_RANGE = [431, 863, 1199, 1535];
+
+const FEEDBACK_PHOTO_SHARD_RANGE = [
+    143, 287, 431, 719, 1007, 1061, 1115, 1169, 1313, 1601, 1655, 1919,
+];
 
 /**
- * Get host id by volume ID and range
+ * Get host id by volume ID
  *
  * @param   {Number}  vol_id  Volume ID
- * @param   {Number}  range   Range number
  *
  * @return  {Number}          Host ID number
  */
-export function getHostId(vol_id, range) {
-    for (let i = 0; i < range.length; i++) {
-        if (vol_id <= range[i]) {
-            return i + 1;
-        }
+export function getHostId(vol_id) {
+    if (vol_id >= 0 && vol_id <= 431) {
+        return 1;
+    } else if (vol_id >= 432 && vol_id <= 863) {
+        return 2;
+    } else if (vol_id >= 864 && vol_id <= 1199) {
+        return 3;
+    } else if (vol_id >= 1200 && vol_id <= 1535) {
+        return 4;
+    } else {
+        return 5;
     }
 
-    return false;
+    // for (let i = 0; i < FEEDBACK_PHOTO_SHARD_RANGE.length; i++) {
+    //     if (vol_id <= FEEDBACK_PHOTO_SHARD_RANGE[i]) {
+    //         return i + 1;
+    //     }
+    // }
+
+    // return false;
 }
 
 /**
@@ -92,22 +108,24 @@ export function getFeedbackPhotosByPhotos(feedback, folderPath) {
 
     const result = [];
 
-    feedback.photos.map((item, index) => {
-        const name = path.parse(item.fullSizeUri).name;
-        const filename = path.parse(item.fullSizeUri).base;
-        const webpFilename = `${name}.webp`;
-        const filepath = path.resolve(folderPath, filename);
-        const webpFilepath = path.resolve(folderPath, webpFilename);
+    feedback.photos
+        .filter((item) => item.fullSizeUri.length)
+        .map((item, index) => {
+            const name = path.parse(item.fullSizeUri).name;
+            const filename = path.parse(item.fullSizeUri).base;
+            const webpFilename = `${name}.webp`;
+            const filepath = path.resolve(folderPath, filename);
+            const webpFilepath = path.resolve(folderPath, webpFilename);
 
-        result.push({
-            url: `https://feedbackphotos.wbstatic.net/${item.fullSizeUri}`,
-            filename,
-            filepath,
-            webpFilename,
-            webpFilepath,
-            index,
+            result.push({
+                url: `https://feedbackphotos.wbstatic.net/${item.fullSizeUri}`,
+                filename,
+                filepath,
+                webpFilename,
+                webpFilepath,
+                index,
+            });
         });
-    });
 
     return result;
 }
@@ -198,6 +216,7 @@ export async function getFeedback(itemId, feedback, queue) {
     // }
 
     photos.push(...getFeedbackPhotosByPhoto(feedback, itemFolderPath));
+    photos.push(...getFeedbackPhotosByPhotos(feedback, itemFolderPath));
 
     photos = photos.filter(({ filename, webpFilename }) => {
         const dbFiles = getFiles(prefix, itemId);
@@ -206,7 +225,10 @@ export async function getFeedback(itemId, feedback, queue) {
             return true;
         }
 
-        if (dbFiles.includes(filename) || dbFiles.includes(webpFilename)) {
+        if (
+            (dbFiles.includes(filename) || dbFiles.includes(webpFilename)) &&
+            options.force
+        ) {
             return false;
         }
 
@@ -348,12 +370,8 @@ export async function getItemInfo(itemId) {
         for (let i = 0; i < e.length; i++) if (t <= e[i]) return i + 1;
     }
 
-    const h = [
-        143, 287, 431, 719, 1007, 1061, 1115, 1169, 1313, 1601, 1655, 1919,
-    ];
-
     const s = Math.floor(itemId / 1e5);
-    const n = p(s, h);
+    const n = p(s, FEEDBACK_PHOTO_SHARD_RANGE);
 
     const url = `https://basket-${
         n && n >= 10 ? n : `0${n}`
@@ -541,10 +559,8 @@ export async function getPriceInfo(itemId) {
         for (let i = 0; i < e.length; i++) if (t <= e[i]) return i + 1;
     }
 
-    const h = [143, 287, 431, 719, 1007, 1061, 1115, 1169, 1313, 1601, 1655];
-
     const s = Math.floor(itemId / 1e5);
-    const n = p(s, h);
+    const n = p(s, FEEDBACK_PHOTO_SHARD_RANGE);
 
     const url = `https://basket-${
         n && n >= 10 ? n : `0${n}`
@@ -626,9 +642,10 @@ export async function getFeedbacks(itemId, query = false, queue) {
         }
 
         for (const feedback of feedbacks) {
-            queue.add(async () => getFeedback(itemId, feedback, queue), {
-                priority: priorities.review,
-            });
+            getFeedback(itemId, feedback, queue);
+            // queue.add(async () => getFeedback(itemId, feedback, queue), {
+            //     priority: priorities.review,
+            // });
         }
     }
 
@@ -1156,6 +1173,70 @@ export function updateItems(queue) {
 }
 
 /**
+ * Check reviews download status helper
+ *
+ * @param   {Object}  queue  Queue
+ *
+ * @return  {Boolean}        Result
+ */
+export async function checkReviews(queue) {
+    const items = getItems(prefix, true);
+
+    log(`Check ${items.length} items reviews`);
+
+    for (const itemId of items) {
+        const files = getItemFiles(prefix, itemId);
+
+        if (files.length) {
+            continue;
+        }
+
+        const item = getItem(prefix, itemId);
+
+        if (!item?.reviews?.length) {
+            continue;
+        }
+
+        if (item?.deleted) {
+            continue;
+        }
+
+        queue.add(
+            async () => {
+                for (const reviewId of item.reviews) {
+                    const feedback = await getReview(prefix, itemId, reviewId);
+
+                    if (!feedback?.photos?.length && !feedback?.photo?.length) {
+                        continue;
+                    }
+
+                    if (!files.length) {
+                        queue.add(
+                            async () => getFeedback(itemId, feedback, queue),
+                            {
+                                priority: priorities.review,
+                            }
+                        );
+                    }
+                }
+
+                logQueue(queue);
+            },
+            { priority: priorities.item }
+        );
+    }
+
+    logQueue(queue);
+
+    while (queue.size || queue.pending) {
+        await sleep(1000);
+        logQueue(queue);
+    }
+
+    return true;
+}
+
+/**
  * Update reviews helper
  *
  * @param   {Object}  queue  Queue
@@ -1176,33 +1257,47 @@ export async function updateReviews(queue) {
     }, 1000);
 
     for (const itemId of items) {
-        const item = getItem(prefix, itemId);
+        queue.add(
+            async () => {
+                const item = getItem(prefix, itemId);
 
-        if (!item?.reviews?.length) {
-            // log("No reviews found", itemId);
-            continue;
-        }
+                if (!item?.reviews?.length) {
+                    // log("No reviews found", itemId);
+                    return false;
+                }
 
-        if (item?.deleted) {
-            continue;
-        }
+                if (item?.deleted) {
+                    return false;
+                }
 
-        for (const reviewId of item.reviews) {
-            const feedback = await getReview(prefix, itemId, reviewId);
+                for (const reviewId of item.reviews) {
+                    const feedback = await getReview(prefix, itemId, reviewId);
 
-            getFeedback(itemId, feedback, queue);
-            // queue.add(async () => getFeedback(itemId, feedback, queue), {
-            //     priority: priorities.review,
-            // });
-        }
+                    if (!feedback?.photos?.length && !feedback?.photo?.length) {
+                        continue;
+                    }
+
+                    getFeedback(itemId, feedback, queue);
+                    // queue.add(
+                    //     async () => getFeedback(itemId, feedback, queue),
+                    //     {
+                    //         priority: priorities.review,
+                    //     }
+                    // );
+                }
+
+                logQueue(queue);
+            },
+            { priority: priorities.item }
+        );
     }
 
     logQueue(queue);
 
-    // while (queue.size || queue.pending) {
-    //     await sleep(1000);
-    //     logQueue(queue);
-    // }
+    while (queue.size || queue.pending) {
+        await sleep(1000);
+        logQueue(queue);
+    }
 
     return true;
 }

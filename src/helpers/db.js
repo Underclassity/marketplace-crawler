@@ -1645,4 +1645,32 @@ export async function deleteUser(prefix, userId) {
     return result ? true : false;
 }
 
+/**
+ * Get items files
+ *
+ * @param   {String}  prefix  Prefix
+ * @param   {String}  itemId  Item ID
+ *
+ * @return  {Array}           Files array
+ */
+export function getItemFiles(prefix, itemId) {
+    if (!prefix || !prefix.length) {
+        logMsg("Prefix not defined!");
+        return [];
+    }
+
+    const itemFolderPath = path.resolve(
+        options.directory,
+        "download",
+        prefix,
+        itemId.toString()
+    );
+
+    if (!fs.existsSync(itemFolderPath)) {
+        return [];
+    }
+
+    return fs.readdirSync(itemFolderPath);
+}
+
 export default updateTime;
