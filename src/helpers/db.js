@@ -94,7 +94,7 @@ export function dbWrite(
     dbPrefix,
     write = true,
     prefix = false,
-    waitTimeout = false
+    waitTimeout = true
 ) {
     if (!dbPrefix || !dbPrefix.length) {
         logMsg("DB prefix not defined!");
@@ -1564,7 +1564,7 @@ export async function addUserReview(prefix, id, reviewId, data) {
 
     const db = dbCache[dbPrefix];
 
-    const dbItem = await db.get(id.toString());
+    let dbItem = await db.get(id.toString());
 
     // Update user data
     if (dbItem) {
@@ -1587,12 +1587,35 @@ export async function addUserReview(prefix, id, reviewId, data) {
             }
         }
     } else {
-        // Create new user if not defined
-        await db.set(id.toString(), {
-            id,
-            info: { ...data },
-            reviews: [reviewId],
-        });
+        try {
+            // Create new user if not defined
+            await db.set(id.toString(), {
+                id,
+                info: { ...data },
+                reviews: [reviewId],
+            });
+        } catch (error) {
+            dbItem = await db.get(id.toString());
+
+            if (!dbItem.reviews.includes(reviewId)) {
+                dbItem.reviews.push(reviewId);
+                await db.set(id.toString(), dbItem);
+            }
+
+            if (!deepEqual(dbItem.info, data)) {
+                for (const dataId in data) {
+                    if (dbItem.info[dataId] != data[dataId]) {
+                        if (dataId == "country") {
+                            continue;
+                        }
+
+                        dbItem.info[dataId] = data[dataId];
+
+                        await db.set(id.toString(), dbItem);
+                    }
+                }
+            }
+        }
     }
 
     return true;

@@ -542,6 +542,27 @@
             "program": "${workspaceFolder}\\log.js",
             "args": ["--include", "wildberries"]
         },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Wildberries Reviews Reverse",
+            "skipFiles": ["<node_internals>/**"],
+            "program": "${workspaceFolder}\\index.js",
+            "args": [
+                "--thumbnail",
+                "false",
+                "--include",
+                "wildberries",
+                "--throat",
+                "10",
+                "--timeout",
+                "10000",
+                "--reverse",
+                "true",
+                "--check",
+                "true"
+            ]
+        },
 
         // Wiggle
         {

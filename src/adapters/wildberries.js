@@ -216,7 +216,7 @@ export async function getFeedback(itemId, feedback, queue) {
     // }
 
     photos.push(...getFeedbackPhotosByPhoto(feedback, itemFolderPath));
-    photos.push(...getFeedbackPhotosByPhotos(feedback, itemFolderPath));
+    // photos.push(...getFeedbackPhotosByPhotos(feedback, itemFolderPath));
 
     photos = photos.filter(({ filename, webpFilename }) => {
         const dbFiles = getFiles(prefix, itemId);
