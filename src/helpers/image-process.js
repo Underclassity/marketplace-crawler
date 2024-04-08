@@ -16,6 +16,7 @@ import generateThumbail from "./generate-thumbnail.js";
 import getHeaders from "./get-headers.js";
 import logMsg from "./log-msg.js";
 import priorities from "./priorities.js";
+import queueCall from "./queue-call.js";
 import sleep from "./sleep.js";
 
 import options from "../options.js";
@@ -369,9 +370,12 @@ export async function downloadFile(url, filepath, queue, itemId, prefix) {
 
     // wait for file
     if (result && !fs.existsSync(filepath)) {
-        while (result && !fs.existsSync(filepath)) {
+        let counter = 0;
+
+        while (result && !fs.existsSync(filepath) && counter <= 10) {
             logMsg(`Wait for file ${filename}`, itemId, prefix);
             await sleep(1000);
+            counter++;
         }
     }
 
@@ -454,41 +458,39 @@ export async function downloadVideo(url, filepath, queue, itemId, prefix) {
  * @return  {Object}         Result object
  */
 export async function isExist(url, queue) {
-    let result;
-
-    await queue.add(
+    return await queueCall(
         async () => {
             try {
+                if (url.includes("undefined")) {
+                    debugger;
+                }
+
                 const headRequest = await axios(url, {
                     method: "head",
-                    timeout: 5000,
+                    timeout: 3000,
                     headers: getHeaders(),
                 });
+
                 const { headers } = headRequest;
 
                 const contentLength = parseInt(headers["content-length"]);
 
-                result = {
+                return {
                     size: contentLength,
                     exists: true,
                     error: false,
                 };
             } catch (error) {
-                result = {
+                return {
                     size: false,
                     exists: false,
                     error,
                 };
             }
         },
-        { priority: priorities.checkSize }
+        queue,
+        priorities.checkSize
     );
-
-    while (!result) {
-        await sleep(10);
-    }
-
-    return result;
 }
 
 /**
@@ -655,12 +657,27 @@ export async function downloadItem(url, filepath, queue, isVideo = false) {
         return true;
     }
 
-    const { exists, size } = await isExist(url, queue);
+    let exists = false;
+    let size = false;
+    let isSizeEqual = false;
 
-    const isSizeEqual =
-        fs.existsSync(filepath) && size && size == fs.statSync(filepath).size
-            ? true
-            : false;
+    const isFileExists = fs.existsSync(filepath);
+
+    if (isFileExists) {
+        exists = true;
+        isSizeEqual = true;
+        size = fs.statSync(filepath).size;
+    } else {
+        const result = await isExist(url, queue);
+
+        exists = result.exists;
+        size = result.size;
+
+        isSizeEqual =
+            isFileExists && size && size == fs.statSync(filepath).size
+                ? true
+                : false;
+    }
 
     // const isSizeEqual = await checkSize(
     //     url,

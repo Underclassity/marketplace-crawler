@@ -173,6 +173,11 @@ export const options = yargs(hideBin(process.argv))
         describe: "Reverse priority queue flag",
         default: false,
         type: "boolean",
+    })
+    .option("queue", {
+        describe: "Use queue for process tasks",
+        default: true,
+        type: "boolean",
     }).argv;
 
 console.log("Options:");

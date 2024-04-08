@@ -1,0 +1,25 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Echo param",
+            "type": "shell",
+            "command": "echo ${input:param1}",
+            "problemMatcher": []
+        },
+        {
+            "label": "Echo without param",
+            "type": "shell",
+            "command": "echo Hello",
+            "problemMatcher": []
+        }
+    ],
+    "inputs": [
+        {
+            "id": "param1",
+            "description": "Param1:",
+            "default": "Hello",
+            "type": "promptString"
+        }
+    ]
+}

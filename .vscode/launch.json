@@ -467,6 +467,8 @@
                 "false",
                 "--time",
                 "24",
+                "--throat",
+                "10",
                 "--include",
                 "wildberries",
                 "--update",
@@ -516,27 +518,6 @@
         {
             "type": "node",
             "request": "launch",
-            "name": "Wildberries Reviews Reverse",
-            "skipFiles": ["<node_internals>/**"],
-            "program": "${workspaceFolder}\\index.js",
-            "args": [
-                "--thumbnail",
-                "false",
-                "--include",
-                "wildberries",
-                "--throat",
-                "10",
-                "--timeout",
-                "10000",
-                "--reverse",
-                "true",
-                "--reviews",
-                "true"
-            ]
-        },
-        {
-            "type": "node",
-            "request": "launch",
             "name": "Wildberries Log",
             "skipFiles": ["<node_internals>/**"],
             "program": "${workspaceFolder}\\log.js",
@@ -545,7 +526,7 @@
         {
             "type": "node",
             "request": "launch",
-            "name": "Wildberries Reviews Reverse",
+            "name": "Wildberries Check Reverse",
             "skipFiles": ["<node_internals>/**"],
             "program": "${workspaceFolder}\\index.js",
             "args": [
@@ -568,7 +549,7 @@
         {
             "type": "node",
             "request": "launch",
-            "name": "Wiggle Brands",
+            "name": "Wiggle Brands Reverse",
             "skipFiles": ["<node_internals>/**"],
             "program": "${workspaceFolder}\\index.js",
             "args": [
@@ -576,6 +557,10 @@
                 "false",
                 "--time",
                 "24",
+                "--throat",
+                "10",
+                "--reverse",
+                "true",
                 "--include",
                 "wiggle",
                 "--brands",

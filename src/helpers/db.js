@@ -102,7 +102,6 @@ export function dbWrite(
     }
 
     if (!is.string(dbPrefix)) {
-        console.trace();
         logMsg(`Input DB prefix ${dbPrefix} is not a string!`, false, prefix);
         return false;
     }
@@ -571,8 +570,8 @@ export function updateBrand(prefix, itemId, brand) {
 
     if (brand?.length) {
         brand = brand.trim();
-    } else {
-        console.trace();
+    } else if (!brand) {
+        // console.trace();
         logMsg("Brand not defined!");
 
         return false;
@@ -696,11 +695,11 @@ export function getBrands(prefix, withNames = false) {
     for (const itemId in db.data) {
         const item = db.data[itemId];
 
-        if (!withNames && item?.brand?.length && !brands.includes(item.brand)) {
+        if (!withNames && item?.brand && !brands.includes(item.brand)) {
             brands.push(item.brand);
         }
 
-        if (withNames && item?.brand?.length && !(item.brand in brands)) {
+        if (withNames && item?.brand && !(item.brand in brands)) {
             brands[item.brand] = { id: item.brand, name: undefined };
         }
 
@@ -737,7 +736,7 @@ export function getBrands(prefix, withNames = false) {
     if (!withNames) {
         return brands
             .filter((item) => item)
-            .map((item) => item.trim())
+            .map((item) => (item?.trim ? item.trim() : item))
             .filter((item, index, array) => array.indexOf(item) === index);
     }
 
@@ -1694,6 +1693,43 @@ export function getItemFiles(prefix, itemId) {
     }
 
     return fs.readdirSync(itemFolderPath);
+}
+
+/**
+ * Remove item directory
+ *
+ * @param   {String}  prefix  Prefix
+ * @param   {String}  itemId  Item ID
+ *
+ * @return  {Array}           Files array
+ */
+export function removeItemFiles(prefix, itemId) {
+    if (!prefix || !prefix.length) {
+        logMsg("Prefix not defined!");
+        return [];
+    }
+
+    const itemFolderPath = path.resolve(
+        options.directory,
+        "download",
+        prefix,
+        itemId.toString()
+    );
+
+    if (!fs.existSync(itemFolderPath)) {
+        logMsg("Item dir not found", itemId, prefix);
+        return false;
+    }
+
+    try {
+        logMsg("Remove item dir", itemId, prefix);
+        fs.rmdirSync(itemFolderPath, { recursive: true });
+    } catch (error) {
+        logMsg(`Remove item dir error: ${error.message}`, itemId, prefix);
+        return false;
+    }
+
+    return true;
 }
 
 export default updateTime;

@@ -118,30 +118,30 @@ puppeteer.use(StealthPlugin());
         queue.eta.report(queue.min);
     });
 
-    // if (options.id) {
-    //     const browser = await puppeteer.launch({
-    //         headless: options.headless,
-    //         devtools: options.headless ? false : true,
-    //     });
+    if (options.id) {
+        logMsg(`Update item ${options.id}`);
 
-    //     logMsg(`Update item ${options.id}`);
+        if (ids.includes("aliexpress") && options.cookies) {
+            await processCookiesAndSession();
+        }
 
-    //     queue.add(
-    //         () =>
-    //             getOzonItem(
-    //                 null,
-    //                 options.id,
-    //                 options.query || "ID",
-    //                 queue,
-    //                 browser
-    //             ),
-    //         {
-    //             priority: 9,
-    //         }
-    //     );
+        for (const id of ids) {
+            const { getItemByID } = await import(`./src/adapters/${id}.js`);
 
-    //     return true;
-    // }
+            if (getItemByID) {
+                getItemByID(options.id, queue);
+            } else {
+                logMsg("Update item by ID not found!", false, id);
+            }
+        }
+
+        while (queue.size || queue.pending || isDBWriting()) {
+            await sleep(1000);
+            logQueue(queue);
+        }
+
+        return true;
+    }
 
     if (options.reviews) {
         logMsg("Update items reviews");

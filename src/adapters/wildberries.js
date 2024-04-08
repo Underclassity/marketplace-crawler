@@ -88,6 +88,11 @@ export function feedBackPhotoPath(photoId) {
     const vol_id = Math.floor(photoId / 100_000);
     const host = getHostId(vol_id, FEEDBACK_PHOTO_SHARD_RANGE);
     const part_id = Math.floor(photoId / 1000);
+
+    if (host == undefined || part_id == undefined || vol_id == undefined) {
+        debugger;
+    }
+
     return `https://feedback${
         host && host >= 10 ? host : `0${host}`
     }.wb.ru/vol${vol_id}/part${part_id}/${photoId}/photos/fs.webp`;
@@ -1015,11 +1020,13 @@ export async function processItems(items, brand = options.brand, queue) {
 export async function updateBrands(queue) {
     const brandIDs = getBrands(prefix);
 
+    log(`Update brands: ${brandIDs.length}`);
+
     for (const brandID of brandIDs) {
         const brandItems = await queue.add(
             async () => getBrandItemsByID(brandID, queue),
             {
-                priority: priorities.item,
+                priority: priorities.page,
             }
         );
 
@@ -1031,6 +1038,13 @@ export async function updateBrands(queue) {
         log(`Found ${brandItems.length || 0} items for brand ${brandID}`);
 
         processItems(brandItems, brandID, queue);
+    }
+
+    logQueue(queue);
+
+    while (queue.size || queue.pending) {
+        await sleep(1000);
+        logQueue(queue);
     }
 
     return true;
@@ -1115,6 +1129,35 @@ export async function updateItemsByCategory(categoryId, queue) {
         queue.add(() => getFeedbacks(itemId, false, queue), {
             priority: priorities.item,
         });
+    }
+
+    return true;
+}
+
+/**
+ * Get item by ID
+ *
+ * @param   {String}  itemId      Item ID
+ * @param   {Object}  queue       Queue instance
+ *
+ * @return  {Boolean}             Result
+ */
+export async function getItemByID(itemId = options.id, queue) {
+    if (!itemId) {
+        return false;
+    }
+
+    log("Get item call", itemId);
+
+    queue.add(() => getFeedbacks(itemId, false, queue), {
+        priority: priorities.item,
+    });
+
+    logQueue(queue);
+
+    while (queue.size || queue.pending) {
+        await sleep(1000);
+        logQueue(queue);
     }
 
     return true;
@@ -1264,10 +1307,12 @@ export async function updateReviews(queue) {
                 if (!item?.reviews?.length) {
                     // log("No reviews found", itemId);
                     return false;
+                    // continue;
                 }
 
                 if (item?.deleted) {
                     return false;
+                    // continue;
                 }
 
                 for (const reviewId of item.reviews) {
@@ -1278,12 +1323,9 @@ export async function updateReviews(queue) {
                     }
 
                     getFeedback(itemId, feedback, queue);
-                    // queue.add(
-                    //     async () => getFeedback(itemId, feedback, queue),
-                    //     {
-                    //         priority: priorities.review,
-                    //     }
-                    // );
+                    // queue.add(async () => getFeedback(itemId, feedback, queue), {
+                    //     priority: priorities.review,
+                    // });
                 }
 
                 logQueue(queue);
@@ -1412,6 +1454,7 @@ export async function getBrandItemsByID(brandID, queue) {
         addInfoToProducts(getItemsData.data.products);
 
         const results = getItemsData.data.products
+            .filter((item) => item.brandId == brandID)
             .map((item) => item.root)
             .filter((item, index, array) => array.indexOf(item) === index)
             .map((item) => (item = parseInt(item, 10)))
@@ -1476,6 +1519,13 @@ export async function getItemsByBrand(queue, brand = options.brand) {
     const items = await getBrandItemsByID(brand, queue);
 
     processItems(items, brand, queue);
+
+    logQueue(queue);
+
+    while (queue.size || queue.pending) {
+        await sleep(1000);
+        logQueue(queue);
+    }
 
     return true;
 }
