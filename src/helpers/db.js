@@ -1,9 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { LowSync } from "lowdb";
-import { JSONFileSync } from "lowdb/node";
-
 import { QuickDB } from "quick.db";
 
 import is from "is_js";
@@ -17,29 +14,7 @@ import options from "../options.js";
 
 const dbPath = path.resolve(options.directory, "db");
 
-const writeCache = {};
 const dbCache = {};
-
-/**
- * Check is DB writing
- *
- * @return  {Boolean}  DB write flag
- */
-export function isDBWriting(dbPrefix = false) {
-    let isWriting = false;
-
-    for (const id in writeCache) {
-        if (dbPrefix && id != dbPrefix) {
-            continue;
-        }
-
-        if (writeCache[id]) {
-            isWriting = true;
-        }
-    }
-
-    return isWriting;
-}
 
 /**
  * Load DB by prefix
@@ -55,142 +30,12 @@ export function loadDB(dbPrefix) {
     }
 
     if (!(dbPrefix in dbCache)) {
-        if (dbPrefix.includes("-reviews") || dbPrefix.includes("-users")) {
-            dbCache[dbPrefix] = new QuickDB({
-                filePath: path.resolve(dbPath, `${dbPrefix}.sqlite`),
-            });
-        } else {
-            dbCache[dbPrefix] = new LowSync(
-                new JSONFileSync(path.resolve(dbPath, `${dbPrefix}.json`))
-            );
-
-            const db = dbCache[dbPrefix];
-
-            db.read();
-
-            if (!db.data) {
-                db.data = {};
-                db.write();
-            }
-        }
+        dbCache[dbPrefix] = new QuickDB({
+            filePath: path.resolve(dbPath, `${dbPrefix}.sqlite`),
+        });
     }
-
-    // dbCache[dbPrefix].read();
 
     return dbCache[dbPrefix];
-}
-
-/**
- * Write in DB helper
- *
- * @param   {String}    dbPrefix       DB prefix
- * @param   {Boolean}   write          Write flag
- * @param   {String}    prefix         Prefix
- * @param   {Boolean}   waitTimeout    Wait for write timeout
- *
- * @return  {Boolean}                  Result
- */
-export function dbWrite(
-    dbPrefix,
-    write = true,
-    prefix = false,
-    waitTimeout = true
-) {
-    if (!dbPrefix || !dbPrefix.length) {
-        logMsg("DB prefix not defined!");
-        return false;
-    }
-
-    if (!is.string(dbPrefix)) {
-        logMsg(`Input DB prefix ${dbPrefix} is not a string!`, false, prefix);
-        return false;
-    }
-
-    loadDB(dbPrefix);
-
-    const db = dbCache[dbPrefix];
-
-    if (!db || !db.write) {
-        debugger;
-        logMsg("DB not defined!");
-        return false;
-    }
-
-    if (!write) {
-        return false;
-    }
-
-    if (dbPrefix && dbPrefix in writeCache && writeCache[dbPrefix]) {
-        logMsg(`Already writing in DB ${dbPrefix}`, false, prefix);
-        return false;
-    }
-
-    try {
-        if (dbPrefix) {
-            writeCache[dbPrefix] = true;
-        }
-
-        if (waitTimeout) {
-            setTimeout(() => {
-                const startTime = Date.now();
-
-                try {
-                    db.write();
-                } catch (error) {
-                    logMsg(
-                        `Write in DB ${dbPrefix} error: ${error}`,
-                        false,
-                        prefix
-                    );
-                }
-
-                const endTime = Date.now();
-
-                logMsg(
-                    `Write in DB ${dbPrefix}: ${endTime - startTime}ms`,
-                    false,
-                    prefix
-                );
-            }, 0);
-        } else {
-            const startTime = Date.now();
-
-            try {
-                db.write();
-            } catch (error) {
-                logMsg(
-                    `Write in DB ${dbPrefix} error: ${error}`,
-                    false,
-                    prefix
-                );
-            }
-
-            const endTime = Date.now();
-
-            logMsg(
-                `Write in DB ${dbPrefix}: ${endTime - startTime}ms`,
-                false,
-                prefix
-            );
-        }
-
-        // Add sleep tick
-        if (dbPrefix && waitTimeout) {
-            setTimeout(() => {
-                writeCache[dbPrefix] = false;
-            }, 10_000);
-        } else {
-            writeCache[dbPrefix] = false;
-        }
-    } catch (error) {
-        logMsg(`Write DB error: ${error.message}`, false, prefix);
-
-        if (dbPrefix) {
-            writeCache[dbPrefix] = false;
-        }
-    }
-
-    return true;
 }
 
 /**
@@ -202,7 +47,7 @@ export function dbWrite(
  *
  * @return  {Boolean}            Result
  */
-export function dbItemCheck(dbPrefix, itemId, prefix) {
+export async function dbItemCheck(dbPrefix, itemId, prefix) {
     if (!dbPrefix || !dbPrefix.length) {
         logMsg("DB prefix not defined!");
         return false;
@@ -222,30 +67,35 @@ export function dbItemCheck(dbPrefix, itemId, prefix) {
 
     const db = dbCache[dbPrefix];
 
-    if (!db || !db.write) {
+    if (!db) {
         logMsg("DB not defined!");
         return false;
     }
 
-    if (!(itemId in db.data)) {
-        db.data[itemId] = {
+    let item = await db.get(itemId.toString());
+
+    if (!item) {
+        await db.set(itemId.toString(), {
             id: itemId,
             reviews: [],
             tags: [],
             brand: undefined,
-        };
-
-        dbWrite(dbPrefix, true, prefix);
+        });
+        item = await db.get(itemId.toString());
     }
 
-    if (!("reviews" in db.data[itemId])) {
-        db.data[itemId].reviews = {};
-        dbWrite(dbPrefix, true, prefix);
+    if (!("reviews" in item)) {
+        await db.set(itemId.toString(), {
+            ...item,
+            reviews: {},
+        });
     }
 
-    if (!("tags" in db.data[itemId])) {
-        db.data[itemId].tags = [];
-        dbWrite(dbPrefix, true, prefix);
+    if (!("tags" in item)) {
+        await db.set(itemId.toString(), {
+            ...item,
+            tags: [],
+        });
     }
 
     return true;
@@ -260,7 +110,7 @@ export function dbItemCheck(dbPrefix, itemId, prefix) {
  *
  * @return  {Boolean}          Result
  */
-export function addItem(prefix, itemId, data = {}) {
+export async function addItem(prefix, itemId, data = {}) {
     if (!prefix || !prefix.length) {
         logMsg("Prefix not defined!");
         return false;
@@ -282,21 +132,21 @@ export function addItem(prefix, itemId, data = {}) {
 
     const db = dbCache[dbPrefix];
 
-    if (itemId in db.data && !options.force) {
+    const item = await getItem(prefix, itemId);
+
+    if (item && !options.force) {
         logMsg("Item already in DB", itemId, prefix);
     } else {
         logMsg("Add new item", itemId, prefix);
 
-        db.data[itemId] = {
+        await db.set(itemId.toString(), {
             id: itemId,
             reviews: [],
             tags: options.query ? [options.query] : [],
             time: 0,
             brand: undefined,
             ...data,
-        };
-
-        dbWrite(dbPrefix, true, prefix);
+        });
     }
 
     return true;
@@ -310,7 +160,7 @@ export function addItem(prefix, itemId, data = {}) {
  *
  * @return  {Boolean}          Result
  */
-export function deleteItem(prefix, itemId) {
+export async function deleteItem(prefix, itemId) {
     if (!prefix || !prefix.length) {
         logMsg("Prefix not defined!");
         return false;
@@ -321,7 +171,7 @@ export function deleteItem(prefix, itemId) {
         return false;
     }
 
-    const dbItem = getItem(prefix, itemId);
+    const dbItem = await getItem(prefix, itemId);
 
     if (!dbItem) {
         logMsg(`Item ${itemId} not found in adapter ${prefix}`);
@@ -334,8 +184,10 @@ export function deleteItem(prefix, itemId) {
 
     const db = dbCache[dbPrefix];
 
-    db.data[itemId].deleted = true;
-    dbWrite(dbPrefix, true, prefix);
+    await db.set(itemId.toString(), {
+        ...dbItem,
+        deleted: true,
+    });
 
     const thumbnailFilePath = path.resolve(
         options.directory,
@@ -348,7 +200,7 @@ export function deleteItem(prefix, itemId) {
         options.directory,
         "download",
         prefix,
-        itemId
+        itemId.toString()
     );
 
     // delete thumbnail
@@ -372,11 +224,10 @@ export function deleteItem(prefix, itemId) {
  * @param   {String}   prefix  Prefix
  * @param   {String}   itemId  Item ID
  * @param   {Object}   data    Data
- * @param   {Boolean}  write   Write flag
  *
  * @return  {Boolean}          Result
  */
-export function updateItem(prefix, itemId, data, write = true) {
+export async function updateItem(prefix, itemId, data) {
     if (!prefix || !prefix.length) {
         logMsg("Prefix not defined!");
         return false;
@@ -396,7 +247,7 @@ export function updateItem(prefix, itemId, data, write = true) {
 
     loadDB(dbPrefix);
 
-    const item = getItem(prefix, itemId);
+    const item = await getItem(prefix, itemId);
 
     if (!item) {
         return false;
@@ -405,8 +256,7 @@ export function updateItem(prefix, itemId, data, write = true) {
     const newObject = { ...item, ...data };
 
     if (!deepEqual(newObject, item)) {
-        dbCache[dbPrefix].data[itemId] = newObject;
-        dbWrite(dbPrefix, write, prefix);
+        await dbCache[dbPrefix].set(itemId.toString(), newObject);
     }
 
     return true;
@@ -420,7 +270,7 @@ export function updateItem(prefix, itemId, data, write = true) {
  *
  * @return  {Object}          DB item
  */
-export function getItem(prefix, itemId) {
+export async function getItem(prefix, itemId) {
     if (!prefix || !prefix.length) {
         logMsg("Prefix not defined!");
         return false;
@@ -435,8 +285,10 @@ export function getItem(prefix, itemId) {
 
     loadDB(dbPrefix);
 
-    if (itemId in dbCache[dbPrefix].data) {
-        return dbCache[dbPrefix].data[itemId];
+    const item = await dbCache[dbPrefix].get(itemId.toString());
+
+    if (item) {
+        return item;
     } else {
         logMsg("Item not found in DB", itemId, prefix);
         return false;
@@ -452,7 +304,7 @@ export function getItem(prefix, itemId) {
  *
  * @return  {Boolean}         Result
  */
-export function updateTime(prefix, itemId, time = Date.now()) {
+export async function updateTime(prefix, itemId, time = Date.now()) {
     if (!prefix || !prefix.length) {
         logMsg("Prefix not defined!");
         return false;
@@ -467,13 +319,16 @@ export function updateTime(prefix, itemId, time = Date.now()) {
 
     loadDB(dbPrefix);
 
-    if (!dbItemCheck(dbPrefix, itemId, prefix)) {
+    if (!(await dbItemCheck(dbPrefix, itemId, prefix))) {
         return false;
     }
 
-    dbCache[dbPrefix].data[itemId].time = time;
+    const item = await dbCache[dbPrefix].get(itemId.toString());
 
-    dbWrite(dbPrefix, true, prefix);
+    await dbCache[dbPrefix].set(itemId.toString(), {
+        ...item,
+        time,
+    });
 
     return true;
 }
@@ -487,7 +342,7 @@ export function updateTime(prefix, itemId, time = Date.now()) {
  *
  * @return  {Boolean}         Result
  */
-export function updateTags(prefix, itemId, tag) {
+export async function updateTags(prefix, itemId, tag) {
     if (!prefix || !prefix.length) {
         logMsg("Prefix not defined!");
         return false;
@@ -509,7 +364,7 @@ export function updateTags(prefix, itemId, tag) {
 
     const db = dbCache[dbPrefix];
 
-    if (!dbItemCheck(dbPrefix, itemId, prefix)) {
+    if (!(await dbItemCheck(dbPrefix, itemId, prefix))) {
         return false;
     }
 
@@ -522,12 +377,18 @@ export function updateTags(prefix, itemId, tag) {
         return false;
     }
 
-    if (!("tags" in db.data[itemId])) {
-        db.data[itemId].tags = [tag];
-        dbWrite(dbPrefix, true, prefix);
-    } else if (!db.data[itemId].tags.includes(tag)) {
-        db.data[itemId].tags.push(tag);
-        dbWrite(dbPrefix, true, prefix);
+    const item = await db.get(itemId.toString());
+
+    if (!("tags" in item)) {
+        await db.set(itemId.toString(), {
+            ...item,
+            tags: [tag],
+        });
+    } else if (!item.tags.includes(tag)) {
+        await db.set(itemId.toString(), {
+            ...item,
+            tags: [...item.tags, tag],
+        });
     }
 
     return true;
@@ -542,7 +403,7 @@ export function updateTags(prefix, itemId, tag) {
  *
  * @return  {Boolean}         Result
  */
-export function updateBrand(prefix, itemId, brand) {
+export async function updateBrand(prefix, itemId, brand) {
     if (!prefix || !prefix.length) {
         logMsg("Prefix not defined!");
         return false;
@@ -564,7 +425,7 @@ export function updateBrand(prefix, itemId, brand) {
 
     const db = dbCache[dbPrefix];
 
-    if (!dbItemCheck(dbPrefix, itemId, prefix)) {
+    if (!(await dbItemCheck(dbPrefix, itemId, prefix))) {
         return false;
     }
 
@@ -577,10 +438,14 @@ export function updateBrand(prefix, itemId, brand) {
         return false;
     }
 
+    const item = await db.get(itemId.toString());
+
     // Add brand id if not defined
-    if (!("brand" in db.data[itemId])) {
-        db.data[itemId].brand = brand;
-        dbWrite(dbPrefix, true, prefix);
+    if (!("brand" in item)) {
+        await db.set(itemId.toString(), {
+            ...item,
+            brand,
+        });
     }
 
     return true;
@@ -596,7 +461,7 @@ export function updateBrand(prefix, itemId, brand) {
  *
  * @return  {Array}                      Items IDs array or items objects array
  */
-export function getItems(
+export async function getItems(
     prefix = false,
     force = options.force,
     deleted = false,
@@ -613,54 +478,61 @@ export function getItems(
 
     const db = dbCache[dbPrefix];
 
-    if (!db || !db.write) {
+    if (!db) {
         logMsg("DB not defined!", false, prefix);
         return false;
     }
 
     const time = options.time * 60 * 60 * 1000;
 
-    const items = Object.keys(db.data)
-        .filter((id) => {
-            const item = db.data[id];
+    const items = await db.all();
 
-            if (options.favorite) {
-                const favoriteFlag = isFavorite(prefix, id);
+    let filteredItems = [];
 
-                if (!favoriteFlag) {
-                    return false;
-                }
+    // Process async fitler
+    for (const { id, value: item } of items) {
+        if (options.favorite) {
+            const favoriteFlag = await isFavorite(prefix, id);
+
+            if (!favoriteFlag) {
+                continue;
             }
+        }
 
-            if (item?.time && Date.now() - item.time <= time && !force) {
-                logMsg(`Already updated by time`, id, prefix);
-                return false;
-            }
+        if (item?.time && Date.now() - item.time <= time && !force) {
+            logMsg(`Already updated by time`, id, prefix);
+            continue;
+        }
 
-            if ("deleted" in item && item.deleted && !deleted) {
-                logMsg(`Deleted item`, id, prefix);
+        if ("deleted" in item && item.deleted && !deleted) {
+            logMsg(`Deleted item`, id, prefix);
 
-                return false;
-            }
+            continue;
+        }
 
-            if (options.id?.length && id.toString() != options.id) {
-                return false;
-            }
+        if (options.id?.length && id.toString() != options.id) {
+            continue;
+        }
 
-            return true;
-        })
+        filteredItems.push(item);
+    }
+
+    filteredItems = filteredItems
         .sort((a, b) => {
             const aReviewsCount = a.reviews ? Object.keys(a.reviews).length : 0;
             const bReviewsCount = b.reviews ? Object.keys(b.reviews).length : 0;
 
             return aReviewsCount - bReviewsCount;
+        })
+        .map((item) => {
+            if (objects) {
+                return item;
+            }
+
+            return item.id;
         });
 
-    if (objects) {
-        return items.map((id) => db.data[id]);
-    }
-
-    return items;
+    return filteredItems;
 }
 
 /**
@@ -671,7 +543,7 @@ export function getItems(
  *
  * @return  {Array}               Array of brands
  */
-export function getBrands(prefix, withNames = false) {
+export async function getBrands(prefix, withNames = false) {
     if (!prefix || !prefix.length) {
         logMsg("Prefix not defined!");
         return false;
@@ -683,18 +555,16 @@ export function getBrands(prefix, withNames = false) {
 
     const db = dbCache[dbPrefix];
 
-    if (!db || !db.write) {
+    if (!db) {
         logMsg("DB not defined!", false, prefix);
         return false;
     }
 
-    db.read();
+    const items = await db.all();
 
     const brands = withNames ? {} : [];
 
-    for (const itemId in db.data) {
-        const item = db.data[itemId];
-
+    for (const { value: item } of items) {
         if (!withNames && item?.brand && !brands.includes(item.brand)) {
             brands.push(item.brand);
         }
@@ -750,7 +620,7 @@ export function getBrands(prefix, withNames = false) {
  *
  * @return  {Array}           Array of tags
  */
-export function getTags(prefix) {
+export async function getTags(prefix) {
     if (!prefix || !prefix.length) {
         logMsg("Prefix not defined!");
         return false;
@@ -762,18 +632,16 @@ export function getTags(prefix) {
 
     const db = dbCache[dbPrefix];
 
-    if (!db || !db.write) {
+    if (!db) {
         logMsg("DB not defined!", false, prefix);
         return false;
     }
 
-    db.read();
+    const items = await db.all();
 
     let tags = [];
 
-    for (const itemId in db.data) {
-        const item = db.data[itemId];
-
+    for (const { value: item } of items) {
         if (item?.tags?.length && !item?.deleted) {
             item.tags.forEach((tag) => {
                 if (!tags.includes(tag)) {
@@ -813,9 +681,7 @@ export async function getUsersFromReviews(prefix) {
 
     const reviews = await dbCache[dbReviewsPrefix].all();
 
-    for (const reviewId in reviews) {
-        const reviewItem = reviews[reviewId];
-
+    for (const { id: reviewId, value: reviewItem } in reviews) {
         if (prefix == "wildberries") {
             const { wbUserId } = reviewItem;
 
@@ -915,7 +781,7 @@ export async function getReview(prefix, itemId, reviewId) {
         return false;
     }
 
-    const item = getItem(prefix, itemId);
+    const item = await getItem(prefix, itemId);
 
     if (!item) {
         return false;
@@ -929,7 +795,7 @@ export async function getReview(prefix, itemId, reviewId) {
 
     loadDB(dbReviewsPrefix);
 
-    return await dbCache[dbReviewsPrefix].get(reviewId);
+    return await dbCache[dbReviewsPrefix].get(reviewId.toString());
 }
 
 /**
@@ -960,9 +826,7 @@ export async function getReviews(prefix, query = false) {
 
     const results = [];
 
-    for (const reviewId in reviews) {
-        const reviewItem = reviews[reviewId];
-
+    for (const { value: reviewItem } in reviews) {
         for (const queryId in query) {
             if (reviewItem[queryId] == query[queryId]) {
                 results.push(reviewItem);
@@ -980,16 +844,9 @@ export async function getReviews(prefix, query = false) {
  * @param   {String}   itemId       Item ID
  * @param   {String}   reviewId     Review ID
  * @param   {Object}   review       Review object
- * @param   {Boolean}  write        Write flag
  * @return  {Boolean}               Result
  */
-export async function addReview(
-    prefix,
-    itemId,
-    reviewId,
-    review,
-    write = true
-) {
+export async function addReview(prefix, itemId, reviewId, review) {
     if (!prefix || !prefix.length) {
         logMsg("Prefix not defined!");
         return false;
@@ -1025,49 +882,51 @@ export async function addReview(
     const reviewsDB = dbCache[dbReviewsPrefix];
 
     if (options.force) {
-        await reviewsDB.set(reviewId, review);
+        await reviewsDB.set(reviewId.toString(), review);
 
         logMsg(`Force update review ${reviewId} in DB`, itemId, prefix);
 
         return true;
     }
 
-    let isWrite = false;
+    let item = await productsDB.get(itemId.toString());
 
     // Add item if not defined
-    if (!(itemId in productsDB.data)) {
-        addItem(prefix, itemId);
+    if (!item) {
+        await addItem(prefix, itemId);
+
+        item = await productsDB.get(itemId.toString());
     }
 
     // Convert old object reviews to new array type
-    if (!Array.isArray(productsDB.data[itemId].reviews)) {
-        productsDB.data[itemId].reviews = Object.keys(
-            productsDB.data[itemId].reviews
-        );
-        dbWrite(dbProductsPrefix, write, prefix);
-        isWrite = true;
+    if (!Array.isArray(item.reviews)) {
+        await productsDB.set(itemId.toString(), {
+            ...item,
+            reviews: Object.keys(item.reviews),
+        });
     }
 
     // Check is review in product item
-    if (!productsDB.data[itemId].reviews.includes(reviewId)) {
-        productsDB.data[itemId].reviews.push(reviewId);
-        dbWrite(dbProductsPrefix, write, prefix);
-        isWrite = true;
+    if (!item.reviews.includes(reviewId)) {
+        await productsDB.set(itemId.toString(), {
+            ...item,
+            reviews: [...item.reviews, reviewId],
+        });
     }
 
-    let reviewItem = await reviewsDB.get(reviewId);
+    let reviewItem = await reviewsDB.get(reviewId.toString());
 
     if (!reviewItem) {
-        reviewItem = await reviewsDB.set(reviewId, review);
+        reviewItem = await reviewsDB.set(reviewId.toString(), review);
         logMsg(`Force add/update review ${reviewId} in DB`, itemId, prefix);
     } else if (deepEqual(reviewItem, review)) {
         logMsg(`Review ${reviewId} already saved in DB`, itemId, prefix);
     } else {
-        reviewItem = await reviewsDB.set(reviewId, review);
+        reviewItem = await reviewsDB.set(reviewId.toString(), review);
         logMsg(`Update review ${reviewId} in DB`, itemId, prefix);
     }
 
-    return { result: true, isWrite };
+    return true;
 }
 
 /**
@@ -1078,7 +937,7 @@ export async function addReview(
  *
  * @return  {Boolean}         Result
  */
-export function updateFiles(prefix, itemId) {
+export async function updateFiles(prefix, itemId) {
     if (!prefix || !prefix.length) {
         logMsg("Prefix not defined!");
         return false;
@@ -1110,9 +969,10 @@ export function updateFiles(prefix, itemId) {
         .map((filepath) => path.basename(filepath))
         .sort();
 
-    if (!(itemId in db.data) || db.data[itemId] != folderFiles) {
-        db.data[itemId] = folderFiles;
-        dbWrite(dbPrefix, true, prefix);
+    const item = await db.get(itemId.toString());
+
+    if (!item || item != folderFiles) {
+        await db.set(itemId.toString(), folderFiles);
     }
 
     return true;
@@ -1126,7 +986,7 @@ export function updateFiles(prefix, itemId) {
  *
  * @return  {Array}           Array of filenames
  */
-export function getFiles(prefix, itemId) {
+export async function getFiles(prefix, itemId) {
     if (!prefix || !prefix.length) {
         logMsg("Prefix not defined!");
         return false;
@@ -1141,11 +1001,13 @@ export function getFiles(prefix, itemId) {
 
     loadDB(dbPrefix);
 
-    if (!(itemId in dbCache[dbPrefix].data)) {
+    const files = dbCache[dbPrefix].get(itemId.toString());
+
+    if (!files) {
         return false;
     }
 
-    return dbCache[dbPrefix].data[itemId];
+    return files;
 }
 
 /**
@@ -1202,7 +1064,7 @@ export function getFilesSize(prefix, itemId) {
  *
  * @return  {Boolean}              Result
  */
-export function addPrediction(prefix, itemId, filename, predictions) {
+export async function addPrediction(prefix, itemId, filename, predictions) {
     if (!prefix || !prefix.length) {
         logMsg("Prefix not defined!");
         return false;
@@ -1233,14 +1095,19 @@ export function addPrediction(prefix, itemId, filename, predictions) {
 
     const db = dbCache[dbPrefix];
 
-    if (!(itemId in db.data)) {
-        db.data[itemId] = {};
-        dbWrite(dbPrefix, true, prefix, false);
+    let item = await db.get(itemId.toString());
+
+    if (!item) {
+        await db.set(itemId.toString(), {});
+        item = await db.get(itemId.toString());
     }
 
-    if (!(filename in db.data[itemId])) {
-        db.data[itemId][filename] = predictions;
-        dbWrite(dbPrefix, true, prefix, false);
+    if (!(filename in item)) {
+        item[filename] = predictions;
+
+        await db.set(itemId.toString(), {
+            ...item,
+        });
     }
 
     return true;
@@ -1255,7 +1122,7 @@ export function addPrediction(prefix, itemId, filename, predictions) {
  *
  * @return  {Array|Boolean}     Predictions
  */
-export function getItemPredictions(prefix, itemId, filename) {
+export async function getItemPredictions(prefix, itemId, filename) {
     if (!prefix || !prefix.length) {
         logMsg("Prefix not defined!");
         return false;
@@ -1277,15 +1144,17 @@ export function getItemPredictions(prefix, itemId, filename) {
 
     const db = dbCache[dbPrefix];
 
-    if (!(itemId in db.data)) {
+    const item = await db.get(itemId.toString());
+
+    if (!item) {
         return false;
     }
 
-    if (!(filename in db.data[itemId])) {
+    if (!(filename in item)) {
         return false;
     }
 
-    return db.data[itemId][filename];
+    return item[filename];
 }
 
 /**
@@ -1295,7 +1164,7 @@ export function getItemPredictions(prefix, itemId, filename) {
  *
  * @return  {Object}          Predictions object
  */
-export function getPredictions(prefix) {
+export async function getPredictions(prefix) {
     if (!prefix || !prefix.length) {
         logMsg("Prefix not defined!");
         return false;
@@ -1307,11 +1176,11 @@ export function getPredictions(prefix) {
 
     const db = dbCache[dbPrefix];
 
+    const items = await db.all();
+
     const allPredictions = {};
 
-    for (const itemId in db.data) {
-        const item = db.data[itemId];
-
+    for (const { value: item } of items) {
         for (const filename in item) {
             const predictions = item[filename];
 
@@ -1353,7 +1222,7 @@ export function getPredictions(prefix) {
  *
  * @return  {Array}             Predictions
  */
-export function getPredictionsForFile(prefix, itemId, filename) {
+export async function getPredictionsForFile(prefix, itemId, filename) {
     if (!prefix || !prefix.length) {
         logMsg("Prefix not defined!");
         return false;
@@ -1365,17 +1234,19 @@ export function getPredictionsForFile(prefix, itemId, filename) {
 
     const db = dbCache[dbPrefix];
 
-    if (!(itemId in db.data)) {
+    const item = await db.get(itemId.toString());
+
+    if (!item) {
         logMsg("Predictions for item not found!", itemId, prefix);
         return false;
     }
 
-    if (!(filename in db.data[itemId])) {
+    if (!(filename in item)) {
         logMsg(`Predictions for file ${filename} not found!`, itemId, prefix);
         return false;
     }
 
-    return db.data[itemId][filename];
+    return item[filename];
 }
 
 /**
@@ -1386,7 +1257,7 @@ export function getPredictionsForFile(prefix, itemId, filename) {
  *
  * @return  {Object}          Predictions object
  */
-export function getPredictionsForItem(prefix, itemId) {
+export async function getPredictionsForItem(prefix, itemId) {
     if (!prefix || !prefix.length) {
         logMsg("Prefix not defined!");
         return false;
@@ -1398,12 +1269,14 @@ export function getPredictionsForItem(prefix, itemId) {
 
     const db = dbCache[dbPrefix];
 
-    if (!(itemId in db.data)) {
+    const item = await db.get(itemId.toString());
+
+    if (!item) {
         logMsg("Predictions for item not found!", itemId, prefix);
         return false;
     }
 
-    return db.data[itemId];
+    return item;
 }
 
 /**
@@ -1414,7 +1287,7 @@ export function getPredictionsForItem(prefix, itemId) {
  *
  * @return  {Boolean}         Result
  */
-export function addToFavorite(prefix, itemId) {
+export async function addToFavorite(prefix, itemId) {
     if (!prefix || !prefix.length) {
         logMsg("Prefix not defined!");
         return false;
@@ -1431,9 +1304,11 @@ export function addToFavorite(prefix, itemId) {
 
     const db = dbCache[dbPrefix];
 
-    if (!(itemId in db.data)) {
-        db.data[itemId] = true;
-        db.write();
+    const item = await db.get(itemId.toString());
+
+    if (!item) {
+        await db.set(itemId.toString(), true);
+
         return true;
     }
 
@@ -1448,7 +1323,7 @@ export function addToFavorite(prefix, itemId) {
  *
  * @return  {Boolean}         Result
  */
-export function removeFromFavorite(prefix, itemId) {
+export async function removeFromFavorite(prefix, itemId) {
     if (!prefix || !prefix.length) {
         logMsg("Prefix not defined!");
         return false;
@@ -1465,9 +1340,10 @@ export function removeFromFavorite(prefix, itemId) {
 
     const db = dbCache[dbPrefix];
 
-    if (itemId in db.data) {
-        db.data[itemId] = false;
-        db.write();
+    const item = await db.get(itemId.toString());
+
+    if (item) {
+        await db.set(itemId.toString(), false);
         return true;
     }
 
@@ -1482,7 +1358,7 @@ export function removeFromFavorite(prefix, itemId) {
  *
  * @return  {Boolean}         Result
  */
-export function toggleFavorite(prefix, itemId) {
+export async function toggleFavorite(prefix, itemId) {
     if (!prefix || !prefix.length) {
         logMsg("Prefix not defined!");
         return false;
@@ -1499,9 +1375,11 @@ export function toggleFavorite(prefix, itemId) {
 
     const db = dbCache[dbPrefix];
 
-    return itemId in db.data && db.data[itemId]
-        ? removeFromFavorite(prefix, itemId)
-        : addToFavorite(prefix, itemId);
+    const item = await db.get(itemId.toString());
+
+    return item
+        ? await removeFromFavorite(prefix, itemId)
+        : await addToFavorite(prefix, itemId);
 }
 
 /**
@@ -1512,7 +1390,7 @@ export function toggleFavorite(prefix, itemId) {
  *
  * @return  {Boolean}         Result
  */
-export function isFavorite(prefix, itemId) {
+export async function isFavorite(prefix, itemId) {
     if (!prefix || !prefix.length) {
         logMsg("Prefix not defined!");
         return false;
@@ -1529,8 +1407,10 @@ export function isFavorite(prefix, itemId) {
 
     const db = dbCache[dbPrefix];
 
+    const item = await db.get(itemId.toString());
+
     // Check and return result
-    if (itemId in db.data && db.data[itemId]) {
+    if (item) {
         return true;
     }
 
@@ -1639,7 +1519,9 @@ export async function getUsers(prefix) {
 
     const db = dbCache[dbPrefix];
 
-    return await db.all();
+    const users = await db.all();
+
+    return users.map((item) => item.value);
 }
 
 /**

@@ -645,14 +645,14 @@ export async function downloadItem(url, filepath, queue, isVideo = false) {
     //     return false;
     // }
 
-    if (fs.existsSync(webpFilepath) && webpFilepath != filepath) {
+    if (fs.existsSync(webpFilepath) && webpFilepath != filepath && !isVideo) {
         deleteHelper(filepath, id, prefix);
 
         // logMsg("Webp file exists", id, prefix);
         return true;
     }
 
-    if (fs.existsSync(webpFilepath) && webpFilepath == filepath) {
+    if (fs.existsSync(webpFilepath) && webpFilepath == filepath && !isVideo) {
         // logMsg("Webp file exists", id, prefix);
         return true;
     }
@@ -667,7 +667,7 @@ export async function downloadItem(url, filepath, queue, isVideo = false) {
         exists = true;
         isSizeEqual = true;
         size = fs.statSync(filepath).size;
-    } else {
+    } else if (!isVideo) {
         const result = await isExist(url, queue);
 
         exists = result.exists;
@@ -696,6 +696,10 @@ export async function downloadItem(url, filepath, queue, isVideo = false) {
     let isDownloaded = false;
 
     let isDownload = false;
+
+    if (isVideo) {
+        exists = true;
+    }
 
     if (isSizeEqual || !exists) {
         isDownloaded = true;
@@ -750,7 +754,7 @@ export async function downloadItem(url, filepath, queue, isVideo = false) {
     }
 
     if (isDownload) {
-        updateFiles(prefix, id);
+        await updateFiles(prefix, id);
     }
 
     return true;

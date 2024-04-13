@@ -107,10 +107,10 @@ app.get("/files/:adapter/:itemId", (req, res) => {
     });
 });
 
-app.get("/brands/:adapter", (req, res) => {
+app.get("/brands/:adapter", async (req, res) => {
     const { adapter } = req.params;
 
-    const brands = getBrands(adapter, true);
+    const brands = await getBrands(adapter, true);
 
     return res.json({
         brands,
@@ -118,10 +118,10 @@ app.get("/brands/:adapter", (req, res) => {
     });
 });
 
-app.get("/tags/:adapter", (req, res) => {
+app.get("/tags/:adapter", async (req, res) => {
     const { adapter } = req.params;
 
-    const tags = getTags(adapter);
+    const tags = await getTags(adapter);
 
     return res.json({
         tags,
@@ -129,10 +129,10 @@ app.get("/tags/:adapter", (req, res) => {
     });
 });
 
-app.get("/predictions/:adapter", (req, res) => {
+app.get("/predictions/:adapter", async (req, res) => {
     const { adapter } = req.params;
 
-    const predictions = getPredictions(adapter);
+    const predictions = await getPredictions(adapter);
 
     return res.json({
         predictions,
@@ -140,10 +140,10 @@ app.get("/predictions/:adapter", (req, res) => {
     });
 });
 
-app.get("/categories/:adapter", (req, res) => {
+app.get("/categories/:adapter", async (req, res) => {
     const { adapter } = req.params;
 
-    const items = getItems(adapter, true);
+    const items = await getItems(adapter, true);
 
     if (adapter != "wildberries" || !items.length) {
         return res.json({ categories: {} });
@@ -152,7 +152,7 @@ app.get("/categories/:adapter", (req, res) => {
     const cache = {};
 
     for (const itemId of items) {
-        const product = getItem(adapter, itemId);
+        const product = await getItem(adapter, itemId);
 
         if (!product.info) {
             continue;

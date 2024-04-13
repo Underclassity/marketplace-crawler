@@ -12,12 +12,10 @@ import { logQueue } from "../helpers/log-msg.js";
 import {
     addItem,
     addReview,
-    dbWrite,
     getItem,
     getItems,
     getReview,
     getTags,
-    isDBWriting,
     updateItem,
     updateTags,
     updateTime,
@@ -176,7 +174,7 @@ export async function getOzonItemInfo(link, itemId, queue) {
                     log("Info params not found", itemId);
                 }
 
-                updateItem(prefix, itemId, cache, true);
+                await updateItem(prefix, itemId, cache, true);
 
                 return true;
             } catch (error) {
@@ -204,7 +202,7 @@ export async function getOzonItemByXHR(link, itemId, queue) {
     log("Try to get reviews with XHR", itemId);
 
     if (!link) {
-        const dbItem = getItem(prefix, itemId);
+        const dbItem = await getItem(prefix, itemId);
 
         if (dbItem?.link) {
             link = dbItem.link;
@@ -259,8 +257,7 @@ export async function getOzonItemByXHR(link, itemId, queue) {
                         prefix,
                         itemId,
                         reviewItem.uuid,
-                        reviewItem,
-                        false
+                        reviewItem
                     );
 
                     if (reviewItem.content.photos?.length) {
@@ -296,14 +293,8 @@ export async function getOzonItemByXHR(link, itemId, queue) {
     }
 
     if (getInfo) {
-        // Write all reviews changes
-        while (!isDBWriting(`${prefix}-reviews`)) {
-            dbWrite(`${prefix}-reviews`, true, prefix);
-            await sleep(10);
-        }
-
         // Update item time
-        updateTime(prefix, itemId);
+        await updateTime(prefix, itemId);
     } else {
         log(`No info get`, itemId);
     }
@@ -325,7 +316,7 @@ export async function getOzonItem(link, itemId, queue, browser) {
     log("Try to get reviews", itemId);
 
     if (!link) {
-        const dbItem = getItem(prefix, itemId);
+        const dbItem = await getItem(prefix, itemId);
 
         if (dbItem?.link) {
             link = dbItem.link;
@@ -408,7 +399,7 @@ export async function getOzonItem(link, itemId, queue, browser) {
 
             resultReviews[reviewId] = reviewItem;
 
-            await addReview(prefix, itemId, reviewId, reviewItem, true);
+            await addReview(prefix, itemId, reviewId, reviewItem);
         }
 
         if (Object.keys(resultReviews).length == reviews.length) {
@@ -465,8 +456,8 @@ export async function getOzonItem(link, itemId, queue, browser) {
                 page = undefined;
             }
 
-            updateTime(prefix, itemId);
-            updateTags(prefix, itemId, options.query);
+            await updateTime(prefix, itemId);
+            await updateTags(prefix, itemId, options.query);
 
             // await browserClose(browser);
             // return false;
@@ -532,7 +523,7 @@ export async function getOzonItem(link, itemId, queue, browser) {
             for (const reviewId in resultReviews) {
                 const reviewItem = resultReviews[reviewId];
 
-                await addReview(prefix, itemId, reviewId, reviewItem, true);
+                await addReview(prefix, itemId, reviewId, reviewItem);
 
                 if (reviewItem.content.photos.length) {
                     for (const photoItem of reviewItem.content.photos) {
@@ -560,8 +551,8 @@ export async function getOzonItem(link, itemId, queue, browser) {
             }
         }
 
-        updateTime(prefix, itemId);
-        updateTags(prefix, itemId, options.query);
+        await updateTime(prefix, itemId);
+        await updateTags(prefix, itemId, options.query);
 
         // await page.close();
         // await browserClose(browser);
@@ -592,7 +583,7 @@ export async function getOzonItem(link, itemId, queue, browser) {
  * @return  {Boolean}           Result
  */
 export async function updateItemById(itemId, queue, browser) {
-    const item = getItem(prefix, itemId);
+    const item = await getItem(prefix, itemId);
 
     if (!item) {
         return false;
@@ -614,19 +605,19 @@ export async function updateItemById(itemId, queue, browser) {
  * @return  {Boolean}        Result
  */
 export async function updateInfo(queue) {
-    const items = getItems(prefix);
+    const items = await getItems(prefix);
 
     log(`Update info for ${items.length} items`);
 
-    items.forEach((itemId) => {
-        const item = getItem(prefix, itemId);
+    for (const itemId of items) {
+        const item = await getItem(prefix, itemId);
 
         if (!item || (item?.info && !options.force)) {
-            return false;
+            continue;
         }
 
         getOzonItemInfo(item.link, itemId, queue);
-    });
+    }
 
     return true;
 }
@@ -639,21 +630,21 @@ export async function updateInfo(queue) {
  * @return  {Boolean}        Result
  */
 export async function updateItems(queue) {
-    const items = getItems(prefix);
+    const items = await getItems(prefix);
 
     log(`Update ${items.length} items`);
 
-    items.forEach((itemId) => {
-        const item = getItem(prefix, itemId);
+    for (const itemId of items) {
+        const item = await getItem(prefix, itemId);
 
         if (!item) {
-            return false;
+            continue;
         }
 
         queue.add(() => getOzonItemByXHR(item.link, itemId, queue), {
             priority: priorities.item,
         });
-    });
+    }
 
     return true;
 }
@@ -666,12 +657,12 @@ export async function updateItems(queue) {
  * @return  {Boolean}        Result
  */
 export async function updateReviews(queue) {
-    const items = getItems(prefix, true);
+    const items = await getItems(prefix, true);
 
     log(`Update ${items.length} items reviews`);
 
     for (const itemId of items) {
-        const item = getItem(prefix, itemId);
+        const item = await getItem(prefix, itemId);
 
         if (!item?.reviews?.length) {
             continue;
@@ -798,7 +789,7 @@ export async function getItemsByQuery(queue, query = options.query) {
 
                     const beforeFilterCount = items.length;
 
-                    items = items.filter((item) => {
+                    items = items.filter(async (item) => {
                         const id = parseInt(
                             item.slice(item.lastIndexOf("-") + 1),
                             10
@@ -806,7 +797,7 @@ export async function getItemsByQuery(queue, query = options.query) {
 
                         const time = options.time * 60 * 60 * 1000;
 
-                        const dbReviewItem = getItem(prefix, id);
+                        const dbReviewItem = await getItem(prefix, id);
 
                         if (
                             dbReviewItem?.time &&
@@ -836,7 +827,7 @@ export async function getItemsByQuery(queue, query = options.query) {
                             10
                         );
 
-                        addItem(prefix, id, {
+                        await addItem(prefix, id, {
                             link: result,
                         });
 

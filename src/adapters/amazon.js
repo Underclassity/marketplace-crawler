@@ -16,7 +16,6 @@ import AdblockerPlugin from "puppeteer-extra-plugin-adblocker";
 import {
     addItem,
     addReview,
-    dbWrite,
     getItem,
     getItems,
     getReview,
@@ -160,7 +159,7 @@ async function downloadImages(asin, queue) {
         return false;
     }
 
-    let dbItem = getItem(prefix, asin);
+    let dbItem = await getItem(prefix, asin);
 
     if (!dbItem) {
         log("DB item not found!", asin);
@@ -171,7 +170,7 @@ async function downloadImages(asin, queue) {
         const reviews = await getReviews(prefix, { asin });
 
         if (reviews.length) {
-            updateItem(
+            await updateItem(
                 prefix,
                 asin,
                 {
@@ -180,7 +179,7 @@ async function downloadImages(asin, queue) {
                 true
             );
 
-            dbItem = getItem(prefix, asin);
+            dbItem = await getItem(prefix, asin);
         } else {
             log(`Reviews not found`, asin);
             return true;
@@ -222,7 +221,7 @@ async function downloadImages(asin, queue) {
 export async function processItem(asin, browser, queue, query = false) {
     const time = options.time * 60 * 60 * 1000;
 
-    const dbItem = getItem(prefix, asin);
+    const dbItem = await getItem(prefix, asin);
 
     if (!dbItem) {
         log("DB item not found!", asin);
@@ -409,14 +408,12 @@ export async function processItem(asin, browser, queue, query = false) {
                             title,
                         };
 
-                        await addReview(prefix, asin, id, dbItem, false);
+                        await addReview(prefix, asin, id, dbItem);
 
                         if (photos.length) {
                             downloadImages(asin, queue);
                         }
                     }
-
-                    dbWrite(`${prefix}-reviews`, true, prefix);
 
                     await page.close();
                 } catch (error) {
@@ -432,10 +429,10 @@ export async function processItem(asin, browser, queue, query = false) {
 
     log("Get all reviews", asin);
 
-    updateTime(prefix, asin);
+    await updateTime(prefix, asin);
 
     if (query) {
-        updateTags(prefix, asin, query);
+        await updateTags(prefix, asin, query);
     }
 
     // await queue.add(
@@ -457,8 +454,8 @@ export async function processItem(asin, browser, queue, query = false) {
 
     //         if (!reviews) {
     //             log("Reviews not found", product.asin);
-    //             updateTime(prefix, product.asin);
-    //             updateTags(prefix, product.asin, options.query);
+    //             await updateTime(prefix, product.asin);
+    //             await updateTags(prefix, product.asin, options.query);
     //             return false;
     //         }
 
@@ -478,10 +475,10 @@ export async function processItem(asin, browser, queue, query = false) {
     //             }
     //         }
 
-    //         updateTime(prefix, product.asin);
+    //         await updateTime(prefix, product.asin);
 
     //         if (query) {
-    //             updateTags(prefix, product.asin, query);
+    //             await updateTags(prefix, product.asin, query);
     //         }
     //     },
     //     { priority: priorities.item }
@@ -502,10 +499,10 @@ export async function processItem(asin, browser, queue, query = false) {
  */
 export async function processItems(products, browser, queue, query) {
     for (const product of products) {
-        const dbItem = getItem(prefix, product.asin);
+        const dbItem = await getItem(prefix, product.asin);
 
         if (!dbItem) {
-            addItem(prefix, product.asin, product);
+            await addItem(prefix, product.asin, product);
         }
 
         processItem(product.asin, browser, queue, query);
@@ -522,7 +519,7 @@ export async function processItems(products, browser, queue, query) {
  * @return  {Boolean}        Result
  */
 export async function updateItems(queue) {
-    const items = getItems(prefix);
+    const items = await getItems(prefix);
 
     log(`Update ${items.length} items`);
 
@@ -553,7 +550,7 @@ export async function updateItems(queue) {
  * @return  {Boolean}        Result
  */
 export async function updateReviews(queue) {
-    const items = getItems(prefix, true);
+    const items = await getItems(prefix, true);
 
     log(`Update ${items.length} items reviews`);
 

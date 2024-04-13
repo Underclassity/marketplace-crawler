@@ -26,7 +26,7 @@ const files = fs
         const readStream = fs.createReadStream(filepath);
         const parseStream = json.createParseStream();
 
-        const db = new QuickDB({ filePath: `db/${id}.db` });
+        const db = new QuickDB({ filePath: `db/${id}.sqlite` });
 
         let isEnd = false;
 
@@ -47,6 +47,11 @@ const files = fs
             isEnd = true;
         });
 
+        parseStream.on("error", (err) => {
+            logMsg.log(`Parse error: ${err}`, id);
+            isEnd = true;
+        });
+
         readStream.pipe(parseStream);
 
         while (!isEnd) {
@@ -59,7 +64,7 @@ const files = fs
     //     const dbData = loadDB(`${id}-reviews`);
     //     console.log(dbData.data);
     //     // for (const itemId of items) {
-    //     //     const item = getItem(id, itemId);
+    //     //     const item = await getItem(id, itemId);
     //     //     if (await db.get(itemId)) {
     //     //         logMsg("Item already in DB", itemId, id);
     //     //     } else {

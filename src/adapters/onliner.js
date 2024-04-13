@@ -45,7 +45,7 @@ function log(msg, itemId = false) {
 export async function updateItemPrices(itemId, queue) {
     log("Try to update item prices", itemId);
 
-    const dbItem = getItem(prefix, itemId);
+    const dbItem = await getItem(prefix, itemId);
 
     if (!dbItem) {
         log("Not found in DB");
@@ -68,7 +68,7 @@ export async function updateItemPrices(itemId, queue) {
 
                     // const { chart_data, sale } = priceRequest.data;
 
-                    updateItem(prefix, itemId, {
+                    await updateItem(prefix, itemId, {
                         prices: priceRequest.data,
                     });
 
@@ -127,7 +127,7 @@ export async function updateItemPrices(itemId, queue) {
 export async function updateItemReviews(itemId, queue) {
     log("Try to update", itemId);
 
-    const dbItem = getItem(prefix, itemId);
+    const dbItem = await getItem(prefix, itemId);
 
     if (!dbItem) {
         log("Not found in DB");
@@ -157,7 +157,7 @@ export async function updateItemReviews(itemId, queue) {
                     log(`${reviews.length} reviews get`, itemId);
 
                     for (const review of reviews) {
-                        await addReview(prefix, itemId, review.id, review, true);
+                        await addReview(prefix, itemId, review.id, review);
                     }
                 } catch (error) {
                     log(`Get item reviews error: ${error.message}`, itemId);
@@ -178,7 +178,7 @@ export async function updateItemReviews(itemId, queue) {
  * @return  {Boolean}        Result
  */
 export async function updateItems(queue) {
-    const items = getItems(prefix);
+    const items = await getItems(prefix);
 
     log(`Update ${items.length} items`);
 
@@ -186,7 +186,7 @@ export async function updateItems(queue) {
         await updateItemReviews(itemId, queue);
         await updateItemPrices(itemId, queue);
 
-        updateTime(prefix, itemId);
+        await updateTime(prefix, itemId);
     }
 
     return true;
@@ -200,12 +200,12 @@ export async function updateItems(queue) {
  * @return  {Boolean}        Result
  */
 export async function updateReviews(queue) {
-    const items = getItems(prefix, true);
+    const items = await getItems(prefix, true);
 
     log(`Update ${items.length} items reviews`);
 
     for (const itemId of items) {
-        const item = getItem(prefix, itemId);
+        const item = await getItem(prefix, itemId);
 
         if (!item?.reviews?.length) {
             continue;
@@ -288,9 +288,9 @@ export async function getItemsByQuery(queue, query = options.query) {
                     totalPages = page.last;
 
                     for (const product of products) {
-                        addItem(prefix, product.id, product);
+                        await addItem(prefix, product.id, product);
 
-                        const item = getItem(prefix, product.id);
+                        const item = await getItem(prefix, product.id);
 
                         if (
                             item?.time &&
@@ -308,8 +308,8 @@ export async function getItemsByQuery(queue, query = options.query) {
                         await updateItemReviews(product.id, queue);
                         await updateItemPrices(product.id, queue);
 
-                        updateTime(prefix, product.id);
-                        updateTags(prefix, product.id, options.query);
+                        await updateTime(prefix, product.id);
+                        await updateTags(prefix, product.id, options.query);
                     }
                 } catch (error) {
                     log(`Get items on page ${pageId} error: ${error.message}`);

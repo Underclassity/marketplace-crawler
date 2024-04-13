@@ -34,7 +34,7 @@ favoriteRouter.get("/:adapter/:itemId", (req, res) => {
     });
 });
 
-favoriteRouter.post("/:adapter/:itemId", (req, res) => {
+favoriteRouter.post("/:adapter/:itemId", async (req, res) => {
     const { adapter, itemId } = req.params;
 
     if (!adapters.includes(adapter)) {
@@ -44,7 +44,7 @@ favoriteRouter.post("/:adapter/:itemId", (req, res) => {
         });
     }
 
-    const result = addToFavorite(adapter, itemId);
+    const result = await addToFavorite(adapter, itemId);
 
     return res.json({
         result,
@@ -52,7 +52,7 @@ favoriteRouter.post("/:adapter/:itemId", (req, res) => {
     });
 });
 
-favoriteRouter.delete("/:adapter/:itemId", (req, res) => {
+favoriteRouter.delete("/:adapter/:itemId", async (req, res) => {
     const { adapter, itemId } = req.params;
 
     if (!adapters.includes(adapter)) {
@@ -62,7 +62,7 @@ favoriteRouter.delete("/:adapter/:itemId", (req, res) => {
         });
     }
 
-    const result = removeFromFavorite(adapter, itemId);
+    const result = await removeFromFavorite(adapter, itemId);
 
     return res.json({
         result,

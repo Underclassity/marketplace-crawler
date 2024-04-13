@@ -34,7 +34,7 @@ function log(msg, id = false) {
  *
  * @return  {Boolean}         Result
  */
-export function processItem(itemId, queue) {
+export async function processItem(itemId, queue) {
     if (!itemId) {
         log("ID not defined!");
         return false;
@@ -42,7 +42,7 @@ export function processItem(itemId, queue) {
 
     log("Update item", itemId);
 
-    const item = getItem(prefix, itemId);
+    const item = await getItem(prefix, itemId);
 
     if (!item?.images) {
         return false;
@@ -78,7 +78,7 @@ export function processItem(itemId, queue) {
  * @return  {Boolean}        Result
  */
 export async function updateWithTags(queue) {
-    const tags = getTags(prefix);
+    const tags = await getTags(prefix);
 
     log(`Update items with tags: ${tags.join(", ")}`);
 
@@ -97,7 +97,7 @@ export async function updateWithTags(queue) {
  * @return  {Boolean}        Result
  */
 export async function updateItems(queue) {
-    const items = getItems(prefix);
+    const items = await getItems(prefix);
 
     log(`Update ${items.length} items`);
 
@@ -168,14 +168,14 @@ export async function getItemsByQuery(queue, query = options.query) {
                     const data = request.data;
 
                     if (data?.ads?.length) {
-                        data.ads.forEach((ad) => {
-                            addItem(prefix, ad.ad_id, ad);
+                        for (const ad of data.ads) {
+                            await addItem(prefix, ad.ad_id, ad);
 
-                            // updateTime(prefix, ad.ad_id, Date.now());
-                            // updateTags(prefix, ad.ad_id, options.query);
+                            // await updateTime(prefix, ad.ad_id, Date.now());
+                            // await updateTags(prefix, ad.ad_id, options.query);
 
                             processItem(ad.ad_id, queue);
-                        });
+                        }
 
                         count += data.ads.length;
 

@@ -6,7 +6,6 @@ import axios from "axios";
 import {
     addItem,
     addReview,
-    dbWrite,
     getBrands,
     getItem,
     getItems,

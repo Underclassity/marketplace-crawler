@@ -7,7 +7,7 @@ import express from "express";
 
 import {
     deleteItem,
-    getFiles,
+    // getFiles,
     getFilesSize,
     getItem,
     getItems,
@@ -65,29 +65,45 @@ function getRandomFilesIds(adapter, itemId) {
 
 export const adapterRouter = express.Router();
 
-adapterRouter.get("/", (req, res) => {
-    const data = adapters.map((adapter) => {
-        const items = getItems(adapter, true);
-        const files = items
-            .map((itemId) => getFiles(adapter, itemId)?.length || 0)
-            .reduce((a, b) => a + b, 0);
-        const reviews = items.reduce((prev, current) => {
-            prev += getItem(adapter, current)?.reviews?.length || 0;
-            return prev;
-        }, 0);
+adapterRouter.get("/", async (req, res) => {
+    const data = [];
 
-        return {
+    for (const adapter of adapters) {
+        const items = await getItems(adapter, true);
+
+        // let files = 0;
+        // let reviews = 0;
+
+        // for (const itemId of items) {
+        //     if (!itemId) {
+        //         continue;
+        //     }
+
+        //     const itemFiles = await getFiles(adapter, itemId);
+
+        //     if (itemFiles?.length) {
+        //         files += itemFiles.length;
+        //     }
+
+        //     const item = await getItem(adapter, itemId);
+
+        //     if (item?.reviews?.length) {
+        //         reviews += item.reviews.length;
+        //     }
+        // }
+
+        data.push({
             id: adapter,
             items: items.length,
-            files,
-            reviews,
-        };
-    });
+            // files,
+            // reviews,
+        });
+    }
 
     return res.json({ adapters: data });
 });
 
-adapterRouter.get("/:adapter", (req, res) => {
+adapterRouter.get("/:adapter", async (req, res) => {
     const { adapter } = req.params;
 
     const page = parseInt(req.query.page || 1, 10);
@@ -140,12 +156,12 @@ adapterRouter.get("/:adapter", (req, res) => {
 
             return db.data[itemId].tags.includes(tag);
         })
-        .filter((itemId) => {
+        .filter(async (itemId) => {
             if (!isFavoriteFlag) {
                 return true;
             }
 
-            if (isFavorite(adapter, itemId)) {
+            if (await isFavorite(adapter, itemId)) {
                 return true;
             }
 
@@ -271,7 +287,7 @@ adapterRouter.get("/:adapter", (req, res) => {
             itemId in dbFiles.data ? dbFiles.data[itemId].length : 0;
 
         resultItem.size = sizeDb.data[`${adapter}-${itemId}`];
-        resultItem.favorite = isFavorite(adapter, itemId);
+        resultItem.favorite = await isFavorite(adapter, itemId);
         resultItem.category = db.data[itemId]?.info?.data?.subject_id;
 
         items.push(resultItem);
@@ -450,7 +466,7 @@ adapterRouter.get("/:adapter/:itemId", (req, res) => {
     });
 });
 
-adapterRouter.delete("/:adapter/:itemId", (req, res) => {
+adapterRouter.delete("/:adapter/:itemId", async (req, res) => {
     const { adapter, itemId } = req.params;
 
     const item = getItem(adapter, itemId);
@@ -477,7 +493,7 @@ adapterRouter.delete("/:adapter/:itemId", (req, res) => {
     );
 
     // found db item and set delete param to true
-    const { result } = deleteItem(adapter, itemId);
+    const { result } = await deleteItem(adapter, itemId);
 
     // delete thumbnail
     if (fs.existsSync(thumbnailFilePath) && result) {

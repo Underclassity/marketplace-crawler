@@ -41,14 +41,14 @@ const adapters = getAdaptersIds();
         let count = 0;
 
         for (const itemId of itemsFolders) {
-            if (!getItem(adapter, itemId)) {
+            if (!(await getItem(adapter, itemId))) {
                 logMsg(
                     `Add new item ${itemId} in ${adapter} adapter`,
                     false,
                     adapter
                 );
 
-                addItem(adapter, itemId);
+                await addItem(adapter, itemId);
 
                 count++;
             }

@@ -13,7 +13,7 @@ const adapters = getAdaptersIds();
 
 export const predictionsRouter = express.Router();
 
-predictionsRouter.get("/:adapter", (req, res) => {
+predictionsRouter.get("/:adapter", async (req, res) => {
     const { adapter } = req.params;
 
     if (!adapters.includes(adapter)) {
@@ -24,12 +24,12 @@ predictionsRouter.get("/:adapter", (req, res) => {
     }
 
     return res.json({
-        predictions: getPredictions(adapter),
+        predictions: await getPredictions(adapter),
         error: false,
     });
 });
 
-predictionsRouter.get("/:adapter/:itemId", (req, res) => {
+predictionsRouter.get("/:adapter/:itemId", async (req, res) => {
     const { adapter, itemId } = req.params;
 
     if (!adapters.includes(adapter)) {
@@ -47,12 +47,12 @@ predictionsRouter.get("/:adapter/:itemId", (req, res) => {
     }
 
     return res.json({
-        predictions: getPredictionsForItem(adapter, itemId),
+        predictions: await getPredictionsForItem(adapter, itemId),
         error: false,
     });
 });
 
-predictionsRouter.get("/:adapter/:itemId/:filename", (req, res) => {
+predictionsRouter.get("/:adapter/:itemId/:filename", async (req, res) => {
     const { adapter, itemId, filename } = req.params;
 
     if (!adapters.includes(adapter)) {
@@ -70,12 +70,12 @@ predictionsRouter.get("/:adapter/:itemId/:filename", (req, res) => {
     }
 
     return res.json({
-        predictions: getPredictionsForFile(adapter, itemId, filename),
+        predictions: await getPredictionsForFile(adapter, itemId, filename),
         error: false,
     });
 });
 
-predictionsRouter.post("/:adapter/:itemId/:filename", (req, res) => {
+predictionsRouter.post("/:adapter/:itemId/:filename", async (req, res) => {
     const { adapter, itemId, filename } = req.params;
     const predictions = req.body;
 
@@ -101,7 +101,7 @@ predictionsRouter.post("/:adapter/:itemId/:filename", (req, res) => {
     }
 
     return res.json({
-        result: addPrediction(adapter, itemId, filename, predictions),
+        result: await addPrediction(adapter, itemId, filename, predictions),
         error: false,
     });
 });

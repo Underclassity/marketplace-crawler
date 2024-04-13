@@ -33,7 +33,7 @@ let counter = 0;
  * @return  {Boolean}           Result
  */
 async function getFilePredictions(adapter, itemId, filename) {
-    const dbPredictions = getItemPredictions(adapter, itemId, filename);
+    const dbPredictions = await getItemPredictions(adapter, itemId, filename);
 
     if (Array.isArray(dbPredictions) && !options.force) {
         // logMsg(`Predictions for ${filename} already in DB`, itemId, adapter);
@@ -66,7 +66,7 @@ async function getFilePredictions(adapter, itemId, filename) {
     const predictions = await detectImage(image);
 
     if (!predictions) {
-        addPrediction(adapter, itemId, filename, []);
+        await addPrediction(adapter, itemId, filename, []);
         logMsg(`No predictions found for ${filename}`, itemId, adapter);
         return false;
     }
@@ -90,7 +90,7 @@ async function getFilePredictions(adapter, itemId, filename) {
         adapter
     );
 
-    addPrediction(adapter, itemId, filename, predictions);
+    await addPrediction(adapter, itemId, filename, predictions);
 
     return true;
 }
@@ -104,7 +104,7 @@ async function getFilePredictions(adapter, itemId, filename) {
  * @return  {Boolean}          Result
  */
 async function processItem(adapter, itemId) {
-    let filenames = getFiles(adapter, itemId);
+    let filenames = await getFiles(adapter, itemId);
 
     filenames = Array.isArray(filenames)
         ? filenames.filter((filename) => path.parse(filename).ext != ".mp4")
@@ -115,8 +115,14 @@ async function processItem(adapter, itemId) {
         return false;
     }
 
-    filenames = filenames.filter((filename) => {
-        const dbPredictions = getItemPredictions(adapter, itemId, filename);
+    const filteredFilenames = [];
+
+    for (const filename of filenames) {
+        const dbPredictions = await getItemPredictions(
+            adapter,
+            itemId,
+            filename
+        );
 
         if (Array.isArray(dbPredictions) && !options.force) {
             // logMsg(
@@ -124,11 +130,14 @@ async function processItem(adapter, itemId) {
             //     itemId,
             //     adapter
             // );
-            return false;
+            continue;
         }
 
-        return true;
-    });
+        filteredFilenames.push(filename);
+    }
+
+    // Save results
+    filenames = [...filteredFilenames];
 
     logMsg(`Process ${filenames.length} files`, itemId, adapter);
 
@@ -151,7 +160,7 @@ async function processItem(adapter, itemId) {
  * @return  {Boolean}          Result
  */
 async function processAdapter(adapter) {
-    const items = getItems(adapter, true);
+    const items = await getItems(adapter, true);
 
     if (!items?.length) {
         logMsg("Items not found in adapter", false, adapter);

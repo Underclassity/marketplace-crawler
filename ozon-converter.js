@@ -48,7 +48,7 @@ async function getItemLink(itemId) {
 }
 
 (async () => {
-    const items = getItems(prefix, true, false, true);
+    const items = await getItems(prefix, true, false, true);
 
     const cache = {};
 

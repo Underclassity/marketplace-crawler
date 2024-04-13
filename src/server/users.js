@@ -42,8 +42,8 @@ usersRouter.get("/:adapter", async (req, res) => {
     const page = parseInt(req.query.page || 1, 10);
     const limit = parseInt(req.query.limit || 100, 10);
     const isPhotos = req.query.photos == "true" || false;
-    const isFavoriteFlag = req.query.favorite == "true" || false;
-    const sortId = req.query.sort || false;
+    // const isFavoriteFlag = req.query.favorite == "true" || false;
+    // const sortId = req.query.sort || false;
 
     if (!adapters.includes(adapter)) {
         return res.json({
@@ -55,9 +55,11 @@ usersRouter.get("/:adapter", async (req, res) => {
     let users = await getUsers(adapter);
     const count = Object.keys(users).length;
 
-    users = Object.keys(users).filter(async (userId) => {
+    const filteredUsers = [];
+
+    for (const userId of Object.keys(users)) {
         if (!("photos" in req.query)) {
-            return true;
+            continue;
         }
 
         let userReviews = await getUserReviews(adapter, userId);
@@ -66,8 +68,12 @@ usersRouter.get("/:adapter", async (req, res) => {
             ? userReviews.filter((item) => item?.photos?.length)
             : userReviews.filter((item) => !item?.photos?.length);
 
-        return userReviews.length;
-    });
+        if (userReviews.length) {
+            filteredUsers.push(userId);
+        }
+    }
+
+    users = [...filteredUsers];
 
     users = users
         .slice((page - 1) * limit, (page - 1) * limit + limit)

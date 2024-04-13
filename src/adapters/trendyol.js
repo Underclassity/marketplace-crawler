@@ -9,7 +9,6 @@ import AdblockerPlugin from "puppeteer-extra-plugin-adblocker";
 import {
     addItem,
     addReview,
-    dbWrite,
     getItem,
     getItems,
     getReview,
@@ -314,13 +313,11 @@ async function scrapeItem(itemId, queue) {
     log(`Get ${results.length}(${totalCount}) reviews`);
 
     for (const result of results) {
-        await addReview(prefix, itemId, result.id, result, false);
+        await addReview(prefix, itemId, result.id, result);
     }
 
-    dbWrite(`${prefix}-reviews`, true, prefix, false);
-
-    updateTime(prefix, itemId);
-    updateTags(prefix, itemId, options.query);
+    await updateTime(prefix, itemId);
+    await updateTags(prefix, itemId, options.query);
 
     for (const result of results) {
         await processReview(itemId, result.id, queue);
@@ -346,10 +343,10 @@ async function processLinks(links, queue) {
     log(`Process ${links.length} links`);
 
     for (const link of links) {
-        const dbItem = getItem(prefix, link.id);
+        const dbItem = await getItem(prefix, link.id);
 
         if (!dbItem) {
-            addItem(prefix, link.id, {
+            await addItem(prefix, link.id, {
                 link: link.href,
             });
         }
@@ -427,7 +424,7 @@ export async function updateItemById(itemId, queue) {
 export async function updateItems(queue) {
     const browser = await puppeteer.launch(browserConfig);
 
-    const items = getItems(prefix);
+    const items = await getItems(prefix);
 
     log(`Update ${items.length} items`);
 
@@ -456,22 +453,22 @@ export async function updateItems(queue) {
  *
  * @return  {Boolean}        Result
  */
-export function updateReviews(queue) {
-    const items = getItems(prefix, true);
+export async function updateReviews(queue) {
+    const items = await getItems(prefix, true);
 
     log(`Update ${items.length} items reviews`);
 
-    items.forEach((itemId) => {
-        const item = getItem(prefix, itemId);
+    for (const itemId of items) {
+        const item = await getItem(prefix, itemId);
 
         if (!item?.reviews?.length) {
-            return false;
+            continue;
         }
 
         for (const reviewId of item.reviews) {
             processReview(itemId, reviewId, queue);
         }
-    });
+    }
 
     return true;
 }

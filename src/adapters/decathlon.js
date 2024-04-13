@@ -52,7 +52,7 @@ export async function getReviews(itemId, queue) {
         return false;
     }
 
-    const dbItem = getItem(prefix, itemId);
+    const dbItem = await getItem(prefix, itemId);
 
     if (!dbItem) {
         log("Item not found in DB", itemId);
@@ -128,14 +128,14 @@ export async function getReviews(itemId, queue) {
         }
 
         for (const item of reviews) {
-            await addReview(prefix, itemId, item.id, item, true);
+            await addReview(prefix, itemId, item.id, item);
         }
 
         log(`All reviews get for model ${model_id}`, itemId);
     }
 
-    updateTime(prefix, itemId);
-    updateTags(prefix, itemId, options.query);
+    await updateTime(prefix, itemId);
+    await updateTags(prefix, itemId, options.query);
 
     log(`All models get`, itemId);
 
@@ -183,12 +183,12 @@ export async function getItemsOnPages(queue, query = options.query) {
                     return false;
                 }
 
-                const { products, payload } = data;
+                const { products } = data;
 
                 log(`Found ${products.length}`);
 
                 for (const product of products) {
-                    addItem(prefix, product.shopify_product_id, product);
+                    await addItem(prefix, product.shopify_product_id, product);
                 }
             });
 
@@ -298,12 +298,12 @@ export async function getItemsOnPages(queue, query = options.query) {
  * @return  {Boolean}        Result
  */
 export async function updateReviews(queue) {
-    const items = getItems(prefix, true);
+    const items = await getItems(prefix, true);
 
     log(`Update ${items.length} items reviews`);
 
     for (const itemId of items) {
-        const item = getItem(prefix, itemId);
+        const item = await getItem(prefix, itemId);
 
         if (!item || !item?.reviews?.length) {
             return false;
@@ -333,7 +333,7 @@ export async function updateReviews(queue) {
  * @return  {Boolean}        Result
  */
 export async function updateItems(queue) {
-    const items = getItems(prefix);
+    const items = await getItems(prefix);
 
     log(`Update ${items.length} items`);
 

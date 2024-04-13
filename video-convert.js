@@ -18,7 +18,7 @@ const queue = createQueue();
 
 (async () => {
     for (const dbId of ids) {
-        const dbIds = getItems(dbId, true);
+        const dbIds = await getItems(dbId, true);
 
         for (const itemId of dbIds) {
             const itemFolderPath = path.resolve(

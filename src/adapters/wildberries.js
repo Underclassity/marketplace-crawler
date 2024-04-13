@@ -7,7 +7,6 @@ import {
     addItem,
     addReview,
     addUserReview,
-    dbWrite,
     getBrands,
     getFiles,
     getItem,
@@ -26,6 +25,7 @@ import downloadItem from "../helpers/image-process.js";
 import getHeaders from "../helpers/get-headers.js";
 import options from "../options.js";
 import priorities from "../helpers/priorities.js";
+import queueCall from "../helpers/queue-call.js";
 import sleep from "../helpers/sleep.js";
 
 const prefix = "wildberries";
@@ -46,6 +46,10 @@ function log(msg, itemId = false) {
 
 const FEEDBACK_PHOTO_SHARD_RANGE = [
     143, 287, 431, 719, 1007, 1061, 1115, 1169, 1313, 1601, 1655, 1919,
+];
+
+const REGIONS = [
+    1, 4, 22, 30, 31, 33, 40, 48, 66, 68, 69, 70, 80, 83, 114, 115,
 ];
 
 /**
@@ -184,7 +188,7 @@ export async function getFeedback(itemId, feedback, queue) {
         return false;
     }
 
-    // await addReview(prefix, id, feedback.id, feedback, true);
+    // await addReview(prefix, id, feedback.id, feedback);
 
     await addUserReview(
         prefix,
@@ -197,7 +201,11 @@ export async function getFeedback(itemId, feedback, queue) {
         return true;
     }
 
-    if (!feedback?.photos?.length && !feedback?.photo?.length) {
+    if (
+        !feedback?.photos?.length &&
+        !feedback?.photo?.length &&
+        !feedback?.video
+    ) {
         return true;
     }
 
@@ -210,7 +218,7 @@ export async function getFeedback(itemId, feedback, queue) {
         fs.mkdirSync(itemFolderPath, { recursive: true });
     }
 
-    let photos = [];
+    const photos = [];
 
     // If two params exists - download photos for extra quality
     // if (feedback.photos && feedback.photo) {
@@ -223,31 +231,56 @@ export async function getFeedback(itemId, feedback, queue) {
     photos.push(...getFeedbackPhotosByPhoto(feedback, itemFolderPath));
     // photos.push(...getFeedbackPhotosByPhotos(feedback, itemFolderPath));
 
-    photos = photos.filter(({ filename, webpFilename }) => {
-        const dbFiles = getFiles(prefix, itemId);
+    const filteredPhotos = [];
+
+    for (const photo of photos) {
+        const dbFiles = await getFiles(prefix, itemId);
 
         if (!dbFiles) {
-            return true;
+            filteredPhotos.push(photo);
+            continue;
         }
 
         if (
-            (dbFiles.includes(filename) || dbFiles.includes(webpFilename)) &&
+            (dbFiles.includes(photo.filename) ||
+                dbFiles.includes(photo.webpFilename)) &&
             options.force
         ) {
-            return false;
+            continue;
         }
 
-        return true;
-    });
+        filteredPhotos.push(photo);
+    }
 
-    if (photos.length) {
-        log(`Get ${photos.length} photos for review ${feedback.id}`, itemId);
+    if (filteredPhotos.length) {
+        log(
+            `Get ${filteredPhotos.length} photos for review ${feedback.id}`,
+            itemId
+        );
 
-        for (const { url, filepath } of photos) {
+        for (const { url, filepath } of filteredPhotos) {
             downloadItem(url, filepath, queue);
         }
     } else {
         log(`No photos for download for review ${feedback.id}`, itemId);
+    }
+
+    if (feedback?.video) {
+        const [basket, id] = feedback.video.id.split("/");
+        const url = `https://videofeedback${basket.padStart(
+            2,
+            0
+        )}.wb.ru/${id}/index.m3u8`;
+
+        const filepath = path.resolve(
+            options.directory,
+            "download",
+            prefix,
+            itemId.toString(),
+            `${id}.mp4`
+        );
+
+        downloadItem(url, filepath, queue, true);
     }
 
     return true;
@@ -260,16 +293,16 @@ export async function getFeedback(itemId, feedback, queue) {
  *
  * @return  {Boolean}            Result
  */
-export function addInfoToProducts(products) {
+export async function addInfoToProducts(products) {
     if (!Array.isArray(products)) {
         return false;
     }
 
-    products.forEach((product) => {
-        const item = getItem(prefix, parseInt(product.root, 10));
+    for (const product of products) {
+        const item = await getItem(prefix, parseInt(product.root, 10));
 
         if (!item) {
-            return false;
+            continue;
         }
 
         const {
@@ -311,7 +344,7 @@ export function addInfoToProducts(products) {
         ) {
             logMsg(`Add another info to item`, parseInt(product.root, 10));
 
-            updateItem(
+            await updateItem(
                 prefix,
                 parseInt(product.root, 10),
                 {
@@ -329,7 +362,7 @@ export function addInfoToProducts(products) {
 
             item.ids[idIndex] = idObject;
 
-            updateItem(
+            await updateItem(
                 prefix,
                 parseInt(product.root, 10),
                 {
@@ -342,7 +375,7 @@ export function addInfoToProducts(products) {
         } else if (!item.ids || !Array.isArray(item.ids)) {
             logMsg(`Add info to item`, parseInt(product.root, 10));
 
-            updateItem(
+            await updateItem(
                 prefix,
                 parseInt(product.root, 10),
                 {
@@ -352,7 +385,7 @@ export function addInfoToProducts(products) {
                 false
             );
         }
-    });
+    }
 
     return true;
 }
@@ -407,10 +440,7 @@ export async function getItemInfo(itemId) {
     //             locale: "by",
     //             lang: "ru",
     //             dest: -59208,
-    //             regions: [
-    //                 1, 4, 22, 30, 31, 33, 40, 48, 66, 68, 69, 70, 80, 83, 114,
-    //                 115,
-    //             ],
+    //             regions: REGIONS,
     //             emp: 0,
     //             reg: 1,
     //             spp: 0,
@@ -532,13 +562,23 @@ export async function getFeedbackByXhr(itemId) {
     const checksum = crc16(+(itemId || 0)) % 100 >= 50 ? "2" : "1";
 
     try {
-        const request = await axios(
-            `https://feedbacks${checksum}.wb.ru/feedbacks/v1/${itemId}`,
-            {
-                headers: getHeaders(),
-                timeout: options.timeout,
-            }
-        );
+        const link = `https://feedbacks${checksum}.wb.ru/feedbacks/v1/${itemId}`;
+
+        const bodyRequest = await axios(link, {
+            method: "head",
+            headers: getHeaders(),
+            timeout: 5000,
+        });
+
+        if (bodyRequest.status != 200) {
+            log("Get all reviews by XHR error: Not exist");
+            return false;
+        }
+
+        const request = await axios(link, {
+            headers: getHeaders(),
+            timeout: options.timeout,
+        });
 
         const { feedbacks } = request.data;
 
@@ -625,25 +665,12 @@ export async function getFeedbacks(itemId, query = false, queue) {
     if (isResult) {
         log(`Found ${feedbacks.length} feedbacks items`, itemId);
 
-        let isWriteCall = false;
+        const item = await getItem(prefix, itemId);
 
         for (const feedback of feedbacks) {
-            let { isWrite } = await addReview(
-                prefix,
-                itemId,
-                feedback.id,
-                feedback,
-                false
-            );
-
-            if (isWrite) {
-                isWriteCall = true;
+            if (!item.reviews.includes(feedback.id) || options.force) {
+                await addReview(prefix, itemId, feedback.id, feedback);
             }
-        }
-
-        if (feedbacks.length && isWriteCall) {
-            // dbWrite(`${prefix}-reviews`, true, prefix);
-            dbWrite(`${prefix}-products`, true, prefix);
         }
 
         for (const feedback of feedbacks) {
@@ -654,7 +681,7 @@ export async function getFeedbacks(itemId, query = false, queue) {
         }
     }
 
-    const item = getItem(prefix, itemId);
+    const item = await getItem(prefix, itemId);
 
     // Try to get item info
     if (item.ids && Array.isArray(item.ids) && item.ids.length && !item.info) {
@@ -663,7 +690,7 @@ export async function getFeedbacks(itemId, query = false, queue) {
         const infoData = await getItemInfo(firstIdItem.id);
 
         if (firstIdItem.name == infoData.imt_name) {
-            updateItem(prefix, itemId, {
+            await updateItem(prefix, itemId, {
                 info: infoData,
             });
         }
@@ -672,23 +699,23 @@ export async function getFeedbacks(itemId, query = false, queue) {
     // const priceInfo = isResult ? await getPriceInfo(id) : false;
 
     // if (priceInfo) {
-    //     const item = getItem(prefix, id);
+    //     const item = await getItem(prefix, id);
 
     //     if (!item) {
-    //         addItem(prefix, id, {
+    //         await addItem(prefix, id, {
     //             prices: [],
     //         });
     //     }
 
     //     if (item && !("prices" in item)) {
-    //         updateItem(prefix, id, {
+    //         await updateItem(prefix, id, {
     //             prices: [],
     //         });
     //     }
 
     //     for (const price of priceInfo) {
     //         if (item?.prices && !item.prices.includes(price)) {
-    //             updateItem(prefix, id, {
+    //             await updateItem(prefix, id, {
     //                 prices: item.prices.concat(price),
     //             });
     //         }
@@ -696,10 +723,10 @@ export async function getFeedbacks(itemId, query = false, queue) {
     // }
 
     if (isResult) {
-        updateTime(prefix, itemId);
+        await updateTime(prefix, itemId);
 
         if (query) {
-            updateTags(prefix, itemId, query);
+            await updateTags(prefix, itemId, query);
         }
     }
 
@@ -777,10 +804,7 @@ export async function itemsRequest(page = 1, query = options.query) {
                     locale: "by",
                     lang: "ru",
                     dest: -59_208,
-                    regions: [
-                        1, 4, 22, 30, 31, 33, 40, 48, 66, 68, 69, 70, 80, 83,
-                        114, 115,
-                    ],
+                    regions: REGIONS,
                     emp: 0,
                     reg: 1,
                     pricemarginCoeff: "1.0",
@@ -864,9 +888,7 @@ export async function categoryRequest(page = 1, categoryId = options.category) {
         locale: "by",
         lang: "ru",
         dest: -59_208,
-        regions: [
-            1, 4, 22, 30, 31, 33, 40, 48, 66, 68, 69, 70, 80, 83, 114, 115,
-        ],
+        regions: REGIONS,
         emp: 0,
         reg: 1,
         pricemarginCoeff: "1.0",
@@ -927,10 +949,7 @@ export async function brandItemsRequest(brand = options.brand, page = 1) {
                     locale: "by",
                     lang: "ru",
                     dest: -59_208,
-                    regions: [
-                        1, 4, 22, 30, 31, 33, 40, 48, 66, 68, 69, 70, 80, 83,
-                        114, 115,
-                    ],
+                    regions: REGIONS,
                     reg: 1,
                     spp: 16,
                 },
@@ -961,17 +980,18 @@ export async function processItems(items, brand = options.brand, queue) {
     const count = items.length;
 
     // Add items if not exist
-    items.forEach((itemId) => {
-        const dbReviewItem = getItem(prefix, itemId);
+    for (const itemId of items) {
+        const dbReviewItem = await getItem(prefix, itemId);
 
         if (!dbReviewItem) {
-            addItem(prefix, itemId);
+            await addItem(prefix, itemId);
         }
-    });
+    }
 
-    // Filter by updated time
-    items = items.filter((itemId) => {
-        const dbReviewItem = getItem(prefix, itemId);
+    const filteredItems = [];
+
+    for (const itemId of items) {
+        const dbReviewItem = await getItem(prefix, itemId);
         const time = options.time * 60 * 60 * 1000;
 
         if (
@@ -979,25 +999,28 @@ export async function processItems(items, brand = options.brand, queue) {
             Date.now() - dbReviewItem.time <= time &&
             !options.force
         ) {
-            return false;
+            continue;
         }
 
         if (dbReviewItem.deleted) {
-            return false;
+            continue;
         }
 
-        return true;
-    });
+        filteredItems.push(itemId);
+    }
+
+    // Filter by updated time
+    items = [...filteredItems];
 
     log(`Found ${items.length}(${count}) items on all pages`);
 
     for (const itemId of items) {
-        const dbReviewItem = getItem(prefix, itemId);
+        const dbReviewItem = await getItem(prefix, itemId);
 
         if (dbReviewItem) {
-            updateBrand(prefix, itemId, brand);
+            await updateBrand(prefix, itemId, brand);
         } else {
-            updateItem(prefix, itemId, {
+            await updateItem(prefix, itemId, {
                 brand: options.brand,
             });
         }
@@ -1018,16 +1041,15 @@ export async function processItems(items, brand = options.brand, queue) {
  * @return  {Boolean}        Result
  */
 export async function updateBrands(queue) {
-    const brandIDs = getBrands(prefix);
+    const brandIDs = await getBrands(prefix);
 
     log(`Update brands: ${brandIDs.length}`);
 
     for (const brandID of brandIDs) {
-        const brandItems = await queue.add(
+        const brandItems = await queueCall(
             async () => getBrandItemsByID(brandID, queue),
-            {
-                priority: priorities.page,
-            }
+            queue,
+            priorities.page
         );
 
         if (!brandItems || !brandItems.length) {
@@ -1090,37 +1112,39 @@ export async function updateItemsByCategory(categoryId, queue) {
 
         count += getItemsData.data.products.length;
 
-        addInfoToProducts(getItemsData.data.products);
-
-        dbWrite(`${prefix}-products`, true, prefix);
+        await addInfoToProducts(getItemsData.data.products);
 
         const results = getItemsData.data.products
             .map((item) => item.root)
             .filter((item, index, array) => array.indexOf(item) === index)
-            .map((item) => (item = parseInt(item, 10)))
-            .filter((item) => {
-                const dbReviewItem = getItem(prefix, item);
-                const time = options.time * 60 * 60 * 1000;
+            .map((item) => (item = parseInt(item, 10)));
 
-                if (
-                    dbReviewItem?.time &&
-                    Date.now() - dbReviewItem.time <= time &&
-                    !options.force
-                ) {
-                    return false;
-                }
+        const filtedResults = [];
 
-                if (dbReviewItem?.deleted) {
-                    return false;
-                }
+        for (const item of results) {
+            const dbReviewItem = await getItem(prefix, item);
+            const time = options.time * 60 * 60 * 1000;
 
-                return true;
-            })
-            .sort((a, b) => a - b);
+            if (
+                dbReviewItem?.time &&
+                Date.now() - dbReviewItem.time <= time &&
+                !options.force
+            ) {
+                continue;
+            }
 
-        log(`Page ${page} found ${results.length} items`);
+            if (dbReviewItem?.deleted) {
+                continue;
+            }
 
-        items.push(...results);
+            filtedResults.push(item);
+        }
+
+        filtedResults.sort((a, b) => a - b);
+
+        log(`Page ${page} found ${filtedResults.length} items`);
+
+        items.push(...filtedResults);
     }
 
     log(`Found ${items.length}(${count}) items on all pages`);
@@ -1201,8 +1225,8 @@ export async function updateItemById(itemId, queue) {
  *
  * @return  {Boolean}        Result
  */
-export function updateItems(queue) {
-    const items = getItems(prefix);
+export async function updateItems(queue) {
+    const items = await getItems(prefix);
 
     log(`Update ${items.length} items`);
 
@@ -1211,6 +1235,13 @@ export function updateItems(queue) {
             priority: priorities.item,
         })
     );
+
+    logQueue(queue);
+
+    while (queue.size || queue.pending) {
+        await sleep(1000);
+        logQueue(queue);
+    }
 
     return true;
 }
@@ -1223,7 +1254,7 @@ export function updateItems(queue) {
  * @return  {Boolean}        Result
  */
 export async function checkReviews(queue) {
-    const items = getItems(prefix, true);
+    const items = await getItems(prefix, true);
 
     log(`Check ${items.length} items reviews`);
 
@@ -1234,7 +1265,7 @@ export async function checkReviews(queue) {
             continue;
         }
 
-        const item = getItem(prefix, itemId);
+        const item = await getItem(prefix, itemId);
 
         if (!item?.reviews?.length) {
             continue;
@@ -1249,7 +1280,11 @@ export async function checkReviews(queue) {
                 for (const reviewId of item.reviews) {
                     const feedback = await getReview(prefix, itemId, reviewId);
 
-                    if (!feedback?.photos?.length && !feedback?.photo?.length) {
+                    if (
+                        !feedback?.photos?.length &&
+                        !feedback?.photo?.length &&
+                        !feedback?.video
+                    ) {
                         continue;
                     }
 
@@ -1287,7 +1322,7 @@ export async function checkReviews(queue) {
  * @return  {Boolean}        Result
  */
 export async function updateReviews(queue) {
-    const items = getItems(prefix, true);
+    const items = await getItems(prefix, true);
 
     log(`Update ${items.length} items reviews`);
 
@@ -1302,7 +1337,7 @@ export async function updateReviews(queue) {
     for (const itemId of items) {
         queue.add(
             async () => {
-                const item = getItem(prefix, itemId);
+                const item = await getItem(prefix, itemId);
 
                 if (!item?.reviews?.length) {
                     // log("No reviews found", itemId);
@@ -1318,7 +1353,11 @@ export async function updateReviews(queue) {
                 for (const reviewId of item.reviews) {
                     const feedback = await getReview(prefix, itemId, reviewId);
 
-                    if (!feedback?.photos?.length && !feedback?.photo?.length) {
+                    if (
+                        !feedback?.photos?.length &&
+                        !feedback?.photo?.length &&
+                        !feedback?.video
+                    ) {
                         continue;
                     }
 
@@ -1351,26 +1390,26 @@ export async function updateReviews(queue) {
  *
  * @return  {Boolean}        Result
  */
-export function logStats(queue) {
+export async function logStats(queue) {
     log("Start analyze products");
 
-    const items = getItems(prefix, true);
+    const items = await getItems(prefix, true);
 
     if (!items.length) {
         log("Items not found");
         return false;
     }
 
-    const tags = getTags(prefix);
+    const tags = await getTags(prefix);
 
     log(`Tags: ${tags.join(", ")}`);
 
     queue.add(
-        () => {
+        async () => {
             const cache = {};
 
             for (const itemId of items) {
-                const product = getItem(prefix, itemId);
+                const product = await getItem(prefix, itemId);
 
                 if (!product.info) {
                     continue;
@@ -1451,7 +1490,7 @@ export async function getBrandItemsByID(brandID, queue) {
 
         const beforeFilterCount = getItemsData.data.products.length;
 
-        addInfoToProducts(getItemsData.data.products);
+        await addInfoToProducts(getItemsData.data.products);
 
         const results = getItemsData.data.products
             .filter((item) => item.brandId == brandID)
@@ -1567,37 +1606,39 @@ export async function getItemsByQuery(queue, query = options.query) {
 
         count += getItemsData.data.products.length;
 
-        addInfoToProducts(getItemsData.data.products);
-
-        dbWrite(`${prefix}-products`, true, prefix);
+        await addInfoToProducts(getItemsData.data.products);
 
         const results = getItemsData.data.products
             .map((item) => item.root)
             .filter((item, index, array) => array.indexOf(item) === index)
-            .map((item) => (item = parseInt(item, 10)))
-            .filter((item) => {
-                const dbReviewItem = getItem(prefix, item);
-                const time = options.time * 60 * 60 * 1000;
+            .map((item) => (item = parseInt(item, 10)));
 
-                if (
-                    dbReviewItem?.time &&
-                    Date.now() - dbReviewItem.time <= time &&
-                    !options.force
-                ) {
-                    return false;
-                }
+        const filtedResults = [];
 
-                if (dbReviewItem?.deleted) {
-                    return false;
-                }
+        for (const item of results) {
+            const dbReviewItem = await getItem(prefix, item);
+            const time = options.time * 60 * 60 * 1000;
 
-                return true;
-            })
-            .sort((a, b) => a - b);
+            if (
+                dbReviewItem?.time &&
+                Date.now() - dbReviewItem.time <= time &&
+                !options.force
+            ) {
+                continue;
+            }
 
-        log(`Page ${page} found ${results.length} items`);
+            if (dbReviewItem?.deleted) {
+                continue;
+            }
 
-        items.push(...results);
+            filtedResults.push(item);
+        }
+
+        filtedResults.sort((a, b) => a - b);
+
+        log(`Page ${page} found ${filtedResults.length} items`);
+
+        items.push(...filtedResults);
     }
 
     log(`Found ${items.length}(${count}) items on all pages`);

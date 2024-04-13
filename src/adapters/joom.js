@@ -59,7 +59,7 @@ export async function getFeedback(itemId, feedback) {
         return false;
     }
 
-    await addReview(prefix, itemId, feedback.id, feedback, true);
+    await addReview(prefix, itemId, feedback.id, feedback);
 
     if (!options.download) {
         return true;
@@ -126,13 +126,7 @@ export async function getItemById(itemId, browser) {
                         continue;
                     }
 
-                    await addReview(
-                        prefix,
-                        itemId,
-                        reviewItem.id,
-                        reviewItem,
-                        true
-                    );
+                    await addReview(prefix, itemId, reviewItem.id, reviewItem);
                 }
             }
 
@@ -143,8 +137,8 @@ export async function getItemById(itemId, browser) {
                 );
 
                 clearTimeout(getReviewsTimeout);
-                getReviewsTimeout = setTimeout(() => {
-                    const item = getItem(prefix, itemId);
+                getReviewsTimeout = setTimeout(async () => {
+                    const item = await getItem(prefix, itemId);
 
                     if (item.reviews.length == reviewsCount) {
                         isReviewsData = false;
@@ -181,7 +175,7 @@ export async function getItemById(itemId, browser) {
                 : 0;
         });
 
-        const dbItem = getItem(prefix, itemId);
+        const dbItem = await getItem(prefix, itemId);
 
         const dbReviewsCount = dbItem.reviews.length;
 
@@ -227,8 +221,8 @@ export async function getItemById(itemId, browser) {
         log(`Get item error: ${error.message}`, itemId);
     }
 
-    updateTime(prefix, itemId);
-    updateTags(prefix, itemId, options.query);
+    await updateTime(prefix, itemId);
+    await updateTags(prefix, itemId, options.query);
 
     log("Close page", itemId);
 
@@ -247,7 +241,7 @@ export async function getItemById(itemId, browser) {
 export async function updateItems(queue) {
     const browser = await puppeteer.launch(browserConfig);
 
-    const items = getItems(prefix);
+    const items = await getItems(prefix);
 
     log(`Update ${items.length} items`);
 
@@ -278,12 +272,12 @@ export async function updateItems(queue) {
  * @return  {Boolean}        Result
  */
 export async function updateReviews(queue) {
-    const items = getItems(prefix, true);
+    const items = await getItems(prefix, true);
 
     log(`Update ${items.length} items reviews`);
 
     for (const itemId of items) {
-        const item = getItem(prefix, itemId);
+        const item = await getItem(prefix, itemId);
 
         if (!item?.reviews?.length) {
             return false;
@@ -408,12 +402,12 @@ export async function getItemsByQuery(query = options.query) {
 
                 log(`Add new item ${item.id}`);
 
-                addItem(prefix, item.id, {
+                await addItem(prefix, item.id, {
                     ...data,
                 });
 
-                updateTime(prefix, item.id);
-                updateTags(prefix, item.id, query);
+                await updateTime(prefix, item.id);
+                await updateTags(prefix, item.id, query);
             }
 
             clearTimeout(getDataTimeout);
@@ -449,10 +443,10 @@ export async function getItemsByQuery(query = options.query) {
         for (const id of productIds) {
             log(`Add new item ${id}`);
 
-            addItem(prefix, id);
+            await addItem(prefix, id);
 
-            updateTime(prefix, id);
-            updateTags(prefix, id, options.query);
+            await updateTime(prefix, id);
+            await updateTags(prefix, id, options.query);
         }
 
         const isNext = await page.evaluate(() => {

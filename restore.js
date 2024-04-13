@@ -28,13 +28,13 @@ async function restorePrefix(prefix) {
                 continue;
             }
 
-            const dbItem = getItem(prefix, nmId);
+            const dbItem = await getItem(prefix, nmId);
 
             if (dbItem) {
                 if (!dbItem.reviews.includes(review.id)) {
                     logMsg(`Add review ${review.id} to item`, nmId, prefix);
 
-                    updateItem(
+                    await updateItem(
                         prefix,
                         nmId,
                         {
@@ -46,7 +46,7 @@ async function restorePrefix(prefix) {
             } else {
                 logMsg("Add new item", nmId, prefix);
 
-                addItem(prefix, nmId, {
+                await addItem(prefix, nmId, {
                     reviews: [review.id],
                 });
             }

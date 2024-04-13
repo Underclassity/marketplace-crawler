@@ -362,7 +362,7 @@ export async function scrapeItem(itemId, queue) {
 
     const time = options.time * 60 * 60 * 1000;
 
-    const dbReviewItem = getItem(prefix, itemId);
+    const dbReviewItem = await getItem(prefix, itemId);
 
     if (
         dbReviewItem?.time &&
@@ -430,13 +430,12 @@ export async function scrapeItem(itemId, queue) {
                 prefix,
                 itemId,
                 reviewItem.evaluationId || reviewItem.id,
-                reviewItem,
-                true
+                reviewItem
             );
         }
 
-        updateTime(prefix, itemId);
-        updateTags(prefix, itemId, options.query);
+        await updateTime(prefix, itemId);
+        await updateTags(prefix, itemId, options.query);
 
         reviews = reviews
             .filter((reviewItem) => reviewItem.images)
@@ -688,7 +687,7 @@ export async function scrapeItemByBrowser(itemId, browser, startPage, queue) {
                     maxPages = Math.round(data.data.totalAmount / pageSize) + 1;
                     log(`Set reviews max page to ${maxPages}`, itemId);
 
-                    const item = getItem(prefix, itemId);
+                    const item = await getItem(prefix, itemId);
 
                     const reviewsCount = item?.reviews
                         ? item.reviews.length
@@ -727,8 +726,7 @@ export async function scrapeItemByBrowser(itemId, browser, startPage, queue) {
                             prefix,
                             itemId,
                             reviewItem.id,
-                            reviewItem,
-                            false
+                            reviewItem
                         );
                     }
 
@@ -830,10 +828,10 @@ export async function scrapeItemByBrowser(itemId, browser, startPage, queue) {
     log(`Get all reviews for item result ${result}`, itemId);
 
     if (result) {
-        updateTime(prefix, itemId);
-        updateTags(prefix, itemId, options.query);
+        await updateTime(prefix, itemId);
+        await updateTags(prefix, itemId, options.query);
 
-        const item = getItem(prefix, itemId);
+        const item = await getItem(prefix, itemId);
 
         const reviews = item.reviews
             .map((reviewId) => getReview(prefix, itemId, reviewId))
@@ -981,8 +979,8 @@ export async function processPage(
     log(`Found ${items.length} on page ${pageId}`);
 
     for (const item of items) {
-        addItem(prefix, item);
-        updateTags(prefix, item, query);
+        await addItem(prefix, item);
+        await updateTags(prefix, item, query);
 
         queue.add(() => scrapeItem(item, queue), { priority: priorities.item });
     }
@@ -1110,7 +1108,7 @@ export async function updateItemById(itemId, queue, browser) {
 export async function updateItems(queue) {
     const browser = await puppeteer.launch(browserConfig);
 
-    const items = getItems(prefix);
+    const items = await getItems(prefix);
 
     log(`Update ${items.length} items`);
 
@@ -1145,12 +1143,12 @@ export async function updateItems(queue) {
  * @return  {Boolean}         Result
  */
 export async function updateReviews(queue) {
-    const items = getItems(prefix, true);
+    const items = await getItems(prefix, true);
 
     log(`Update ${items.length} reviews`);
 
     for (const itemId of items) {
-        const item = getItem(prefix, itemId);
+        const item = await getItem(prefix, itemId);
 
         if (!item || !item?.reviews?.length) {
             // logMsg("Reviews not found!", itemId);

@@ -9,7 +9,6 @@ import AdblockerPlugin from "puppeteer-extra-plugin-adblocker";
 import {
     addItem,
     addReview,
-    dbWrite,
     getBrands,
     getItem,
     getItems,
@@ -132,14 +131,14 @@ async function processLinks(links, browser, queue) {
 
         console.log(url);
 
-        //     let dbItem = getItem(prefix, itemId);
+        //     let dbItem = await getItem(prefix, itemId);
 
         //     if (!dbItem) {
-        //         addItem(prefix, itemId, {
+        //         await addItem(prefix, itemId, {
         //             link,
         //         });
 
-        //         dbItem = getItem(prefix, itemId);
+        //         dbItem = await getItem(prefix, itemId);
         //     }
 
         //     const time = options.time * 60 * 60 * 1000;

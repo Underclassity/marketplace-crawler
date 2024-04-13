@@ -2,11 +2,11 @@ import { createStore } from "vuex";
 
 import axios from "axios";
 
-import "@tensorflow/tfjs-backend-cpu";
-import "@tensorflow/tfjs-backend-webgl";
+// import "@tensorflow/tfjs-backend-cpu";
+// import "@tensorflow/tfjs-backend-webgl";
 
 // import * as mobilenet from "@tensorflow-models/mobilenet";
-import * as cocoSSD from "@tensorflow-models/coco-ssd";
+// import * as cocoSSD from "@tensorflow-models/coco-ssd";
 
 /**
  * Get queue status
@@ -315,46 +315,46 @@ export default createStore({
             return context.state.predictions[adapter];
         },
 
-        async loadModel(context) {
-            if (context.state.model) {
-                return false;
-            }
+        // async loadModel(context) {
+        //     if (context.state.model) {
+        //         return false;
+        //     }
 
-            console.debug("[Store]", "Start model load");
+        //     console.debug("[Store]", "Start model load");
 
-            const startTime = Date.now();
+        //     const startTime = Date.now();
 
-            // const model = await mobilenet.load({
-            //     version: 2,
-            //     alpha: 1.0,
-            //     // modelUrl: "/models/ssd_mobilenet_v2/model.json",
-            // });
+        //     // const model = await mobilenet.load({
+        //     //     version: 2,
+        //     //     alpha: 1.0,
+        //     //     // modelUrl: "/models/ssd_mobilenet_v2/model.json",
+        //     // });
 
-            const model = Object.freeze(await cocoSSD.load());
+        //     const model = Object.freeze(await cocoSSD.load());
 
-            context.state.model = model;
+        //     context.state.model = model;
 
-            const endTime = Date.now();
+        //     const endTime = Date.now();
 
-            console.debug(
-                "[Store]",
-                "Model loaded",
-                Math.round(endTime - startTime),
-                "sec"
-            );
+        //     console.debug(
+        //         "[Store]",
+        //         "Model loaded",
+        //         Math.round(endTime - startTime),
+        //         "sec"
+        //     );
 
-            return true;
-        },
+        //     return true;
+        // },
 
-        async analyzeImage(context, image) {
-            if (!context.state.model) {
-                console.log("No model found");
-                return false;
-            }
+        // async analyzeImage(context, image) {
+        //     if (!context.state.model) {
+        //         console.log("No model found");
+        //         return false;
+        //     }
 
-            // return await context.state.model.classify(image);
-            return await context.state.model.detect(image);
-        },
+        //     // return await context.state.model.classify(image);
+        //     return await context.state.model.detect(image);
+        // },
     },
     modules: {},
 });

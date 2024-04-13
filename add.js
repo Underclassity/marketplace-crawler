@@ -38,7 +38,7 @@ const adapter = ids[0];
         if (answer.itemId == 0) {
             stoped = true;
         } else {
-            addItem(adapter, answer.itemId);
+            await addItem(adapter, answer.itemId);
         }
     }
 })();

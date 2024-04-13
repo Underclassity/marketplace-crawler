@@ -164,7 +164,7 @@ async function addReviewItem(review, itemId, queue) {
     if (dbReviewItem) {
         log(`Review ${Id} already saved in DB`, itemId);
     } else {
-        await addReview(prefix, itemId, Id, review, true);
+        await addReview(prefix, itemId, Id, review);
         log(`Add review ${Id}`, itemId);
     }
 
@@ -189,7 +189,7 @@ async function updateSummary(data, itemId) {
 
     log("Update summary", itemId);
 
-    updateItem(prefix, itemId, {
+    await updateItem(prefix, itemId, {
         ...data,
     });
 
@@ -219,7 +219,7 @@ async function updateStatistics(data, itemId) {
         return false;
     }
 
-    updateItem(prefix, itemId, {
+    await updateItem(prefix, itemId, {
         ...ProductStatistics,
     });
 
@@ -238,7 +238,7 @@ async function updateStatistics(data, itemId) {
 async function updateProductInfo(data, itemId, queue) {
     log("Update product info", itemId);
 
-    const dbItem = getItem(prefix, itemId);
+    const dbItem = await getItem(prefix, itemId);
 
     const { BatchedResultsOrder, HasErrors, BatchedResults, Results } = data;
 
@@ -258,7 +258,7 @@ async function updateProductInfo(data, itemId, queue) {
                 if (item.Id && item.CID) {
                     addReviewItem(item, itemId, queue);
                 } else if (item.Description && item.Name) {
-                    updateItem(
+                    await updateItem(
                         prefix,
                         itemId,
                         {
@@ -277,7 +277,7 @@ async function updateProductInfo(data, itemId, queue) {
     }
 
     if (Results && !dbItem.info) {
-        addItem(prefix, itemId, {
+        await addItem(prefix, itemId, {
             info: Results[0],
         });
     }
@@ -346,7 +346,7 @@ async function scrapeItem(itemId, browser, queue) {
         return false;
     }
 
-    const dbItem = getItem(prefix, itemId);
+    const dbItem = await getItem(prefix, itemId);
 
     const { link } = dbItem;
 
@@ -407,8 +407,8 @@ async function scrapeItem(itemId, browser, queue) {
     if (isReviews) {
         log("No reviews found", itemId);
 
-        updateTags(prefix, itemId, options.query);
-        updateTime(prefix, itemId);
+        await updateTags(prefix, itemId, options.query);
+        await updateTime(prefix, itemId);
 
         return false;
     }
@@ -471,13 +471,13 @@ async function scrapeItem(itemId, browser, queue) {
 
     // // Add id if not defined
     // if (!("id" in dbItem)) {
-    //     updateItem(prefix, itemId, {
+    //     await updateItem(prefix, itemId, {
     //         id,
     //     });
     // }
 
-    updateTags(prefix, itemId, options.query);
-    updateTime(prefix, itemId);
+    await updateTags(prefix, itemId, options.query);
+    await updateTime(prefix, itemId);
 
     return true;
 }
@@ -502,14 +502,14 @@ async function processLinks(links, browser, queue) {
     for (const link of links) {
         const itemId = link.replace("https://www.wiggle.com/p/", "");
 
-        let dbItem = getItem(prefix, itemId);
+        let dbItem = await getItem(prefix, itemId);
 
         if (!dbItem) {
-            addItem(prefix, itemId, {
+            await addItem(prefix, itemId, {
                 link,
             });
 
-            dbItem = getItem(prefix, itemId);
+            dbItem = await getItem(prefix, itemId);
         }
 
         const time = options.time * 60 * 60 * 1000;
@@ -544,7 +544,7 @@ async function processLinks(links, browser, queue) {
  * @return  {Boolean}        Result
  */
 export async function updateBrands(queue) {
-    const brands = getBrands(prefix, true);
+    const brands = await getBrands(prefix, true);
 
     for (const brandId in brands) {
         const brandItem = brands[brandId];
@@ -605,7 +605,7 @@ export async function updateItemById(itemId, queue) {
 export async function updateItems(queue) {
     const browser = await puppeteer.launch(browserConfig);
 
-    const items = getItems(prefix);
+    const items = await getItems(prefix);
 
     log(`Update ${items.length} items`);
 
@@ -635,12 +635,12 @@ export async function updateItems(queue) {
  * @return  {Boolean}        Result
  */
 export async function updateReviews(queue) {
-    const items = getItems(prefix, true);
+    const items = await getItems(prefix, true);
 
     log(`Update ${items.length} items reviews`);
 
     for (const itemId of items) {
-        const item = getItem(prefix, itemId);
+        const item = await getItem(prefix, itemId);
 
         if (!item?.reviews?.length) {
             return false;

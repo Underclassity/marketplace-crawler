@@ -9,10 +9,10 @@ const ids = getAdaptersIds();
     for (const adapter of ids) {
         let tags = [];
 
-        const items = getItems(adapter, true);
+        const items = await getItems(adapter, true);
 
         for (const itemId of items) {
-            const item = getItem(adapter, itemId);
+            const item = await getItem(adapter, itemId);
 
             tags.push(...(item?.tags || []));
         }

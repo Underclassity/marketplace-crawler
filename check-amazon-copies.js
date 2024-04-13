@@ -12,7 +12,7 @@ const amazonFolderPath = path.resolve("download", prefix);
 const cache = {};
 
 (async () => {
-    const items = getItems(prefix, true);
+    const items = await getItems(prefix, true);
 
     const allFiles = [];
 

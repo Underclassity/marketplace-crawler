@@ -3,13 +3,7 @@ import path from "node:path";
 
 import inquirer from "inquirer";
 
-import {
-    getItem,
-    deleteItem,
-    getItems,
-    updateItem,
-    dbWrite,
-} from "./src/helpers/db.js";
+import { getItem, deleteItem, getItems, updateItem } from "./src/helpers/db.js";
 import getAdaptersIds from "./src/helpers/get-adapters-ids.js";
 import logMsg from "./src/helpers/log-msg.js";
 
@@ -24,13 +18,13 @@ const ids = getAdaptersIds();
  */
 async function checkDeleted() {
     for (const adapter of ids) {
-        const items = getItems(adapter, true, true);
+        const items = await getItems(adapter, true, true);
 
         for (const itemId of items) {
-            const item = getItem(adapter, itemId);
+            const item = await getItem(adapter, itemId);
 
             if (item?.deleted) {
-                deleteItem(adapter, itemId);
+                await deleteItem(adapter, itemId);
             }
         }
     }
@@ -53,8 +47,8 @@ async function deleteItemFromDBs(id) {
 
     const foundInIds = [];
 
-    for (const dbId in ids) {
-        const item = getItem(dbId, id);
+    for (const dbId of ids) {
+        const item = await getItem(dbId, id);
 
         if (item) {
             foundInIds.push(dbId);
@@ -99,7 +93,7 @@ async function deleteItemFromDBs(id) {
     const dbId = foundInIds[0];
 
     // found db item and set delete param to true
-    deleteItem(dbId, id);
+    await deleteItem(dbId, id);
 
     return true;
 }
@@ -118,10 +112,10 @@ async function deleteTag(tag) {
     }
 
     for (const adapter of ids) {
-        const items = getItems(adapter, true);
+        const items = await getItems(adapter, true);
 
         for (const itemId of items) {
-            let { tags } = getItem(adapter, itemId);
+            let { tags } = await getItem(adapter, itemId);
 
             if (!tags.includes(tag)) {
                 continue;
@@ -129,12 +123,10 @@ async function deleteTag(tag) {
 
             tags = tags.filter((item) => item != tag);
 
-            updateItem(adapter, itemId, { tags }, false);
+            await updateItem(adapter, itemId, { tags }, false);
 
             logMsg(`Delete tag ${tag} from item`, itemId, adapter);
         }
-
-        dbWrite(`${adapter}-products`, true, adapter, false);
     }
 
     return true;
@@ -149,19 +141,15 @@ async function deleteTag(tag) {
  */
 async function deleteBrand(brandId) {
     for (const adapter of ids) {
-        let items = getItems(adapter, true);
+        const items = await getItems(adapter, true);
 
-        items = items.map((itemId) => {
-            const item = getItem(adapter, itemId);
+        for (const itemId of items) {
+            const item = await getItem(adapter, itemId);
 
             if (item.brand == brandId && !item.deleted) {
-                deleteItem(adapter, itemId);
-
-                return true;
+                await deleteItem(adapter, itemId);
             }
-
-            return true;
-        });
+        }
     }
 }
 

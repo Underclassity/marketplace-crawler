@@ -118,7 +118,7 @@ export async function getItemsFromPageByQuery(
 }
 
 export async function getItemReview(itemId, browser) {
-    const item = getItem(prefix, itemId);
+    const item = await getItem(prefix, itemId);
 
     if (item.info) {
         return true;
@@ -222,7 +222,7 @@ export async function getItemsByQuery(queue, query = options.query) {
 
             // if (!options.force) {
             //     data = data.filter((item) => {
-            //         return getItem(prefix, item.id) ? false : true;
+            //         return await getItem(prefix, item.id) ? false : true;
             //     });
             // }
 
@@ -232,7 +232,7 @@ export async function getItemsByQuery(queue, query = options.query) {
                 );
 
                 for (const item of data) {
-                    addItem(prefix, item.id, {
+                    await addItem(prefix, item.id, {
                         link: item.link,
                     });
 

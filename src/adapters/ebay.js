@@ -127,8 +127,8 @@ async function getPhotosURLs(itemId) {
  *
  * @return  {Boolean}        Result
  */
-export function updateItems(queue) {
-    const items = getItems(prefix);
+export async function updateItems(queue) {
+    const items = await getItems(prefix);
 
     log(`Update ${items.length} items`);
 
@@ -151,12 +151,12 @@ export function updateItems(queue) {
  * @return  {Boolean}         Rtsult
  */
 export async function updateReviews(queue) {
-    const items = getItems(prefix, true);
+    const items = await getItems(prefix, true);
 
     log(`Update ${items.length} items reviews`);
 
     for (const itemId of items) {
-        const item = getItem(prefix, itemId);
+        const item = await getItem(prefix, itemId);
 
         if (!item || !item?.reviews?.length) {
             return false;
@@ -238,10 +238,10 @@ export async function getItemById(itemId, queue) {
 
     const photos = await getPhotosURLs(itemId);
 
-    updateTime(prefix, itemId);
+    await updateTime(prefix, itemId);
 
     for (const photoObject of photos) {
-        await addReview(prefix, itemId, photoObject.id, photoObject, true);
+        await addReview(prefix, itemId, photoObject.id, photoObject);
 
         const photoURL = `https://i.ebayimg.com/images/g/${photoObject.id}/s-l1600.${photoObject.ext}`;
 
@@ -314,10 +314,10 @@ export async function getItemsByQuery(queue, query = options.query) {
                 return array.indexOf(item) == index;
             })
             .map((item) => item.toString())
-            .filter((item) => {
+            .filter(async (item) => {
                 const time = options.time * 60 * 60 * 1000;
 
-                const dbReviewItem = getItem(prefix, item);
+                const dbReviewItem = await getItem(prefix, item);
 
                 if (
                     dbReviewItem?.time &&
@@ -341,8 +341,8 @@ export async function getItemsByQuery(queue, query = options.query) {
         log(`Found ${ids.length} on page ${pageId}`);
 
         for (const id of ids) {
-            addItem(prefix, id);
-            updateTags(prefix, id, options.query);
+            await addItem(prefix, id);
+            await updateTags(prefix, id, options.query);
 
             queue.add(() => getItemById(id, queue), {
                 priority: priorities.item,
