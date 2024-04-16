@@ -56,6 +56,28 @@ puppeteer.use(
 
 puppeteer.use(StealthPlugin());
 
+/**
+ * Log queue helper
+ *
+ * @param   {Object}  queue   Queue instance
+ *
+ * @return  {Boolean}         Result
+ */
+async function whileLog(queue) {
+    if (!queue) {
+        return false;
+    }
+
+    logQueue(queue);
+
+    while (queue.size || queue.pending) {
+        await sleep(1000);
+        logQueue(queue);
+    }
+
+    return true;
+}
+
 (async () => {
     if (options.proxy && options.force) {
         await updateProxies();
@@ -117,12 +139,12 @@ puppeteer.use(StealthPlugin());
         queue.eta.report(queue.min);
     });
 
+    if (ids.includes("aliexpress") && options.cookies) {
+        await processCookiesAndSession();
+    }
+
     if (options.id) {
         logMsg(`Update item ${options.id}`);
-
-        if (ids.includes("aliexpress") && options.cookies) {
-            await processCookiesAndSession();
-        }
 
         for (const id of ids) {
             const { getItemByID } = await import(`./src/adapters/${id}.js`);
@@ -133,21 +155,10 @@ puppeteer.use(StealthPlugin());
                 logMsg("Update item by ID not found!", false, id);
             }
         }
-
-        while (queue.size || queue.pending) {
-            await sleep(1000);
-            logQueue(queue);
-        }
-
-        return true;
     }
 
     if (options.reviews) {
         logMsg("Update items reviews");
-
-        if (ids.includes("aliexpress") && options.cookies) {
-            await processCookiesAndSession();
-        }
 
         for (const id of ids) {
             const { updateReviews } = await import(`./src/adapters/${id}.js`);
@@ -158,21 +169,10 @@ puppeteer.use(StealthPlugin());
                 logMsg("Update reviews not found!", false, id);
             }
         }
-
-        while (queue.size || queue.pending) {
-            await sleep(1000);
-            logQueue(queue);
-        }
-
-        return true;
     }
 
     if (options.update) {
         logMsg("Update items");
-
-        if (ids.includes("aliexpress") && options.cookies) {
-            await processCookiesAndSession();
-        }
 
         for (const id of ids) {
             const { updateItems } = await import(`./src/adapters/${id}.js`);
@@ -183,21 +183,10 @@ puppeteer.use(StealthPlugin());
                 logMsg("Update items not found!", false, id);
             }
         }
-
-        while (queue.size || queue.pending) {
-            await sleep(1000);
-            logQueue(queue);
-        }
-
-        return true;
     }
 
     if (options.info) {
         logMsg("Get info for all items");
-
-        if (ids.includes("aliexpress") && options.cookies) {
-            await processCookiesAndSession();
-        }
 
         for (const id of ids) {
             const { updateInfo } = await import(`./src/adapters/${id}.js`);
@@ -208,21 +197,10 @@ puppeteer.use(StealthPlugin());
                 logMsg("Get items by brand not found!", false, id);
             }
         }
-
-        while (queue.size || queue.pending) {
-            await sleep(1000);
-            logQueue(queue);
-        }
-
-        return true;
     }
 
     if (options.brand) {
         logMsg("Get all brand items");
-
-        if (ids.includes("aliexpress") && options.cookies) {
-            await processCookiesAndSession();
-        }
 
         for (const id of ids) {
             const { getItemsByBrand } = await import(`./src/adapters/${id}.js`);
@@ -233,21 +211,10 @@ puppeteer.use(StealthPlugin());
                 logMsg("Get items by brand not found!", false, id);
             }
         }
-
-        while (queue.size || queue.pending) {
-            await sleep(1000);
-            logQueue(queue);
-        }
-
-        return true;
     }
 
     if (options.brands) {
         logMsg("Update all items with brand");
-
-        if (ids.includes("aliexpress") && options.cookies) {
-            await processCookiesAndSession();
-        }
 
         for (const id of ids) {
             const { updateBrands } = await import(`./src/adapters/${id}.js`);
@@ -258,13 +225,6 @@ puppeteer.use(StealthPlugin());
                 logMsg("Update with brands not found!", false, id);
             }
         }
-
-        while (queue.size || queue.pending) {
-            await sleep(1000);
-            logQueue(queue);
-        }
-
-        return true;
     }
 
     if (options.category) {
@@ -281,21 +241,10 @@ puppeteer.use(StealthPlugin());
                 logMsg("Update category not found!", false, id);
             }
         }
-
-        while (queue.size || queue.pending) {
-            await sleep(1000);
-            logQueue(queue);
-        }
-
-        return true;
     }
 
     if (options.tags) {
         logMsg("Update all items with tags");
-
-        if (ids.includes("aliexpress") && options.cookies) {
-            await processCookiesAndSession();
-        }
 
         for (const id of ids) {
             const { updateWithTags } = await import(`./src/adapters/${id}.js`);
@@ -306,13 +255,6 @@ puppeteer.use(StealthPlugin());
                 logMsg("Update with tags not found!", false, id);
             }
         }
-
-        while (queue.size || queue.pending) {
-            await sleep(1000);
-            logQueue(queue);
-        }
-
-        return true;
     }
 
     if (options.stats) {
@@ -325,15 +267,6 @@ puppeteer.use(StealthPlugin());
                 logMsg("Log stats not found!", false, id);
             }
         }
-
-        logQueue(queue);
-
-        while (queue.size || queue.pending) {
-            await sleep(1000);
-            logQueue(queue);
-        }
-
-        return true;
     }
 
     if (options.check) {
@@ -346,37 +279,21 @@ puppeteer.use(StealthPlugin());
                 logMsg("Check reviews not found!", false, id);
             }
         }
-
-        logQueue(queue);
-
-        while (queue.size || queue.pending) {
-            await sleep(1000);
-            logQueue(queue);
-        }
-
-        return true;
     }
 
-    if (!options.query) {
-        logMsg("Query not defined!");
+    if (options.query) {
+        logMsg(`Get items for query: ${options.query}`);
 
-        return false;
-    }
+        for (const id of ids) {
+            const { getItemsByQuery } = await import(`./src/adapters/${id}.js`);
 
-    logMsg(`Get items for query: ${options.query}`);
-
-    for (const id of ids) {
-        const { getItemsByQuery } = await import(`./src/adapters/${id}.js`);
-
-        if (getItemsByQuery) {
-            getItemsByQuery(queue);
+            if (getItemsByQuery) {
+                getItemsByQuery(queue);
+            }
         }
     }
 
-    while (queue.size || queue.pending) {
-        await sleep(1000);
-        logQueue(queue);
-    }
+    await whileLog(queue);
 
     return true;
 })();

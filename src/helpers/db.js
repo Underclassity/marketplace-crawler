@@ -1001,7 +1001,7 @@ export async function getFiles(prefix, itemId) {
 
     loadDB(dbPrefix);
 
-    const files = dbCache[dbPrefix].get(itemId.toString());
+    const files = await dbCache[dbPrefix].get(itemId.toString());
 
     if (!files) {
         return false;

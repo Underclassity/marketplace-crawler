@@ -79,7 +79,6 @@
         "@vue/cli-plugin-router": "~5.0.0",
         "@vue/cli-plugin-vuex": "~5.0.0",
         "@vue/cli-service": "~5.0.0",
-        "bluebird": "^3.7.2",
         "cheerio": "^1.0.0-rc.12",
         "concurrently": "^8.0.1",
         "cross-spawn": "^7.0.3",
