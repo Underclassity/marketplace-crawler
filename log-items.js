@@ -6,7 +6,7 @@ import { getItem, getItems } from "./src/helpers/db.js";
 import { logMsg } from "./src/helpers/log-msg.js";
 import options from "./src/options.js";
 import getAdaptersIds from "./src/helpers/get-adapters-ids.js";
-import readDir from "./src/helpers/read-dir.js";
+import readDirStats from "./src/helpers/read-dir-stats.js";
 
 const ids = getAdaptersIds();
 
@@ -42,14 +42,9 @@ const ids = getAdaptersIds();
 
             logMsg("Get size", itemId, prefix);
 
-            const files = readDir(itemFolderPath);
+            const { files, size } = readDirStats(itemFolderPath);
 
-            const size = files.reduce((prev, curr) => {
-                prev += fs.statSync(curr).size;
-                return prev;
-            }, 0);
-
-            cache.push([itemId, size, itemInfo]);
+            cache.push([itemId, size, itemInfo, files]);
 
             cache.sort((a, b) => {
                 return b[1] - a[1];
@@ -59,8 +54,8 @@ const ids = getAdaptersIds();
 
             const result = [];
 
-            for (const [id, size, info] of cache) {
-                const obj = { id, size };
+            for (const [id, size, info, files] of cache) {
+                const obj = { id, size, files };
 
                 if (info?.info) {
                     obj.name = `${info.info.subj_root_name} - ${info.info.subj_name}`;
