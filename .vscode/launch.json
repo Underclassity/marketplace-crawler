@@ -526,6 +526,25 @@
         {
             "type": "node",
             "request": "launch",
+            "name": "Wildberries Info",
+            "skipFiles": ["<node_internals>/**"],
+            "program": "${workspaceFolder}\\index.js",
+            "args": [
+                "--thumbnail",
+                "false",
+                "--include",
+                "wildberries",
+                "--throat",
+                "10",
+                "--timeout",
+                "10000",
+                "--info",
+                "true"
+            ]
+        },
+        {
+            "type": "node",
+            "request": "launch",
             "name": "Wildberries Check Reverse",
             "skipFiles": ["<node_internals>/**"],
             "program": "${workspaceFolder}\\index.js",

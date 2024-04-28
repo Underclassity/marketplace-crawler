@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { URL } from "node:url";
 
 import axios from "axios";
 
@@ -81,6 +82,40 @@ export function getHostId(vol_id) {
     // return false;
 }
 
+export function getHostV2(volume) {
+    if (volume >= 0 && volume <= 143) {
+        return "basket-01";
+    } else if (volume >= 144 && volume <= 287) {
+        return "basket-02";
+    } else if (volume >= 288 && volume <= 431) {
+        return "basket-03";
+    } else if (volume >= 432 && volume <= 719) {
+        return "basket-04";
+    } else if (volume >= 720 && volume <= 1007) {
+        return "basket-05";
+    } else if (volume >= 1008 && volume <= 1061) {
+        return "basket-06";
+    } else if (volume >= 1062 && volume <= 1115) {
+        return "basket-07";
+    } else if (volume >= 1116 && volume <= 1169) {
+        return "basket-08";
+    } else if (volume >= 1170 && volume <= 1313) {
+        return "basket-09";
+    } else if (volume >= 1314 && volume <= 1601) {
+        return "basket-10";
+    } else if (volume >= 1602 && volume <= 1655) {
+        return "basket-11";
+    } else if (volume >= 1656 && volume <= 1919) {
+        return "basket-12";
+    } else if (volume >= 1920 && volume <= 2045) {
+        return "basket-13";
+    } else if (volume >= 2046 && volume <= 2189) {
+        return "basket-14";
+    } else {
+        return "basket-15";
+    }
+}
+
 /**
  * Get feedback image URL by photoId
  *
@@ -100,6 +135,36 @@ export function feedBackPhotoPath(photoId) {
     return `https://feedback${
         host && host >= 10 ? host : `0${host}`
     }.wb.ru/vol${vol_id}/part${part_id}/${photoId}/photos/fs.webp`;
+}
+
+/**
+ * Get brand ID from brand link
+ *
+ * @param   {String}  link  Link to brand page
+ *
+ * @return  {String}        Brand ID
+ */
+async function getBrandIdFromLink(link) {
+    const urlObject = new URL(link);
+
+    if (
+        link.includes("wildberries.by") &&
+        urlObject.searchParams.get("brandpage")
+    ) {
+        return urlObject.searchParams.get("brandpage");
+    }
+
+    try {
+        const request = await axios(
+            `https://static-basket-01.wbbasket.ru/vol0/data/${urlObject.pathname}.json`
+        );
+
+        return request.data.id.toString();
+    } catch (error) {
+        log(`Get brand ID from link ${link} error: ${error.message}`);
+    }
+
+    return false;
 }
 
 /**
@@ -209,10 +274,19 @@ export async function getFeedback(itemId, feedback, queue) {
         return true;
     }
 
+    const item = await getItem(prefix, itemId);
+
     const itemFolderPath = path.resolve(
         path.resolve(options.directory, "./download", "wildberries"),
         itemId.toString()
     );
+
+    if (item?.deleted) {
+        if (fs.existsSync(itemFolderPath)) {
+            fs.rmdirSync(itemFolderPath, { recursive: true });
+        }
+        return true;
+    }
 
     if (!fs.existsSync(itemFolderPath)) {
         fs.mkdirSync(itemFolderPath, { recursive: true });
@@ -404,18 +478,27 @@ export async function getItemInfo(itemId) {
 
     log("Try to get full info", itemId);
 
-    function p(t, e) {
-        for (let i = 0; i < e.length; i++) if (t <= e[i]) return i + 1;
-    }
+    itemId = parseInt(itemId, 10);
 
-    const s = Math.floor(itemId / 1e5);
-    const n = p(s, FEEDBACK_PHOTO_SHARD_RANGE);
+    // function p(t, e) {
+    //     for (let i = 0; i < e.length; i++) if (t <= e[i]) return i + 1;
+    // }
 
-    const url = `https://basket-${
-        n && n >= 10 ? n : `0${n}`
-    }.wb.ru/vol${s}/part${Math.floor(
-        itemId / 1e3
-    )}/${itemId}/info/ru/card.json`;
+    // const s = Math.floor(itemId / 1e5);
+    // const n = p(s, FEEDBACK_PHOTO_SHARD_RANGE);
+
+    const volume = ~~(+itemId / 1e5);
+    const part = ~~(+itemId / 1e3);
+
+    const shard = getHostV2(+volume);
+
+    const url = `https://${shard}.wbbasket.ru/vol${volume}/part${part}/${itemId}/info/ru/card.json`;
+
+    // const url = `https://basket-${
+    //     n && n >= 10 ? n : `0${n}`
+    // }.wb.ru/vol${s}/part${Math.floor(
+    //     itemId / 1e3
+    // )}/${itemId}/info/ru/card.json`;
 
     try {
         const request = await axios(url, {
@@ -665,10 +748,15 @@ export async function getFeedbacks(itemId, query = false, queue) {
     if (isResult) {
         log(`Found ${feedbacks.length} feedbacks items`, itemId);
 
-        const item = await getItem(prefix, itemId);
+        let item = await getItem(prefix, itemId);
 
         for (const feedback of feedbacks) {
-            if (!item.reviews.includes(feedback.id) || options.force) {
+            if (!item) {
+                await addItem(prefix, itemId);
+                item = await getItem(prefix, itemId);
+            }
+
+            if (!item?.reviews.includes(feedback.id) || options.force) {
                 await addReview(prefix, itemId, feedback.id, feedback);
             }
         }
@@ -1541,6 +1629,58 @@ export async function getBrandItemsByID(brandID, queue) {
 }
 
 /**
+ * Update info for all items
+ *
+ * @param   {Object}  queue  Queue instance
+ *
+ * @return  {Boolean}        Result
+ */
+export async function updateInfo(queue) {
+    const items = await getItems(prefix, true);
+
+    log(`Update info for ${items.length} items`);
+
+    for (const itemId of items) {
+        const item = await getItem(prefix, itemId);
+
+        // Try to get item info
+        if (
+            item.ids &&
+            Array.isArray(item.ids) &&
+            item.ids.length &&
+            !item.info
+        ) {
+            const firstIdItem = item.ids[0];
+
+            queueCall(
+                async () => {
+                    const infoData = await getItemInfo(firstIdItem.id);
+
+                    if (firstIdItem.name == infoData.imt_name) {
+                        await updateItem(prefix, itemId, {
+                            info: infoData,
+                        });
+                    }
+
+                    logQueue(queue);
+                },
+                queue,
+                priorities.item
+            );
+        }
+    }
+
+    logQueue(queue);
+
+    while (queue.size || queue.pending) {
+        await sleep(1000);
+        logQueue(queue);
+    }
+
+    return true;
+}
+
+/**
  * Get items by brand
  *
  * @param   {Object}  queue  Queue
@@ -1549,7 +1689,17 @@ export async function getBrandItemsByID(brandID, queue) {
  * @return  {Boolean}        Result
  */
 export async function getItemsByBrand(queue, brand = options.brand) {
-    log("Get items call by brand");
+    if (brand.includes("https://")) {
+        brand = await getBrandIdFromLink(brand);
+    }
+
+    if (!brand) {
+        return false;
+    }
+
+    // options.brand = brand;
+
+    log("Get items call by brand: ", brand);
 
     if (brand.indexOf("__") != -1) {
         brand = brand.slice(0, brand.indexOf("__"));

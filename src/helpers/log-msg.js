@@ -78,8 +78,10 @@ export function logQueue(queue) {
 
     const { size } = queue;
 
+    const estimate = queue?.eta?.estimate() || 0;
+
     const queueLogString = `Queue-${options.throat} size ${size} ${
-        `${queue?.eta?.estimate().toFixed(2)}s` || ""
+        `${estimate.toFixed(2)}s` || ""
     }: ${Object.keys(priorities)
         .map(
             (priority) =>
