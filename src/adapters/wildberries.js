@@ -917,16 +917,11 @@ export async function itemsRequest(page = 1, query = options.query) {
 let categoriesData = null;
 
 /**
- * Get items from page by query
+ * Get categories from site helper
  *
- * @param   {Number}  page          Page number
- * @param   {String}  categoryId    Query
- *
- * @return  {Object}                Result
+ * @return  {Array}  Reduced categories
  */
-export async function categoryRequest(page = 1, categoryId = options.category) {
-    log(`Page ${page} items get`);
-
+export async function getCategories() {
     if (!categoriesData) {
         try {
             log("Try to get categories");
@@ -963,6 +958,22 @@ export async function categoryRequest(page = 1, categoryId = options.category) {
     }
 
     const categories = categoriesData.reduce(categoriesReducer, []);
+
+    return categories;
+}
+
+/**
+ * Get items from page by query
+ *
+ * @param   {Number}  page          Page number
+ * @param   {String}  categoryId    Query
+ *
+ * @return  {Object}                Result
+ */
+export async function categoryRequest(page = 1, categoryId = options.category) {
+    log(`Page ${page} items get`);
+
+    const categories = await getCategories();
 
     const category = categories.find((item) => item.id == categoryId);
 

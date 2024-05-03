@@ -535,7 +535,7 @@
                 "--include",
                 "wildberries",
                 "--throat",
-                "10",
+                "3",
                 "--timeout",
                 "10000",
                 "--info",

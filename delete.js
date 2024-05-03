@@ -4,6 +4,7 @@ import path from "node:path";
 import inquirer from "inquirer";
 
 import { getItem, deleteItem, getItems, updateItem } from "./src/helpers/db.js";
+
 import getAdaptersIds from "./src/helpers/get-adapters-ids.js";
 import logMsg from "./src/helpers/log-msg.js";
 
@@ -153,8 +154,44 @@ async function deleteBrand(brandId) {
     }
 }
 
+/**
+ * Delete by category ID helper
+ *
+ * @param   {String}  categoryId   Category ID
+ *
+ * @return  {Boolean}              Result
+ */
+async function deleteCategory(categoryId) {
+    for (const adapter of ids) {
+        if (adapter != "wildberries") {
+            continue;
+        }
+
+        const items = await getItems(adapter, true);
+
+        for (const itemId of items) {
+            const item = await getItem(adapter, itemId);
+
+            if (
+                item?.info?.data &&
+                (item.info.data.subject_id == categoryId ||
+                    item.info.data.subject_root_id == categoryId)
+            ) {
+                await deleteItem(adapter, itemId);
+            }
+        }
+    }
+
+    return true;
+}
+
 (async () => {
-    await checkDeleted();
+    logMsg("Start delete logic");
+
+    // Check deleted items status
+    if (options.check) {
+        await checkDeleted();
+    }
 
     if (options.id) {
         await deleteItemFromDBs(options.id);
@@ -168,6 +205,11 @@ async function deleteBrand(brandId) {
 
     if (options.tag) {
         await deleteTag(options.tag);
+        return true;
+    }
+
+    if (options.category) {
+        await deleteCategory(options.category);
         return true;
     }
 

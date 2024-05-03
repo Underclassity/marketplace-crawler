@@ -505,8 +505,7 @@ export async function getItems(
         }
 
         if ("deleted" in item && item.deleted && !deleted) {
-            logMsg(`Deleted item`, id, prefix);
-
+            // logMsg(`Deleted item`, id, prefix);
             continue;
         }
 
