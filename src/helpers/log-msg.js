@@ -57,10 +57,14 @@ export function logMsg(msg, id = "Common", prefix = "Common") {
         id = id.toString().padEnd(idLength, " ");
     }
 
+    const date = new Date();
+
     return log(
-        `${prefix ? `[${prefix}] ` : ""}${query ? `${query}: ` : ""}${
-            id ? `${id} - ` : ""
-        }${msg}`
+        `${
+            prefix
+                ? `${date.toLocaleTimeString()} [${prefix}] `
+                : "${date.toLocaleTimeString()} "
+        }${query ? `${query}: ` : ""}${id ? `${id} - ` : ""}${msg}`
     );
 }
 
