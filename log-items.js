@@ -71,7 +71,7 @@ function logProgress(length) {
 
         // logMsg(`Size: ${size}`, itemId, prefix);
 
-        const result = [];
+        const result = { info: {}, items: [] };
 
         for (const [id, size, info, files] of cache) {
             const obj = { id, size, files };
@@ -82,10 +82,33 @@ function logProgress(length) {
 
                 obj.subject_root_id = info.info.data.subject_root_id;
                 obj.subject_id = info.info.data.subject_id;
+
+                if (result.info[obj.subject_root_id]) {
+                    result.info[obj.subject_root_id].count++;
+                    result.info[obj.subject_root_id].size += size;
+                } else {
+                    result.info[obj.subject_root_id] = {
+                        count: 1,
+                        name: obj.subj_root_name,
+                        size: +size,
+                    };
+                }
             }
 
-            result.push(obj);
+            result.items.push(obj);
         }
+
+        const infoResults = [];
+
+        for (const id in result.info) {
+            const item = result.info[id];
+            item.id = id;
+            infoResults.push(item);
+        }
+
+        infoResults.sort((a, b) => b.size - a.size);
+
+        result.info = infoResults;
 
         fs.writeFileSync(
             path.resolve(options.directory, "db", `${prefix}-size.json`),
