@@ -162,6 +162,10 @@ async function deleteBrand(brandId) {
  * @return  {Boolean}              Result
  */
 async function deleteCategory(categoryId) {
+    if (!categoryId) {
+        return false;
+    }
+
     for (const adapter of ids) {
         if (adapter != "wildberries") {
             continue;
@@ -179,6 +183,37 @@ async function deleteCategory(categoryId) {
             ) {
                 await deleteItem(adapter, itemId);
             }
+        }
+
+        const dbSizesFilepath = path.resolve(
+            options.directory,
+            "db",
+            "wildberries-size.json"
+        );
+
+        if (fs.existsSync(dbSizesFilepath)) {
+            const data = JSON.parse(fs.readFileSync(dbSizesFilepath));
+
+            data.items = data.items.filter((item) => {
+                if (
+                    item.subject_root_id == categoryId ||
+                    item.subject_id == categoryId
+                ) {
+                    return false;
+                }
+
+                return true;
+            });
+
+            data.info = data.info.filter((item) => {
+                if (item.id == categoryId) {
+                    return false;
+                }
+
+                return true;
+            });
+
+            fs.writeFileSync(dbSizesFilepath, JSON.stringify(data, null, 4));
         }
     }
 
@@ -208,12 +243,30 @@ async function deleteCategory(categoryId) {
         return true;
     }
 
+    let stoped = false;
+
     if (options.category) {
         await deleteCategory(options.category);
+
+        while (!stoped) {
+            const answer = await inquirer.prompt([
+                {
+                    type: "string",
+                    name: "category",
+                    message: "Category ID?",
+                    default: false,
+                },
+            ]);
+
+            if (answer.category == 0) {
+                stoped = true;
+            } else {
+                await deleteCategory(answer.category);
+            }
+        }
+
         return true;
     }
-
-    let stoped = false;
 
     while (!stoped) {
         const answer = await inquirer.prompt([

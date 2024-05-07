@@ -83,13 +83,13 @@ function logProgress(length) {
                 obj.subject_root_id = info.info.data.subject_root_id;
                 obj.subject_id = info.info.data.subject_id;
 
-                if (result.info[obj.subject_root_id]) {
-                    result.info[obj.subject_root_id].count++;
-                    result.info[obj.subject_root_id].size += size;
+                if (result.info[obj.subject_id]) {
+                    result.info[obj.subject_id].count++;
+                    result.info[obj.subject_id].size += size;
                 } else {
-                    result.info[obj.subject_root_id] = {
+                    result.info[obj.subject_id] = {
                         count: 1,
-                        name: obj.subj_root_name,
+                        name: obj.subj_name,
                         size: +size,
                     };
                 }
