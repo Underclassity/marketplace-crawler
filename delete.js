@@ -3,7 +3,13 @@ import path from "node:path";
 
 import inquirer from "inquirer";
 
-import { getItem, deleteItem, getItems, updateItem } from "./src/helpers/db.js";
+import {
+    getItem,
+    deleteItem,
+    getItems,
+    getItemsData,
+    updateItem,
+} from "./src/helpers/db.js";
 
 import getAdaptersIds from "./src/helpers/get-adapters-ids.js";
 import logMsg from "./src/helpers/log-msg.js";
@@ -11,6 +17,16 @@ import logMsg from "./src/helpers/log-msg.js";
 import options from "./src/options.js";
 
 const ids = getAdaptersIds();
+
+const dbCache = {};
+
+async function getItemsDataForAdapter(adapter) {
+    if (!(adapter in dbCache)) {
+        dbCache[adapter] = await getItemsData(adapter);
+    }
+
+    return dbCache[adapter];
+}
 
 /**
  * Check and delete items
@@ -171,17 +187,23 @@ async function deleteCategory(categoryId) {
             continue;
         }
 
-        const items = await getItems(adapter, true);
+        const items = await getItemsDataForAdapter(adapter);
 
-        for (const itemId of items) {
-            const item = await getItem(adapter, itemId);
+        for (const { id, value: item } of items) {
+            if (item.deleted) {
+                continue;
+            }
+
+            if (!("info" in item)) {
+                continue;
+            }
 
             if (
                 item?.info?.data &&
                 (item.info.data.subject_id == categoryId ||
                     item.info.data.subject_root_id == categoryId)
             ) {
-                await deleteItem(adapter, itemId);
+                await deleteItem(adapter, id);
             }
         }
 

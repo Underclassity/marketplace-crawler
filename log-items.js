@@ -3,7 +3,7 @@ import fs from "node:fs";
 
 import cli from "cli";
 
-import { getItem, getItems } from "./src/helpers/db.js";
+import { getItemsData } from "./src/helpers/db.js";
 
 // import { logMsg } from "./src/helpers/log-msg.js";
 
@@ -23,21 +23,19 @@ function logProgress(length) {
 
 (async () => {
     for (const prefix of ids) {
-        const items = await getItems(prefix, true);
+        const items = await getItemsData(prefix);
 
         const cache = [];
 
         counter = 0;
 
-        for (const itemId of items) {
+        for (const { id: itemId, value: itemInfo } of items) {
             const itemFolderPath = path.resolve(
                 options.directory,
                 "download",
                 prefix,
                 itemId.toString()
             );
-
-            const itemInfo = await getItem(prefix, itemId);
 
             if (itemInfo.deleted) {
                 logProgress(items.length);

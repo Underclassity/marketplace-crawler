@@ -535,6 +535,35 @@ export async function getItems(
 }
 
 /**
+ * Get all items data helper
+ *
+ * @param   {String}  prefix  Prefix
+ *
+ * @return  {Array}           Items array
+ */
+export async function getItemsData(prefix) {
+    if (!prefix || !prefix.length) {
+        logMsg("Prefix not defined!");
+        return false;
+    }
+
+    const dbPrefix = `${prefix}-products`;
+
+    loadDB(dbPrefix);
+
+    const db = dbCache[dbPrefix];
+
+    if (!db) {
+        logMsg("DB not defined!", false, prefix);
+        return false;
+    }
+
+    const items = await db.all();
+
+    return items;
+}
+
+/**
  * Get items brands from DB
  *
  * @param   {String}   prefix     Log prefix

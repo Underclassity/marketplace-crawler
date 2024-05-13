@@ -95,7 +95,7 @@ export function logQueue(queue) {
         )
         .join(", ")}`;
 
-    logMsg(queueLogString, false, false);
+    console.log(queueLogString);
 
     return true;
 }
