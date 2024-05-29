@@ -227,7 +227,15 @@ async function deleteCategory(categoryId) {
                 return true;
             });
 
-            data.info = data.info.filter((item) => {
+            data.root_categories = data.root_categories.filter((item) => {
+                if (item.id == categoryId) {
+                    return false;
+                }
+
+                return true;
+            });
+
+            data.categories = data.categories.filter((item) => {
                 if (item.id == categoryId) {
                     return false;
                 }

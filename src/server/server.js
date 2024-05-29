@@ -1,8 +1,6 @@
 import path from "node:path";
 import process from "node:process";
 
-// import ViteExpress from "vite-express";
-
 import "dotenv/config";
 
 // Express.js and modules
@@ -195,7 +193,3 @@ app.get("/categories/:adapter", async (req, res) => {
 app.listen(port, () => {
     logMsg(`Example app listening on port ${port}`);
 });
-
-// ViteExpress.listen(app, port, () => {
-//     logMsg(`Example app listening on port ${port}`);
-// });

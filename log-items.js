@@ -69,7 +69,7 @@ function logProgress(length) {
 
         // logMsg(`Size: ${size}`, itemId, prefix);
 
-        const result = { info: {}, items: [] };
+        const result = { root_categories: {}, categories: {}, items: [] };
 
         for (const [id, size, info, files] of cache) {
             const obj = { id, size, files };
@@ -81,11 +81,22 @@ function logProgress(length) {
                 obj.subject_root_id = info.info.data.subject_root_id;
                 obj.subject_id = info.info.data.subject_id;
 
-                if (result.info[obj.subject_id]) {
-                    result.info[obj.subject_id].count++;
-                    result.info[obj.subject_id].size += size;
+                if (result.root_categories[obj.subject_root_id]) {
+                    result.root_categories[obj.subject_root_id].count++;
+                    result.root_categories[obj.subject_root_id].size += size;
                 } else {
-                    result.info[obj.subject_id] = {
+                    result.root_categories[obj.subject_root_id] = {
+                        count: 1,
+                        name: obj.subj_root_name,
+                        size: +size,
+                    };
+                }
+
+                if (result.categories[obj.subject_id]) {
+                    result.categories[obj.subject_id].count++;
+                    result.categories[obj.subject_id].size += size;
+                } else {
+                    result.categories[obj.subject_id] = {
                         count: 1,
                         name: obj.subj_name,
                         size: +size,
@@ -97,16 +108,25 @@ function logProgress(length) {
         }
 
         const infoResults = [];
+        const infoRootResults = [];
 
-        for (const id in result.info) {
-            const item = result.info[id];
+        for (const id in result.categories) {
+            const item = result.categories[id];
             item.id = id;
             infoResults.push(item);
         }
 
-        infoResults.sort((a, b) => b.size - a.size);
+        for (const id in result.root_categories) {
+            const item = result.root_categories[id];
+            item.id = id;
+            infoRootResults.push(item);
+        }
 
-        result.info = infoResults;
+        infoResults.sort((a, b) => b.size - a.size);
+        infoRootResults.sort((a, b) => b.size - a.size);
+
+        result.categories = infoResults;
+        result.root_categories = infoRootResults;
 
         fs.writeFileSync(
             path.resolve(options.directory, "db", `${prefix}-size.json`),

@@ -500,7 +500,7 @@ export async function getItems(
         }
 
         if (item?.time && Date.now() - item.time <= time && !force) {
-            logMsg(`Already updated by time`, id, prefix);
+            // logMsg(`Already updated by time`, id, prefix);
             continue;
         }
 
