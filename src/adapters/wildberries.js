@@ -5,6 +5,7 @@ import { URL } from "node:url";
 import axios from "axios";
 
 import {
+    // deleteItemParam,
     addItem,
     addReview,
     addUserReview,
@@ -13,6 +14,7 @@ import {
     getItem,
     getItemFiles,
     getItems,
+    getItemsData,
     getReview,
     getTags,
     updateBrand,
@@ -156,7 +158,7 @@ async function getBrandIdFromLink(link) {
 
     try {
         const request = await axios(
-            `https://static-basket-01.wbbasket.ru/vol0/data/${urlObject.pathname}.json`
+            `https://static-basket-01.wbbasket.ru/vol0/data/${urlObject.pathname}.json`,
         );
 
         return request.data.id.toString();
@@ -259,7 +261,7 @@ export async function getFeedback(itemId, feedback, queue) {
         prefix,
         feedback.wbUserId,
         feedback.id,
-        feedback.wbUserDetails
+        feedback.wbUserDetails,
     );
 
     if (!options.download) {
@@ -278,7 +280,7 @@ export async function getFeedback(itemId, feedback, queue) {
 
     const itemFolderPath = path.resolve(
         path.resolve(options.directory, "./download", "wildberries"),
-        itemId.toString()
+        itemId.toString(),
     );
 
     if (item?.deleted) {
@@ -329,7 +331,7 @@ export async function getFeedback(itemId, feedback, queue) {
     if (filteredPhotos.length) {
         log(
             `Get ${filteredPhotos.length} photos for review ${feedback.id}`,
-            itemId
+            itemId,
         );
 
         for (const { url, filepath } of filteredPhotos) {
@@ -343,7 +345,7 @@ export async function getFeedback(itemId, feedback, queue) {
         const [basket, id] = feedback.video.id.split("/");
         const url = `https://videofeedback${basket.padStart(
             2,
-            0
+            0,
         )}.wb.ru/${id}/index.m3u8`;
 
         const filepath = path.resolve(
@@ -351,7 +353,7 @@ export async function getFeedback(itemId, feedback, queue) {
             "download",
             prefix,
             itemId.toString(),
-            `${id}.mp4`
+            `${id}.mp4`,
         );
 
         downloadItem(url, filepath, queue, true);
@@ -425,7 +427,7 @@ export async function addInfoToProducts(products) {
                     brand: brandId,
                     ids: [...item.ids, idObject],
                 },
-                false
+                false,
             );
         } else if (
             item.ids &&
@@ -443,7 +445,7 @@ export async function addInfoToProducts(products) {
                     brand: brandId,
                     ids: item.ids,
                 },
-                false
+                false,
             );
             return true;
         } else if (!item.ids || !Array.isArray(item.ids)) {
@@ -456,7 +458,7 @@ export async function addInfoToProducts(products) {
                     brand: brandId,
                     ids: [idObject],
                 },
-                false
+                false,
             );
         }
     }
@@ -480,13 +482,6 @@ export async function getItemInfo(itemId) {
 
     itemId = parseInt(itemId, 10);
 
-    // function p(t, e) {
-    //     for (let i = 0; i < e.length; i++) if (t <= e[i]) return i + 1;
-    // }
-
-    // const s = Math.floor(itemId / 1e5);
-    // const n = p(s, FEEDBACK_PHOTO_SHARD_RANGE);
-
     const volume = ~~(+itemId / 1e5);
     const part = ~~(+itemId / 1e3);
 
@@ -494,55 +489,18 @@ export async function getItemInfo(itemId) {
 
     const url = `https://${shard}.wbbasket.ru/vol${volume}/part${part}/${itemId}/info/ru/card.json`;
 
-    // const url = `https://basket-${
-    //     n && n >= 10 ? n : `0${n}`
-    // }.wb.ru/vol${s}/part${Math.floor(
-    //     itemId / 1e3
-    // )}/${itemId}/info/ru/card.json`;
-
     try {
         const request = await axios(url, {
             headers: getHeaders(),
             timeout: options.timeout,
         });
 
-        log("Get full info", itemId);
+        log(`Get full info: ${request.data.imt_name}`, itemId);
 
         return request.data;
     } catch (error) {
         log(`Get full info error: ${error.message}`, itemId);
     }
-
-    // try {
-    //     const request = await axios("https://card.wb.ru/cards/detail", {
-    //         params: {
-    //             nm: itemId,
-
-    //             appType: 12,
-    //             curr: "byn",
-    //             locale: "by",
-    //             lang: "ru",
-    //             dest: -59208,
-    //             regions: REGIONS,
-    //             emp: 0,
-    //             reg: 1,
-    //             spp: 0,
-    //         },
-
-    //         headers: getHeaders(),
-    //         timeout: options.timeout,
-    //     });
-
-    //     log("Get full info", itemId);
-
-    //     const { data } = request.data;
-    //     const { products } = data;
-    //     const [product] = products;
-
-    //     return product || false;
-    // } catch (error) {
-    //     log(`Get full info error: ${error.message}`, itemId);
-    // }
 
     return false;
 }
@@ -567,7 +525,7 @@ export async function getQuestions(itemId) {
             {
                 headers: getHeaders(),
                 timeout: options.timeout,
-            }
+            },
         );
 
         const { count } = countRequest.data;
@@ -587,7 +545,7 @@ export async function getQuestions(itemId) {
                         take: 20,
                         skip: page ? page * 20 : 0,
                     },
-                }
+                },
             );
 
             questions.push(...request.data.questions);
@@ -693,7 +651,7 @@ export async function getPriceInfo(itemId) {
     const url = `https://basket-${
         n && n >= 10 ? n : `0${n}`
     }.wb.ru/vol${s}/part${Math.floor(
-        itemId / 1e3
+        itemId / 1e3,
     )}/${itemId}/info/price-history.json`;
 
     try {
@@ -826,6 +784,8 @@ export async function getFeedbacks(itemId, query = false, queue) {
         });
     }
 
+    logQueue(queue);
+
     return true;
 }
 
@@ -855,7 +815,7 @@ export async function feedbacksRequest(itemId, skip) {
 
                 headers: getHeaders(),
                 timeout: options.timeout,
-            }
+            },
         );
 
         return request.data;
@@ -903,7 +863,7 @@ export async function itemsRequest(page = 1, query = options.query) {
 
                 headers: getHeaders(),
                 timeout: options.timeout,
-            }
+            },
         );
 
         return getItemsRequest.data;
@@ -919,9 +879,11 @@ let categoriesData = null;
 /**
  * Get categories from site helper
  *
- * @return  {Array}  Reduced categories
+ * @param   {Boolean}  reduced  Reduced flag
+ *
+ * @return  {Array}             Reduced categories
  */
-export async function getCategories() {
+export async function getCategories(reduced = true) {
     if (!categoriesData) {
         try {
             log("Try to get categories");
@@ -932,7 +894,7 @@ export async function getCategories() {
                     method: "GET",
                     headers: getHeaders(),
                     timeout: options.timeout,
-                }
+                },
             );
 
             categoriesData = categoriesRequest.data.data;
@@ -947,6 +909,10 @@ export async function getCategories() {
         return false;
     }
 
+    if (!reduced) {
+        return categoriesData;
+    }
+
     function categoriesReducer(prev, curr) {
         if (Array.isArray(curr.nodes)) {
             prev.push(...curr.nodes.reduce(categoriesReducer, []));
@@ -957,9 +923,7 @@ export async function getCategories() {
         return prev;
     }
 
-    const categories = categoriesData.reduce(categoriesReducer, []);
-
-    return categories;
+    return categoriesData.reduce(categoriesReducer, []);
 }
 
 /**
@@ -1012,7 +976,7 @@ export async function categoryRequest(page = 1, categoryId = options.category) {
 
                 headers: getHeaders(),
                 timeout: options.timeout,
-            }
+            },
         );
 
         return getItemsRequest.data;
@@ -1055,7 +1019,7 @@ export async function brandItemsRequest(brand = options.brand, page = 1) {
 
                 headers: getHeaders(),
                 timeout: options.timeout,
-            }
+            },
         );
 
         return getItemsRequest.data;
@@ -1129,6 +1093,8 @@ export async function processItems(items, brand = options.brand, queue) {
         });
     }
 
+    logQueue(queue);
+
     return true;
 }
 
@@ -1148,7 +1114,7 @@ export async function updateBrands(queue) {
         const brandItems = await queueCall(
             async () => getBrandItemsByID(brandID, queue),
             queue,
-            priorities.page
+            priorities.page,
         );
 
         if (!brandItems || !brandItems.length) {
@@ -1159,6 +1125,8 @@ export async function updateBrands(queue) {
         log(`Found ${brandItems.length || 0} items for brand ${brandID}`);
 
         processItems(brandItems, brandID, queue);
+
+        logQueue(queue);
     }
 
     logQueue(queue);
@@ -1190,7 +1158,7 @@ export async function updateItemsByCategory(categoryId, queue) {
             () => categoryRequest(page, categoryId),
             {
                 priority: priorities.page,
-            }
+            },
         );
 
         if (!getItemsData || !getItemsData.data) {
@@ -1206,7 +1174,7 @@ export async function updateItemsByCategory(categoryId, queue) {
         }
 
         log(
-            `Page ${page} found ${getItemsData.data.products.length} items before filter`
+            `Page ${page} found ${getItemsData.data.products.length} items before filter`,
         );
 
         count += getItemsData.data.products.length;
@@ -1332,7 +1300,7 @@ export async function updateItems(queue) {
     items.forEach((itemId) =>
         queue.add(() => getFeedbacks(itemId, false, queue), {
             priority: priorities.item,
-        })
+        }),
     );
 
     logQueue(queue);
@@ -1392,14 +1360,14 @@ export async function checkReviews(queue) {
                             async () => getFeedback(itemId, feedback, queue),
                             {
                                 priority: priorities.review,
-                            }
+                            },
                         );
                     }
                 }
 
                 logQueue(queue);
             },
-            { priority: priorities.item }
+            { priority: priorities.item },
         );
     }
 
@@ -1468,7 +1436,7 @@ export async function updateReviews(queue) {
 
                 logQueue(queue);
             },
-            { priority: priorities.item }
+            { priority: priorities.item },
         );
     }
 
@@ -1547,7 +1515,7 @@ export async function logStats(queue) {
 
             log(JSON.stringify(cache, null, 4));
         },
-        { priority: priorities.item }
+        { priority: priorities.item },
     );
 
     return true;
@@ -1572,7 +1540,7 @@ export async function getBrandItemsByID(brandID, queue) {
             () => brandItemsRequest(brandID, page),
             {
                 priority: priorities.page,
-            }
+            },
         );
 
         if (!getItemsData || !getItemsData.data) {
@@ -1647,39 +1615,83 @@ export async function getBrandItemsByID(brandID, queue) {
  * @return  {Boolean}        Result
  */
 export async function updateInfo(queue) {
-    const items = await getItems(prefix, true);
+    const items = await getItemsData(prefix);
 
-    log(`Update info for ${items.length} items`);
+    for (const { value: item, id: itemId } of items) {
+        if (!item.reviews.length) {
+            continue;
+        }
 
-    for (const itemId of items) {
-        const item = await getItem(prefix, itemId);
+        if (item.info) {
+            continue;
+        }
 
-        // Try to get item info
-        if (
-            item.ids &&
-            Array.isArray(item.ids) &&
-            item.ids.length &&
-            !item.info
-        ) {
-            const firstIdItem = item.ids[0];
-
-            queueCall(
-                async () => {
-                    const infoData = await getItemInfo(firstIdItem.id);
-
-                    if (firstIdItem.name == infoData.imt_name) {
-                        await updateItem(prefix, itemId, {
-                            info: infoData,
-                        });
+        queueCall(
+            async () => {
+                for (const reviewId of item.reviews) {
+                    if (item.info) {
+                        return false;
                     }
 
-                    logQueue(queue);
-                },
-                queue,
-                priorities.item
-            );
-        }
+                    const reviewItem = await getReview(
+                        prefix,
+                        itemId,
+                        reviewId,
+                    );
+
+                    if (!reviewItem?.nmId) {
+                        continue;
+                    }
+
+                    const info = await getItemInfo(reviewItem.nmId);
+
+                    if (info) {
+                        await updateItem(prefix, itemId, {
+                            info,
+                        });
+                    }
+                }
+
+                logQueue(queue);
+            },
+            queue,
+            priorities.item,
+        );
     }
+
+    // const items = await getItemsData(prefix);
+
+    // log(`Update info for ${items.length} items`);
+
+    // for (const { value: item, id: itemId } of items) {
+    //     // Try to get item info
+    //     if (
+    //         item.ids &&
+    //         Array.isArray(item.ids) &&
+    //         item.ids.length &&
+    //         !item.info
+    //     ) {
+    //         const firstIdItem = item.ids[0];
+
+    //         queueCall(
+    //             async () => {
+    //                 const infoData = await getItemInfo(firstIdItem.id);
+
+    //                 if (firstIdItem.name == infoData.imt_name) {
+    //                     await updateItem(prefix, itemId, {
+    //                         info: infoData,
+    //                     });
+    //                 }
+
+    //                 logQueue(queue);
+    //             },
+    //             queue,
+    //             priorities.item,
+    //         );
+    //     } else {
+    //         await deleteItemParam(prefix, itemId, "info");
+    //     }
+    // }
 
     logQueue(queue);
 
@@ -1762,7 +1774,7 @@ export async function getItemsByQuery(queue, query = options.query) {
         }
 
         log(
-            `Page ${page} found ${getItemsData.data.products.length} items before filter`
+            `Page ${page} found ${getItemsData.data.products.length} items before filter`,
         );
 
         count += getItemsData.data.products.length;

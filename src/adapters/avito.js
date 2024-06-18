@@ -10,7 +10,6 @@ import AdblockerPlugin from "puppeteer-extra-plugin-adblocker";
 import {
     addItem,
     addReview,
-    dbWrite,
     getBrands,
     getItem,
     getItems,
@@ -36,7 +35,7 @@ import sleep from "../helpers/sleep.js";
 puppeteer.use(
     AdblockerPlugin({
         blockTrackers: true,
-    })
+    }),
 );
 
 puppeteer.use(StealthPlugin());
@@ -69,7 +68,7 @@ export async function getItemsFromPageByQuery(
     queue,
     query,
     browser,
-    pageNumber = 1
+    pageNumber = 1,
 ) {
     log(`Get items for ${query} on page ${pageNumber}`);
 
@@ -82,12 +81,12 @@ export async function getItemsFromPageByQuery(
 
                 await page.goto(
                     `https://www.avito.ru/all?q=${query}&p=${pageNumber}`,
-                    goSettings
+                    goSettings,
                 );
 
                 result = await page.evaluate(() => {
                     return Array.from(
-                        document.querySelectorAll('[data-marker="item"]')
+                        document.querySelectorAll('[data-marker="item"]'),
                     ).map((item) => {
                         const link = item
                             .querySelector("a")
@@ -105,13 +104,13 @@ export async function getItemsFromPageByQuery(
                 return true;
             } catch (error) {
                 log(
-                    `Error get items for ${query} on page ${pageNumber}: ${error.message}`
+                    `Error get items for ${query} on page ${pageNumber}: ${error.message}`,
                 );
 
                 return false;
             }
         },
-        { priority: priorities.item }
+        { priority: priorities.item },
     );
 
     return result;
@@ -134,7 +133,7 @@ export async function getItemReview(itemId, browser) {
         const data = await page.evaluate(() => {
             return Array.from(document.querySelectorAll("[data-marker]"))
                 .filter((item) =>
-                    item.getAttribute("data-marker").includes("item")
+                    item.getAttribute("data-marker").includes("item"),
                 )
                 .map((item) => {
                     return {
@@ -212,7 +211,7 @@ export async function getItemsByQuery(queue, query = options.query) {
             queue,
             query,
             browser,
-            pageNumber
+            pageNumber,
         );
 
         if (data?.length) {
@@ -228,7 +227,7 @@ export async function getItemsByQuery(queue, query = options.query) {
 
             if (data.length) {
                 log(
-                    `Items after filter on page ${pageNumber}: ${data.length}/${itemsLength}`
+                    `Items after filter on page ${pageNumber}: ${data.length}/${itemsLength}`,
                 );
 
                 for (const item of data) {

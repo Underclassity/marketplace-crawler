@@ -263,6 +263,57 @@ export async function updateItem(prefix, itemId, data) {
 }
 
 /**
+ * Update item data
+ *
+ * @param   {String}   prefix  Prefix
+ * @param   {String}   itemId  Item ID
+ * @param   {String}   param   Parameter
+ *
+ * @return  {Boolean}          Result
+ */
+export async function deleteItemParam(prefix, itemId, param) {
+    if (!prefix || !prefix.length) {
+        logMsg("Prefix not defined!");
+        return false;
+    }
+
+    if (!is.string(itemId) && !is.number(itemId)) {
+        logMsg("Item ID not defined!");
+        return false;
+    }
+
+    if (!param?.length) {
+        logMsg("Input param is not a string!");
+        return false;
+    }
+
+    const dbPrefix = `${prefix}-products`;
+
+    loadDB(dbPrefix);
+
+    const item = await getItem(prefix, itemId);
+
+    if (!item) {
+        return false;
+    }
+
+    if (param in item) {
+        // Copy object
+        const newObject = { ...item };
+
+        // Delete param
+        delete newObject[param];
+
+        // Update with new object
+        await dbCache[dbPrefix].set(itemId.toString(), newObject);
+
+        return true;
+    }
+
+    return false;
+}
+
+/**
  * Get item from DB by item ID
  *
  * @param   {String}  prefix  Prefix

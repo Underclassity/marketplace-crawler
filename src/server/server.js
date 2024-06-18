@@ -11,8 +11,6 @@ import cors from "cors";
 import express from "express";
 import morgan from "morgan";
 
-import { LowSync, MemorySync } from "lowdb";
-
 import {
     getBrands,
     getItem,
@@ -31,15 +29,7 @@ import favoriteRouter from "./favorite.js";
 import queueRouter from "./queue.js";
 import usersRouter from "./users.js";
 import predictionsRouter from "./predictions.js";
-
-const sizeDb = new LowSync(new MemorySync(), {});
-
-sizeDb.read();
-
-if (!sizeDb.data) {
-    sizeDb.data = {};
-    sizeDb.write();
-}
+import categoriesRouter from "./categories.js";
 
 const app = express();
 const port = process.env.port || 3000;
@@ -57,6 +47,7 @@ app.use("/adapters", adapterRouter);
 app.use("/favorite", favoriteRouter);
 app.use("/users", usersRouter);
 app.use("/predictions", predictionsRouter);
+app.use("/categories", categoriesRouter);
 app.use(morgan("combined"));
 
 const adapters = getAdaptersIds();
@@ -66,9 +57,9 @@ for (const adapter of adapters) {
         `/static/${adapter}`,
         expressSharp({
             imageAdapter: new FsAdapter(
-                path.resolve(options.directory, "download", adapter)
+                path.resolve(options.directory, "download", adapter),
             ),
-        })
+        }),
     );
 }
 

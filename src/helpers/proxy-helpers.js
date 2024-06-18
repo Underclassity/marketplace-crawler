@@ -18,7 +18,7 @@ if (!fs.existsSync(dbPath)) {
 }
 
 const proxyAdapter = new JSONFileSync(path.resolve(dbPath, "proxy.json"));
-const proxyDb = new LowSync(proxyAdapter);
+const proxyDb = new LowSync(proxyAdapter, {});
 
 proxyDb.read();
 
