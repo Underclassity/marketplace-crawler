@@ -2,22 +2,28 @@ import axios from "axios";
 
 import cheerio from "cheerio";
 
-import { getItems } from "./src/helpers/db.js";
+import { getItems, getItemsData } from "./src/helpers/db.js";
+
+import commandCall from "./src/helpers/command-call.js";
+import log from "./src/helpers/log.js";
 
 const prefix = "ozon";
 
 async function getItemLink(itemId) {
     try {
-        const request = await axios(
-            `https://ozon.by/search/?text=${itemId}&from_global=true`,
-            {
-                method: "GET",
-                responseType: "document",
-                timeout: 5_000,
-            }
-        );
+        log("Get item: ", itemId);
 
-        const $ = cheerio.load(request.data);
+        const url = `https://ozon.by/search/?text=${itemId}&from_global=true`;
+        const result = await commandCall(`curl ${url}`);
+
+        // const request = await axios(url, {
+        //     method: "GET",
+        //     responseType: "document",
+        //     timeout: 5_000,
+        // });
+
+        const $ = cheerio.load(result.stdout.toString());
+        // const $ = cheerio.load(request.data);
 
         let link = false;
 
@@ -33,7 +39,7 @@ async function getItemLink(itemId) {
             const { items } = data;
 
             for (const item of items) {
-                if (item.action.link) {
+                if (item?.action?.link) {
                     link = link.action.link;
                 }
             }
@@ -48,12 +54,12 @@ async function getItemLink(itemId) {
 }
 
 (async () => {
-    const items = await getItems(prefix, true, false, true);
+    const items = await getItemsData(prefix);
 
     const cache = {};
 
-    for (const item of items) {
-        if (item.link) {
+    for (const { value: item } of items) {
+        if (item?.link) {
             const id = item.link
                 .slice(0, item.link.lastIndexOf("-"))
                 .replace("https://ozon.by/product/", "");
@@ -65,7 +71,7 @@ async function getItemLink(itemId) {
                 cache[id].reviews = cache[id].reviews
                     .filter(
                         (element, index, array) =>
-                            array.indexOf(element) === index
+                            array.indexOf(element) === index,
                     )
                     .sort((a, b) => a.localeCompare(b));
                 cache[id].ids.push(itemId);
@@ -73,7 +79,7 @@ async function getItemLink(itemId) {
                 cache[id].ids = cache[id].ids
                     .filter(
                         (element, index, array) =>
-                            array.indexOf(element) === index
+                            array.indexOf(element) === index,
                     )
                     .sort((a, b) => a.localeCompare(b));
             } else {
@@ -89,5 +95,6 @@ async function getItemLink(itemId) {
         }
     }
 
+    console.log(cache);
     debugger;
 })();

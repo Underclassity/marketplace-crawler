@@ -5,16 +5,16 @@ import { QuickDB } from "quick.db";
 
 import is from "is_js";
 
-import logMsg from "./log-msg.js";
-import { getFiles as getFilesFromFolder } from "./get-files.js";
-
+import { getFilesRecursively } from "./get-files.js";
 import deepEqual from "./deep-equal.js";
+import logMsg from "./log-msg.js";
 
 import options from "../options.js";
 
 const dbPath = path.resolve(options.directory, "db");
 
 const dbCache = {};
+const dbDataCache = {};
 
 /**
  * Load DB by prefix
@@ -23,7 +23,7 @@ const dbCache = {};
  *
  * @return  {Object}            DB instance
  */
-export function loadDB(dbPrefix) {
+export async function loadDB(dbPrefix) {
     if (!dbPrefix || !dbPrefix.length) {
         logMsg("DB prefix not defined!");
         return false;
@@ -33,9 +33,220 @@ export function loadDB(dbPrefix) {
         dbCache[dbPrefix] = new QuickDB({
             filePath: path.resolve(dbPath, `${dbPrefix}.sqlite`),
         });
+
+        await dbCache[dbPrefix].init();
+
+        await updateDB(dbPrefix);
     }
 
     return dbCache[dbPrefix];
+}
+
+/**
+ * Update cached data helper
+ *
+ * @param   {String}  dbPrefix  DB prefix
+ *
+ * @return  {Boolean}           Result
+ */
+export async function updateDB(dbPrefix) {
+    if (!dbPrefix || !dbPrefix.length) {
+        logMsg("DB prefix not defined!");
+        return false;
+    }
+
+    // if (dbPrefix in dbCache && dbPrefix.includes("-products")) {
+    //     dbDataCache[dbPrefix] = await dbCache[dbPrefix].all();
+    //     return true;
+    // }
+
+    return false;
+}
+
+/**
+ * DB set helper
+ *
+ * @param   {String}  dbPrefix  DB prefix
+ * @param   {String}  itemId    Item ID
+ * @param   {Object}  data      Input data
+ *
+ * @return  {Object}            Result item
+ */
+export async function dbSet(dbPrefix, itemId, data) {
+    if (!dbPrefix || !itemId) {
+        return false;
+    }
+
+    if (!is.object(data)) {
+        return false;
+    }
+
+    itemId = itemId.toString();
+
+    const db = await loadDB(dbPrefix);
+
+    if (!db) {
+        return false;
+    }
+
+    const result = await db.set(itemId, data);
+
+    if (!result) {
+        return false;
+    }
+
+    await updateDB(dbPrefix);
+
+    return result;
+}
+
+/**
+ * DB delete helper
+ *
+ * @param   {String}  dbPrefix  DB prefix
+ * @param   {String}  itemId    Item ID
+ *
+ * @return  {Object}            Result item
+ */
+export async function dbDetete(dbPrefix, itemId) {
+    if (!dbPrefix || !itemId) {
+        return false;
+    }
+
+    itemId = itemId.toString();
+
+    const db = await loadDB(dbPrefix);
+
+    if (!db) {
+        return false;
+    }
+
+    const result = await db.delete(itemId);
+
+    if (!result) {
+        return false;
+    }
+
+    await updateDB(dbPrefix);
+
+    return result;
+}
+
+/**
+ * DB has helper
+ *
+ * @param   {String}  dbPrefix  DB prefix
+ * @param   {String}  itemId    Item ID
+ *
+ * @return  {Object}            Result
+ */
+export async function dbHas(dbPrefix, itemId) {
+    if (!dbPrefix || !itemId) {
+        return false;
+    }
+
+    itemId = itemId.toString();
+
+    const db = await loadDB(dbPrefix);
+
+    if (!db) {
+        return false;
+    }
+
+    return await db.has(itemId);
+}
+
+/**
+ * Get item from DB helper
+ *
+ * @param   {String}  dbPrefix  DB prefix
+ * @param   {String}  itemId    Item ID
+ *
+ * @return  {Object}            Item
+ */
+async function dbGet(dbPrefix, itemId) {
+    if (!dbPrefix || !itemId) {
+        return false;
+    }
+
+    itemId = itemId.toString();
+
+    const db = await loadDB(dbPrefix);
+
+    if (!db) {
+        return false;
+    }
+
+    return await db.get(itemId);
+}
+
+/**
+ * DB update helper
+ *
+ * @param   {String}  dbPrefix  DB prefix
+ * @param   {String}  itemId    Item ID
+ * @param   {Object}  data      Input data
+ *
+ * @return  {Object}            Result item
+ */
+export async function dbUpdate(dbPrefix, itemId, data) {
+    if (!dbPrefix || !itemId) {
+        return false;
+    }
+
+    if (!is.object(data)) {
+        return false;
+    }
+
+    itemId = itemId.toString();
+
+    const db = await loadDB(dbPrefix);
+
+    if (!db) {
+        return false;
+    }
+
+    const isItem = await db.has(itemId, data);
+
+    if (!isItem) {
+        return false;
+    }
+
+    const item = await db.get(itemId);
+
+    await db.set(itemId, {
+        ...item,
+        ...data,
+    });
+
+    await updateDB(dbPrefix);
+
+    return true;
+}
+
+/**
+ * DB get all items helper
+ *
+ * @param   {String}  dbPrefix  DB prefix
+ *
+ * @return  {Array}             Items data
+ */
+export async function dbAll(dbPrefix) {
+    if (!dbPrefix) {
+        return false;
+    }
+
+    const db = await loadDB(dbPrefix);
+
+    if (!db) {
+        return false;
+    }
+
+    if (dbPrefix in dbDataCache) {
+        return dbDataCache[dbPrefix];
+    }
+
+    return await db.all();
 }
 
 /**
@@ -63,36 +274,30 @@ export async function dbItemCheck(dbPrefix, itemId, prefix) {
         return false;
     }
 
-    loadDB(dbPrefix);
+    const isItem = await dbHas(dbPrefix, itemId);
 
-    const db = dbCache[dbPrefix];
+    let item;
 
-    if (!db) {
-        logMsg("DB not defined!");
-        return false;
-    }
-
-    let item = await db.get(itemId.toString());
-
-    if (!item) {
-        await db.set(itemId.toString(), {
+    if (!isItem) {
+        item = await dbSet(dbPrefix, itemId, {
             id: itemId,
             reviews: [],
             tags: [],
             brand: undefined,
         });
-        item = await db.get(itemId.toString());
+    } else {
+        item = await dbGet(dbPrefix, itemId);
     }
 
     if (!("reviews" in item)) {
-        await db.set(itemId.toString(), {
+        await dbSet(dbPrefix, itemId, {
             ...item,
             reviews: {},
         });
     }
 
     if (!("tags" in item)) {
-        await db.set(itemId.toString(), {
+        await dbSet(dbPrefix, itemId, {
             ...item,
             tags: [],
         });
@@ -128,18 +333,14 @@ export async function addItem(prefix, itemId, data = {}) {
 
     const dbPrefix = `${prefix}-products`;
 
-    loadDB(dbPrefix);
-
-    const db = dbCache[dbPrefix];
-
-    const item = await getItem(prefix, itemId);
+    const item = await dbGet(dbPrefix, itemId);
 
     if (item && !options.force) {
         logMsg("Item already in DB", itemId, prefix);
     } else {
         logMsg("Add new item", itemId, prefix);
 
-        await db.set(itemId.toString(), {
+        await dbSet(dbPrefix, itemId, {
             id: itemId,
             reviews: [],
             tags: options.query ? [options.query] : [],
@@ -180,11 +381,7 @@ export async function deleteItem(prefix, itemId) {
 
     const dbPrefix = `${prefix}-products`;
 
-    loadDB(dbPrefix);
-
-    const db = dbCache[dbPrefix];
-
-    await db.set(itemId.toString(), {
+    await dbSet(dbPrefix, itemId, {
         ...dbItem,
         deleted: true,
     });
@@ -193,14 +390,14 @@ export async function deleteItem(prefix, itemId) {
         options.directory,
         "thumbnails",
         prefix,
-        `${itemId}.webp`
+        `${itemId}.webp`,
     );
 
     const itemDownloadFolder = path.resolve(
         options.directory,
         "download",
         prefix,
-        itemId.toString()
+        itemId.toString(),
     );
 
     // delete thumbnail
@@ -245,19 +442,7 @@ export async function updateItem(prefix, itemId, data) {
 
     const dbPrefix = `${prefix}-products`;
 
-    loadDB(dbPrefix);
-
-    const item = await getItem(prefix, itemId);
-
-    if (!item) {
-        return false;
-    }
-
-    const newObject = { ...item, ...data };
-
-    if (!deepEqual(newObject, item)) {
-        await dbCache[dbPrefix].set(itemId.toString(), newObject);
-    }
+    await dbUpdate(dbPrefix, itemId, data);
 
     return true;
 }
@@ -289,8 +474,6 @@ export async function deleteItemParam(prefix, itemId, param) {
 
     const dbPrefix = `${prefix}-products`;
 
-    loadDB(dbPrefix);
-
     const item = await getItem(prefix, itemId);
 
     if (!item) {
@@ -305,7 +488,7 @@ export async function deleteItemParam(prefix, itemId, param) {
         delete newObject[param];
 
         // Update with new object
-        await dbCache[dbPrefix].set(itemId.toString(), newObject);
+        await dbSet(dbPrefix, itemId, newObject);
 
         return true;
     }
@@ -334,9 +517,7 @@ export async function getItem(prefix, itemId) {
 
     const dbPrefix = `${prefix}-products`;
 
-    loadDB(dbPrefix);
-
-    const item = await dbCache[dbPrefix].get(itemId.toString());
+    const item = await dbGet(dbPrefix, itemId);
 
     if (item) {
         return item;
@@ -368,18 +549,18 @@ export async function updateTime(prefix, itemId, time = Date.now()) {
 
     const dbPrefix = `${prefix}-products`;
 
-    loadDB(dbPrefix);
-
     if (!(await dbItemCheck(dbPrefix, itemId, prefix))) {
         return false;
     }
 
-    const item = await dbCache[dbPrefix].get(itemId.toString());
+    const item = await dbGet(dbPrefix, itemId);
 
-    await dbCache[dbPrefix].set(itemId.toString(), {
+    await dbSet(dbPrefix, itemId, {
         ...item,
         time,
     });
+
+    await updateItemStats(prefix, itemId);
 
     return true;
 }
@@ -411,10 +592,6 @@ export async function updateTags(prefix, itemId, tag) {
 
     const dbPrefix = `${prefix}-products`;
 
-    loadDB(dbPrefix);
-
-    const db = dbCache[dbPrefix];
-
     if (!(await dbItemCheck(dbPrefix, itemId, prefix))) {
         return false;
     }
@@ -428,15 +605,15 @@ export async function updateTags(prefix, itemId, tag) {
         return false;
     }
 
-    const item = await db.get(itemId.toString());
+    const item = await dbGet(dbPrefix, itemId);
 
     if (!("tags" in item)) {
-        await db.set(itemId.toString(), {
+        await dbSet(dbPrefix, itemId, {
             ...item,
             tags: [tag],
         });
     } else if (!item.tags.includes(tag)) {
-        await db.set(itemId.toString(), {
+        await dbSet(dbPrefix, itemId, {
             ...item,
             tags: [...item.tags, tag],
         });
@@ -472,10 +649,6 @@ export async function updateBrand(prefix, itemId, brand) {
 
     const dbPrefix = `${prefix}-products`;
 
-    loadDB(dbPrefix);
-
-    const db = dbCache[dbPrefix];
-
     if (!(await dbItemCheck(dbPrefix, itemId, prefix))) {
         return false;
     }
@@ -489,11 +662,11 @@ export async function updateBrand(prefix, itemId, brand) {
         return false;
     }
 
-    const item = await db.get(itemId.toString());
+    const item = await dbGet(dbPrefix, itemId);
 
     // Add brand id if not defined
     if (!("brand" in item)) {
-        await db.set(itemId.toString(), {
+        await dbSet(dbPrefix, itemId, {
             ...item,
             brand,
         });
@@ -516,7 +689,7 @@ export async function getItems(
     prefix = false,
     force = options.force,
     deleted = false,
-    objects = false
+    objects = false,
 ) {
     if (!prefix || !prefix.length) {
         logMsg("Prefix not defined!");
@@ -525,18 +698,9 @@ export async function getItems(
 
     const dbPrefix = `${prefix}-products`;
 
-    loadDB(dbPrefix);
-
-    const db = dbCache[dbPrefix];
-
-    if (!db) {
-        logMsg("DB not defined!", false, prefix);
-        return false;
-    }
-
     const time = options.time * 60 * 60 * 1000;
 
-    const items = await db.all();
+    const items = await dbAll(dbPrefix);
 
     let filteredItems = [];
 
@@ -600,18 +764,161 @@ export async function getItemsData(prefix) {
 
     const dbPrefix = `${prefix}-products`;
 
-    loadDB(dbPrefix);
+    return await dbAll(dbPrefix);
+}
 
-    const db = dbCache[dbPrefix];
-
-    if (!db) {
-        logMsg("DB not defined!", false, prefix);
+/**
+ * Get all items data with params
+ *
+ * @param   {String}  prefix  Prefix
+ * @param   {Object}  params  Params object
+ *
+ * @return  {Array}           Items array
+ */
+export async function getItemsDataByParams(prefix, params) {
+    if (!prefix || !prefix.length) {
+        logMsg("Prefix not defined!");
         return false;
     }
 
-    const items = await db.all();
+    const dbPrefix = `${prefix}-products`;
 
-    return items;
+    let items = await dbAll(dbPrefix);
+
+    if (!is.object(params)) {
+        return items;
+    }
+
+    const config = {
+        page: 1,
+        limit: 100,
+
+        photos: false,
+        favorite: false,
+
+        sort: false,
+        brand: false,
+        tag: false,
+        category: false,
+
+        deleted: false,
+
+        ...params,
+    };
+
+    items = items
+        .filter(({ value }) => {
+            return config.deleted ? value?.deleted : !value?.deleted;
+        })
+        .filter(({ value }) => {
+            if (!config.tag) {
+                return true;
+            }
+
+            if (config.tag == "no-tag") {
+                return !value?.tags.length;
+            }
+
+            return value.tags.includes(config.tag);
+        })
+        .filter(({ value }) => {
+            if (!config.favorite) {
+                return true;
+            }
+
+            if (value.favorite) {
+                return true;
+            }
+
+            return false;
+        })
+        .filter(({ value }) => {
+            if (!config.photos) {
+                return true;
+            }
+
+            return value?.stats?.count?.files || 0;
+        })
+        .filter(({ value }) => {
+            if (!config.category) {
+                return true;
+            }
+
+            if (config.category == "no-category") {
+                return !value?.info;
+            }
+
+            const { info } = value;
+
+            if (info?.data?.subject_id == config.category) {
+                return true;
+            }
+
+            return false;
+        });
+
+    if (config.brand) {
+        items = items.filter(({ value }) => {
+            if (config.brand == "no-brand") {
+                return !("brand" in value);
+            }
+
+            return value?.brand == config.brand;
+        });
+    }
+
+    if (config.sort) {
+        items = items.sort(({ value: aValue }, { value: bValue }) => {
+            if (config.sort == "reviewsAsc") {
+                return (
+                    (aValue.reviews.length || 0) - (bValue.reviews.length || 0)
+                );
+            }
+
+            if (config.sort == "reviewsDesc") {
+                return (
+                    (bValue.reviews.length || 0) - (aValue.reviews.length || 0)
+                );
+            }
+
+            const aSize = aValue.stats.size;
+            const bSize = bValue.stats.size;
+
+            if (config.sort == "sizeAsc") {
+                return aSize - bSize;
+            }
+
+            if (config.sort == "sizeDesc") {
+                return bSize - aSize;
+            }
+
+            const aFilesCount = aValue.stats.count.files;
+            const bFilesCount = bValue.stats.count.files;
+
+            if (config.sort == "filesAsc") {
+                return aFilesCount - bFilesCount;
+            }
+
+            if (config.sort == "filesDesc") {
+                return bFilesCount - aFilesCount;
+            }
+
+            return 0;
+        });
+    }
+
+    const count = items.length;
+
+    // Cut items
+    const resultItems = items.slice(
+        (config.page - 1) * config.limit,
+        (config.page - 1) * config.limit + config.limit,
+    );
+
+    return {
+        items: resultItems,
+        count,
+    };
 }
 
 /**
@@ -630,16 +937,7 @@ export async function getBrands(prefix, withNames = false) {
 
     const dbPrefix = `${prefix}-products`;
 
-    loadDB(dbPrefix);
-
-    const db = dbCache[dbPrefix];
-
-    if (!db) {
-        logMsg("DB not defined!", false, prefix);
-        return false;
-    }
-
-    const items = await db.all();
+    const items = await dbAll(dbPrefix);
 
     const brands = withNames ? {} : [];
 
@@ -707,16 +1005,7 @@ export async function getTags(prefix) {
 
     const dbPrefix = `${prefix}-products`;
 
-    loadDB(dbPrefix);
-
-    const db = dbCache[dbPrefix];
-
-    if (!db) {
-        logMsg("DB not defined!", false, prefix);
-        return false;
-    }
-
-    const items = await db.all();
+    const items = await dbAll(dbPrefix);
 
     let tags = [];
 
@@ -754,11 +1043,9 @@ export async function getUsersFromReviews(prefix) {
 
     const dbReviewsPrefix = `${prefix}-reviews`;
 
-    loadDB(dbReviewsPrefix);
-
     const results = {};
 
-    const reviews = await dbCache[dbReviewsPrefix].all();
+    const reviews = await dbAll(dbReviewsPrefix);
 
     for (const { id: reviewId, value: reviewItem } in reviews) {
         if (prefix == "wildberries") {
@@ -872,9 +1159,7 @@ export async function getReview(prefix, itemId, reviewId) {
 
     const dbReviewsPrefix = `${prefix}-reviews`;
 
-    loadDB(dbReviewsPrefix);
-
-    return await dbCache[dbReviewsPrefix].get(reviewId.toString());
+    return await dbGet(dbReviewsPrefix, reviewId);
 }
 
 /**
@@ -893,9 +1178,7 @@ export async function getReviews(prefix, query = false) {
 
     const dbReviewsPrefix = `${prefix}-reviews`;
 
-    loadDB(dbReviewsPrefix);
-
-    const reviews = await dbCache[dbReviewsPrefix].all();
+    const reviews = await dbAll(dbReviewsPrefix);
 
     if (!query || !is.object(query)) {
         return reviews;
@@ -954,32 +1237,26 @@ export async function addReview(prefix, itemId, reviewId, review) {
     const dbReviewsPrefix = `${prefix}-reviews`;
     const dbProductsPrefix = `${prefix}-products`;
 
-    loadDB(dbProductsPrefix);
-    loadDB(dbReviewsPrefix);
-
-    const productsDB = dbCache[dbProductsPrefix];
-    const reviewsDB = dbCache[dbReviewsPrefix];
-
     if (options.force) {
-        await reviewsDB.set(reviewId.toString(), review);
+        await dbSet(dbReviewsPrefix, reviewId, review);
 
         logMsg(`Force update review ${reviewId} in DB`, itemId, prefix);
 
         return true;
     }
 
-    let item = await productsDB.get(itemId.toString());
+    const isItem = await dbHas(dbProductsPrefix, itemId);
 
     // Add item if not defined
-    if (!item) {
+    if (!isItem) {
         await addItem(prefix, itemId);
-
-        item = await productsDB.get(itemId.toString());
     }
+
+    const item = await dbGet(dbProductsPrefix, itemId);
 
     // Convert old object reviews to new array type
     if (!Array.isArray(item.reviews)) {
-        await productsDB.set(itemId.toString(), {
+        await dbSet(dbProductsPrefix, itemId, {
             ...item,
             reviews: Object.keys(item.reviews),
         });
@@ -987,21 +1264,21 @@ export async function addReview(prefix, itemId, reviewId, review) {
 
     // Check is review in product item
     if (!item.reviews.includes(reviewId)) {
-        await productsDB.set(itemId.toString(), {
+        await dbSet(dbProductsPrefix, itemId, {
             ...item,
             reviews: [...item.reviews, reviewId],
         });
     }
 
-    let reviewItem = await reviewsDB.get(reviewId.toString());
+    let reviewItem = await dbHas(dbReviewsPrefix, reviewId);
 
     if (!reviewItem) {
-        reviewItem = await reviewsDB.set(reviewId.toString(), review);
+        reviewItem = await dbSet(dbReviewsPrefix, reviewId, review);
         logMsg(`Force add/update review ${reviewId} in DB`, itemId, prefix);
     } else if (deepEqual(reviewItem, review)) {
         logMsg(`Review ${reviewId} already saved in DB`, itemId, prefix);
     } else {
-        reviewItem = await reviewsDB.set(reviewId.toString(), review);
+        reviewItem = await dbSet(dbReviewsPrefix, reviewId, review);
         logMsg(`Update review ${reviewId} in DB`, itemId, prefix);
     }
 
@@ -1031,7 +1308,7 @@ export async function updateFiles(prefix, itemId) {
         options.directory,
         "download",
         prefix,
-        itemId
+        itemId,
     );
 
     if (!fs.existsSync(folderPath)) {
@@ -1040,18 +1317,12 @@ export async function updateFiles(prefix, itemId) {
 
     const dbPrefix = `${prefix}-files`;
 
-    loadDB(dbPrefix);
+    const folderFiles = getFilesRecursively(folderPath).sort();
 
-    const db = dbCache[dbPrefix];
-
-    const folderFiles = getFilesFromFolder(folderPath)
-        .map((filepath) => path.basename(filepath))
-        .sort();
-
-    const item = await db.get(itemId.toString());
+    const item = await dbGet(dbPrefix, itemId);
 
     if (!item || item != folderFiles) {
-        await db.set(itemId.toString(), folderFiles);
+        await dbSet(dbPrefix, itemId, folderFiles);
     }
 
     return true;
@@ -1078,9 +1349,7 @@ export async function getFiles(prefix, itemId) {
 
     const dbPrefix = `${prefix}-files`;
 
-    loadDB(dbPrefix);
-
-    const files = await dbCache[dbPrefix].get(itemId.toString());
+    const files = await dbGet(dbPrefix, itemId);
 
     if (!files) {
         return false;
@@ -1097,7 +1366,7 @@ export async function getFiles(prefix, itemId) {
  *
  * @return  {Number}          Files size
  */
-export function getFilesSize(prefix, itemId) {
+export async function getFilesSize(prefix, itemId) {
     if (!prefix || !prefix.length) {
         logMsg("Prefix not defined!");
         return false;
@@ -1108,7 +1377,7 @@ export function getFilesSize(prefix, itemId) {
         return false;
     }
 
-    const files = getFiles(prefix, itemId);
+    const files = await getFiles(prefix, itemId);
 
     if (!files || !files.length || !Array.isArray(files)) {
         return 0;
@@ -1120,7 +1389,7 @@ export function getFilesSize(prefix, itemId) {
             "download",
             prefix,
             itemId,
-            current
+            current,
         );
 
         if (!fs.existsSync(filepath)) {
@@ -1163,28 +1432,24 @@ export async function addPrediction(prefix, itemId, filename, predictions) {
         logMsg(
             `Input predictions ${predictions} is not an array!`,
             itemId,
-            prefix
+            prefix,
         );
         return false;
     }
 
     const dbPrefix = `${prefix}-predictions`;
 
-    loadDB(dbPrefix);
-
-    const db = dbCache[dbPrefix];
-
-    let item = await db.get(itemId.toString());
+    let item = await dbHas(dbPrefix, itemId);
 
     if (!item) {
-        await db.set(itemId.toString(), {});
-        item = await db.get(itemId.toString());
+        await dbSet(dbPrefix, itemId, {});
+        item = await dbGet(dbPrefix, itemId);
     }
 
     if (!(filename in item)) {
         item[filename] = predictions;
 
-        await db.set(itemId.toString(), {
+        await dbSet(dbPrefix, itemId, {
             ...item,
         });
     }
@@ -1219,11 +1484,7 @@ export async function getItemPredictions(prefix, itemId, filename) {
 
     const dbPrefix = `${prefix}-predictions`;
 
-    loadDB(dbPrefix);
-
-    const db = dbCache[dbPrefix];
-
-    const item = await db.get(itemId.toString());
+    const item = await dbGet(dbPrefix, itemId);
 
     if (!item) {
         return false;
@@ -1251,11 +1512,7 @@ export async function getPredictions(prefix) {
 
     const dbPrefix = `${prefix}-predictions`;
 
-    loadDB(dbPrefix);
-
-    const db = dbCache[dbPrefix];
-
-    const items = await db.all();
+    const items = await dbAll(dbPrefix);
 
     const allPredictions = {};
 
@@ -1309,11 +1566,7 @@ export async function getPredictionsForFile(prefix, itemId, filename) {
 
     const dbPrefix = `${prefix}-predictions`;
 
-    loadDB(dbPrefix);
-
-    const db = dbCache[dbPrefix];
-
-    const item = await db.get(itemId.toString());
+    const item = await dbGet(dbPrefix, itemId);
 
     if (!item) {
         logMsg("Predictions for item not found!", itemId, prefix);
@@ -1344,11 +1597,7 @@ export async function getPredictionsForItem(prefix, itemId) {
 
     const dbPrefix = `${prefix}-predictions`;
 
-    loadDB(dbPrefix);
-
-    const db = dbCache[dbPrefix];
-
-    const item = await db.get(itemId.toString());
+    const item = await dbGet(dbPrefix, itemId);
 
     if (!item) {
         logMsg("Predictions for item not found!", itemId, prefix);
@@ -1379,14 +1628,10 @@ export async function addToFavorite(prefix, itemId) {
 
     const dbPrefix = `${prefix}-favorites`;
 
-    loadDB(dbPrefix);
-
-    const db = dbCache[dbPrefix];
-
-    const item = await db.get(itemId.toString());
+    const item = await dbHas(dbPrefix, itemId);
 
     if (!item) {
-        await db.set(itemId.toString(), true);
+        await dbSet(dbPrefix, itemId, true);
 
         return true;
     }
@@ -1415,14 +1660,10 @@ export async function removeFromFavorite(prefix, itemId) {
 
     const dbPrefix = `${prefix}-favorites`;
 
-    loadDB(dbPrefix);
-
-    const db = dbCache[dbPrefix];
-
-    const item = await db.get(itemId.toString());
+    const item = await dbHas(dbPrefix, itemId);
 
     if (item) {
-        await db.set(itemId.toString(), false);
+        await dbDetete(dbPrefix, itemId);
         return true;
     }
 
@@ -1450,11 +1691,7 @@ export async function toggleFavorite(prefix, itemId) {
 
     const dbPrefix = `${prefix}-favorites`;
 
-    loadDB(dbPrefix);
-
-    const db = dbCache[dbPrefix];
-
-    const item = await db.get(itemId.toString());
+    const item = await dbHas(dbPrefix, itemId);
 
     return item
         ? await removeFromFavorite(prefix, itemId)
@@ -1482,11 +1719,7 @@ export async function isFavorite(prefix, itemId) {
 
     const dbPrefix = `${prefix}-favorites`;
 
-    loadDB(dbPrefix);
-
-    const db = dbCache[dbPrefix];
-
-    const item = await db.get(itemId.toString());
+    const item = await dbGet(dbPrefix, itemId);
 
     // Check and return result
     if (item) {
@@ -1518,17 +1751,13 @@ export async function addUserReview(prefix, id, reviewId, data) {
 
     const dbPrefix = `${prefix}-users`;
 
-    loadDB(dbPrefix);
-
-    const db = dbCache[dbPrefix];
-
-    let dbItem = await db.get(id.toString());
+    let dbItem = await dbGet(dbPrefix, id);
 
     // Update user data
     if (dbItem) {
         if (!dbItem.reviews.includes(reviewId)) {
             dbItem.reviews.push(reviewId);
-            await db.set(id.toString(), dbItem);
+            await dbSet(dbPrefix, id, dbItem);
         }
 
         if (!deepEqual(dbItem.info, data)) {
@@ -1540,24 +1769,24 @@ export async function addUserReview(prefix, id, reviewId, data) {
 
                     dbItem.info[dataId] = data[dataId];
 
-                    await db.set(id.toString(), dbItem);
+                    await dbSet(dbPrefix, id, dbItem);
                 }
             }
         }
     } else {
         try {
             // Create new user if not defined
-            await db.set(id.toString(), {
+            await dbSet(dbPrefix, id, {
                 id,
                 info: { ...data },
                 reviews: [reviewId],
             });
         } catch (error) {
-            dbItem = await db.get(id.toString());
+            dbItem = await dbGet(dbPrefix, id);
 
             if (!dbItem.reviews.includes(reviewId)) {
                 dbItem.reviews.push(reviewId);
-                await db.set(id.toString(), dbItem);
+                await dbSet(dbPrefix, id, dbItem);
             }
 
             if (!deepEqual(dbItem.info, data)) {
@@ -1569,7 +1798,7 @@ export async function addUserReview(prefix, id, reviewId, data) {
 
                         dbItem.info[dataId] = data[dataId];
 
-                        await db.set(id.toString(), dbItem);
+                        await dbSet(dbPrefix, id, dbItem);
                     }
                 }
             }
@@ -1594,11 +1823,7 @@ export async function getUsers(prefix) {
 
     const dbPrefix = `${prefix}-users`;
 
-    loadDB(dbPrefix);
-
-    const db = dbCache[dbPrefix];
-
-    const users = await db.all();
+    const users = await dbAll(dbPrefix);
 
     return users.map((item) => item.value);
 }
@@ -1619,11 +1844,7 @@ export async function deleteUser(prefix, userId) {
 
     const dbPrefix = `${prefix}-users`;
 
-    loadDB(dbPrefix);
-
-    const db = dbCache[dbPrefix];
-
-    const result = await db.delete(userId);
+    const result = await dbDelete(dbPrefix, userId);
 
     return result ? true : false;
 }
@@ -1646,14 +1867,14 @@ export function getItemFiles(prefix, itemId) {
         options.directory,
         "download",
         prefix,
-        itemId.toString()
+        itemId.toString(),
     );
 
     if (!fs.existsSync(itemFolderPath)) {
         return [];
     }
 
-    return fs.readdirSync(itemFolderPath);
+    return getFilesRecursively(itemFolderPath);
 }
 
 /**
@@ -1674,7 +1895,7 @@ export function removeItemFiles(prefix, itemId) {
         options.directory,
         "download",
         prefix,
-        itemId.toString()
+        itemId.toString(),
     );
 
     if (!fs.existSync(itemFolderPath)) {
@@ -1691,6 +1912,94 @@ export function removeItemFiles(prefix, itemId) {
     }
 
     return true;
+}
+
+/**
+ * Update item stats
+ *
+ * @param   {String}   prefix  Prefix
+ * @param   {String}   itemId  Item ID
+ *
+ * @return  {Object}           Stats
+ */
+export async function updateItemStats(prefix, itemId) {
+    if (!prefix || !prefix.length) {
+        logMsg("Prefix not defined!");
+        return false;
+    }
+
+    if (!itemId) {
+        logMsg("Item ID not defined!");
+        return false;
+    }
+
+    const itemFolderPath = path.resolve(
+        options.directory,
+        "download",
+        prefix,
+        itemId.toString(),
+    );
+
+    if (!fs.existsSync(itemFolderPath)) {
+        await dbUpdate(prefix, itemId, {
+            stats: {
+                size: 0,
+                count: {
+                    files: 0,
+                    images: 0,
+                    videos: 0,
+                },
+            },
+        });
+
+        return {
+            size: 0,
+            count: {
+                files: 0,
+                images: 0,
+                videos: 0,
+            },
+        };
+    }
+
+    const files = getFilesRecursively(itemFolderPath);
+
+    let size = 0;
+    let images = 0;
+    let videos = 0;
+    const filesCount = files.length;
+
+    for (const filepath of files) {
+        if (!fs.existsSync(filepath)) {
+            continue;
+        }
+
+        const stats = fs.statSync(filepath);
+
+        size += stats.size;
+
+        if (filepath.includes(".mp4")) {
+            videos++;
+        } else {
+            images++;
+        }
+    }
+
+    const stats = {
+        size,
+        count: {
+            files: filesCount,
+            images,
+            videos,
+        },
+    };
+
+    // Save processed data
+    await dbUpdate(prefix, itemId, {
+        stats,
+    });
+
+    return stats;
 }
 
 export default updateTime;

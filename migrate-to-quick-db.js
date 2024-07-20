@@ -58,19 +58,4 @@ const files = fs
             await sleep(100);
         }
     }
-
-    // for (const id of ids) {
-    //     const db = new QuickDB({ filePath: `db/${id}.db` });
-    //     const dbData = loadDB(`${id}-reviews`);
-    //     console.log(dbData.data);
-    //     // for (const itemId of items) {
-    //     //     const item = await getItem(id, itemId);
-    //     //     if (await db.get(itemId)) {
-    //     //         logMsg("Item already in DB", itemId, id);
-    //     //     } else {
-    //     //         logMsg("Add item to DB", itemId, id);
-    //     //         await db.set(itemId, item);
-    //     //     }
-    //     // }
-    // }
 })();

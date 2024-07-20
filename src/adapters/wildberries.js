@@ -19,6 +19,7 @@ import {
     getTags,
     updateBrand,
     updateItem,
+    updateItemStats,
     updateTags,
     updateTime,
 } from "../helpers/db.js";
@@ -1302,6 +1303,44 @@ export async function updateItems(queue) {
             priority: priorities.item,
         }),
     );
+
+    logQueue(queue);
+
+    while (queue.size || queue.pending) {
+        await sleep(1000);
+        logQueue(queue);
+    }
+
+    return true;
+}
+
+/**
+ * Update items stats helper
+ *
+ * @param   {Object}  queue  Queue
+ *
+ * @return  {Boolean}        Result
+ */
+export async function updateItemsStats(queue) {
+    const items = await getItemsData(prefix);
+
+    log(`Update ${items.length} items`);
+
+    for (const { id: itemId, value: item } of items) {
+        if (item.stats) {
+            continue;
+        }
+
+        queueCall(
+            async () => {
+                await updateItemStats(prefix, itemId);
+
+                logQueue(queue);
+            },
+            queue,
+            priorities.item,
+        );
+    }
 
     logQueue(queue);
 

@@ -1,17 +1,15 @@
-import fs from "node:fs";
 import path from "node:path";
-
-import { LowSync, MemorySync } from "lowdb";
 
 import express from "express";
 
 import {
     deleteItem,
     getFiles,
-    getFilesSize,
     getItem,
-    getItems,
+    getItemFiles,
     getItemsData,
+    getItemsDataByParams,
+    getReview,
     isFavorite,
     loadDB,
 } from "../helpers/db.js";
@@ -23,38 +21,21 @@ import options from "../options.js";
 
 const adapters = getAdaptersIds();
 
-const sizeDb = new LowSync(new MemorySync(), {});
-
-sizeDb.read();
-
-if (!sizeDb.data) {
-    sizeDb.data = {};
-    sizeDb.write();
-}
-
 export const adapterRouter = express.Router();
 
 adapterRouter.get("/", async (req, res) => {
     const data = [];
 
     for (const adapter of adapters) {
-        const items = await getItems(adapter, true);
+        const items = await getItemsData(adapter);
 
         let files = 0;
         let reviews = 0;
 
-        for (const itemId of items) {
-            if (!itemId) {
-                continue;
+        for (const { value: item } of items) {
+            if (item?.stats?.count?.files) {
+                files += item.stats.count.files;
             }
-
-            const itemFiles = await getFiles(adapter, itemId);
-
-            if (itemFiles?.length) {
-                files += itemFiles.length;
-            }
-
-            const item = await getItem(adapter, itemId);
 
             if (item?.reviews?.length) {
                 reviews += item.reviews.length;
@@ -64,8 +45,8 @@ adapterRouter.get("/", async (req, res) => {
         data.push({
             id: adapter,
             items: items.length,
-            files,
-            reviews,
+            files: 0,
+            reviews: 0,
         });
     }
 
@@ -75,6 +56,8 @@ adapterRouter.get("/", async (req, res) => {
 adapterRouter.get("/:adapter", async (req, res) => {
     const { adapter } = req.params;
 
+    logMsg("Get params for request", adapter);
+
     const page = parseInt(req.query.page || 1, 10);
     const limit = parseInt(req.query.limit || 100, 10);
     const isPhotos = req.query.photos == "true" || false;
@@ -83,6 +66,7 @@ adapterRouter.get("/:adapter", async (req, res) => {
     let brand = req.query.brand || false;
     let tag = req.query.tag || false;
     let category = req.query.category || false;
+    const deleted = req.query.deleted || false;
 
     if (brand == "false" || brand == "true") {
         brand = false;
@@ -104,154 +88,58 @@ adapterRouter.get("/:adapter", async (req, res) => {
         });
     }
 
-    const allItems = await getItemsData(adapter);
+    const params = {
+        page,
+        limit,
 
-    const count = allItems.length;
+        photos: isPhotos,
+        favorite: isFavoriteFlag,
 
-    let allItemsIDs = allItems
-        .filter(({ value }) => !value?.deleted)
-        .filter(({ value }) => {
-            if (!tag) {
-                return true;
-            }
+        sort: sortId,
+        brand,
+        tag,
+        category,
 
-            if (tag == "no-tag") {
-                return !value?.tags.length;
-            }
+        deleted,
+    };
 
-            return value.tags.includes(tag);
-        })
-        .filter(async ({ id }) => {
-            if (!isFavoriteFlag) {
-                return true;
-            }
+    const { items, count } = await getItemsDataByParams(adapter, params);
 
-            if (await isFavorite(adapter, id)) {
-                return true;
-            }
+    const resultItems = [];
 
-            return false;
-        })
-        .filter(async ({ id }) => {
-            if (!isPhotos) {
-                return true;
-            }
+    for (const { id: itemId, value: item } of items) {
+        // delete item.info;
+        delete item.ids;
+        delete item.prices;
 
-            const files = await getFiles(adapter, id);
-
-            return files.length;
-        })
-        .filter(({ value }) => {
-            if (!category) {
-                return true;
-            }
-
-            if (category == "no-category") {
-                return !value?.info;
-            }
-
-            const { info } = value;
-
-            if (info?.data?.subject_id == category) {
-                return true;
-            }
-
-            return false;
-        });
-
-    if (brand) {
-        allItemsIDs = allItemsIDs.filter(({ value }) => {
-            if (brand == "no-brand") {
-                return !("brand" in value);
-            }
-
-            return value?.brand == brand;
-        });
-    }
-
-    if (sortId) {
-        allItemsIDs = allItemsIDs.sort(
-            async ({ value: aValue, id: aId }, { value: bValue, id: bId }) => {
-                if (sortId == "reviewsAsc") {
-                    return (
-                        (aValue?.reviews?.length || 0) -
-                        (bValue?.reviews?.length || 0)
-                    );
-                }
-
-                if (sortId == "reviewsDesc") {
-                    return (
-                        (bValue?.reviews?.length || 0) -
-                        (aValue?.reviews?.length || 0)
-                    );
-                }
-
-                if (sortId == "sizeAsc" || sortId == "sizeDesc") {
-                    const aSize = sizeDb.data[`${adapter}-${a}`];
-                    const bSize = sizeDb.data[`${adapter}-${b}`];
-
-                    if (sortId == "sizeAsc") {
-                        return aSize - bSize;
-                    }
-
-                    if (sortId == "sizeDesc") {
-                        return bSize - aSize;
-                    }
-                }
-
-                if (!(sortId == "filesAsc" || sortId == "filesDesc")) {
-                    return false;
-                }
-
-                const aFiles = await getFiles(adapter, aId);
-                const bFiles = await getFiles(adapter, bId);
-
-                const aFilesCount = aFiles?.length ? aFiles.length : 0;
-                const bFilesCount = bFiles?.length ? bFiles.length : 0;
-
-                if (sortId == "filesAsc") {
-                    return aFilesCount - bFilesCount;
-                }
-
-                if (sortId == "filesDesc") {
-                    return bFilesCount - aFilesCount;
-                }
-            },
+        const itemFolderPath = path.resolve(
+            options.directory,
+            "download",
+            adapter,
+            itemId.toString(),
         );
-    }
 
-    // Cut items
-    const resultItemsIDs = allItemsIDs.slice(
-        (page - 1) * limit,
-        (page - 1) * limit + limit,
-    );
+        const files = await getItemFiles(adapter, itemId).map((item) => {
+            return item.replace(itemFolderPath, "").replace(`/`, "");
+        });
 
-    const items = [];
+        item.id = itemId;
+        item.reviews = item?.reviews?.length || 0;
+        item.images = files?.length >= 9 ? getRandom(files, 9) : [];
 
-    for (const { id: itemId, value: resultItem } of resultItemsIDs) {
-        delete resultItem.info;
-        delete resultItem.ids;
-        delete resultItem.prices;
+        item.favorite = await isFavorite(adapter, itemId);
+        item.category = item?.info?.data?.subject_id;
 
-        const files = await getFiles(adapter, itemId);
-
-        resultItem.id = itemId;
-        resultItem.reviews = resultItem?.reviews?.length || 0;
-        resultItem.images = files?.length >= 9 ? getRandom(files, 9) : [];
-        resultItem.files = files?.length ? files.length : 0;
-
-        resultItem.size = sizeDb.data[`${adapter}-${itemId}`];
-        resultItem.favorite = await isFavorite(adapter, itemId);
-        resultItem.category = resultItem?.info?.data?.subject_id;
-
-        items.push(resultItem);
+        resultItems.push(item);
     }
 
     logMsg(
-        `Get page ${page} for adapter ${adapter} with limit ${limit}: ${resultItemsIDs.length} items from ${count}`,
+        `Get page ${page} for adapter ${adapter} with limit ${limit}: ${resultItems.length} items from ${count}`,
+        false,
+        adapter,
     );
 
-    return res.json({ items, count: allItemsIDs.length, error: false });
+    return res.json({ items: resultItems, count, error: false });
 });
 
 adapterRouter.get("/:adapter/files", (req, res) => {
@@ -301,7 +189,7 @@ adapterRouter.get("/:adapter/files", (req, res) => {
     return res.json({ files });
 });
 
-adapterRouter.get("/:adapter/:itemId", (req, res) => {
+adapterRouter.get("/:adapter/:itemId", async (req, res) => {
     const { adapter, itemId } = req.params;
 
     if (!adapters.includes(adapter)) {
@@ -314,98 +202,61 @@ adapterRouter.get("/:adapter/:itemId", (req, res) => {
         });
     }
 
-    const dbFilesPrefix = `${adapter}-files`;
-    const dbReviewsPrefix = `${adapter}-reviews`;
-
-    const dbFiles = loadDB(dbFilesPrefix);
-    const dbReviews = loadDB(dbReviewsPrefix);
-
-    const info = getItem(adapter, itemId);
-
-    const files = itemId in dbFiles.data ? dbFiles.data[itemId].sort() : [];
+    const info = await getItem(adapter, itemId);
+    const files = await getFiles(adapter, itemId);
     const filesNames = files.map((filename) => path.parse(filename).name);
 
-    const reviews = (info.reviews || [])
-        .map((reviewId) => dbReviews.data[reviewId] || [])
-        .filter((review) => {
-            if (adapter == "aliexpress") {
-                return review?.images || review?.additionalReview?.images;
-            }
+    const reviews = [];
 
-            if (adapter == "wildberries") {
-                return review?.photos;
-            }
-        })
-        .map((review) => {
-            let images = [];
+    for (const reviewId of info.reviews) {
+        const review = await getReview(adapter, itemId, reviewId);
 
-            if (Array.isArray(review.images)) {
-                images.push(...review.images);
-            }
+        let images = [];
 
-            if (Array.isArray(review?.additionalReview?.images)) {
-                images.push(...review.additionalReview.images);
-            }
+        if (Array.isArray(review.images)) {
+            images.push(...review.images);
+        }
 
-            if (Array.isArray(review.photos)) {
-                images.push(
-                    ...review.photos.map((item) => {
-                        return {
-                            url: `https://feedbackphotos.wbstatic.net/${item.fullSizeUri}`,
-                        };
-                    }),
-                );
-            }
+        if (Array.isArray(review?.additionalReview?.images)) {
+            images.push(...review.additionalReview.images);
+        }
 
-            images = images
-                .filter((item) => item?.url)
-                .map((item) => path.basename(item.url))
-                .filter((filename) =>
-                    filesNames.includes(path.parse(filename).name),
-                )
-                .map((filename) => {
-                    const parsedFilename = path.parse(filename);
-                    const webpFilename = `${parsedFilename.name}.webp`;
+        if (Array.isArray(review.photos)) {
+            images.push(
+                ...review.photos.map((item) => {
+                    return {
+                        url: `https://feedbackphotos.wbstatic.net/${item.fullSizeUri}`,
+                    };
+                }),
+            );
+        }
 
-                    if (files.includes(webpFilename)) {
-                        return webpFilename;
-                    }
+        images = images
+            .filter((item) => item?.url)
+            .map((item) => path.basename(item.url))
+            .filter((filename) =>
+                filesNames.includes(path.parse(filename).name),
+            );
+        // .map((filename) => {
+        //     const parsedFilename = path.parse(filename);
+        //     const webpFilename = `${parsedFilename.name}.webp`;
 
-                    return filename;
-                });
+        //     if (files.includes(webpFilename)) {
+        //         return webpFilename;
+        //     }
 
-            return {
-                id: review.id,
-                images,
-            };
+        //     return filename;
+        // });
+
+        if (!images?.length) {
+            continue;
+        }
+
+        reviews.push({
+            id: review.id,
+            images,
         });
-
-    // delete info.reviews;
-
-    const size = files
-        .filter((filename) =>
-            fs.existsSync(
-                path.resolve(
-                    options.directory,
-                    "download",
-                    adapter,
-                    itemId,
-                    filename,
-                ),
-            ),
-        )
-        .reduce((previous, current) => {
-            previous += fs.statSync(
-                path.resolve(
-                    options.directory,
-                    "download",
-                    adapter,
-                    itemId,
-                    current,
-                ),
-            ).size;
-            return previous;
-        }, 0);
+    }
 
     return res.json({
         info: {
@@ -414,8 +265,8 @@ adapterRouter.get("/:adapter/:itemId", (req, res) => {
             time: info.time,
         },
         reviews,
-        count: files.length,
-        size,
+        count: info.stats.count.files,
+        size: info.stats.size,
         error: false,
     });
 });
@@ -423,41 +274,8 @@ adapterRouter.get("/:adapter/:itemId", (req, res) => {
 adapterRouter.delete("/:adapter/:itemId", async (req, res) => {
     const { adapter, itemId } = req.params;
 
-    const item = getItem(adapter, itemId);
-
-    if (!item || item.deleted) {
-        return res.json({
-            result: true,
-            error: false,
-        });
-    }
-
-    const thumbnailFilePath = path.resolve(
-        options.directory,
-        "thumbnails",
-        adapter,
-        `${adapter}.webp`,
-    );
-
-    const itemDownloadFolder = path.resolve(
-        options.directory,
-        "download",
-        adapter,
-        adapter,
-    );
-
     // found db item and set delete param to true
     const { result } = await deleteItem(adapter, itemId);
-
-    // delete thumbnail
-    if (fs.existsSync(thumbnailFilePath) && result) {
-        fs.unlinkSync(thumbnailFilePath);
-    }
-
-    // delete item dir if exist
-    if (fs.existsSync(itemDownloadFolder) && result) {
-        fs.rmSync(itemDownloadFolder, { recursive: true });
-    }
 
     return res.json({
         result,

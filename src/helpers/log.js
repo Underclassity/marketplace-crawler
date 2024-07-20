@@ -13,7 +13,7 @@ export function log(msg) {
     }
 
     if (options.logs) {
-        console.log(msg);
+        console.log(...arguments);
         return true;
     }
 

@@ -242,6 +242,23 @@
                 "true"
             ]
         },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Kufar Reviews",
+            "skipFiles": ["<node_internals>/**"],
+            "program": "${workspaceFolder}\\index.js",
+            "args": [
+                "--thumbnail",
+                "false",
+                "--time",
+                "24",
+                "--include",
+                "kufar",
+                "--reviews",
+                "true"
+            ]
+        },
 
         // Ozon
         {
@@ -442,6 +459,25 @@
         {
             "type": "node",
             "request": "launch",
+            "name": "Wildberries Brands Reverse",
+            "skipFiles": ["<node_internals>/**"],
+            "program": "${workspaceFolder}\\index.js",
+            "args": [
+                "--thumbnail",
+                "false",
+                "--time",
+                "24",
+                "--include",
+                "wildberries",
+                "--brands",
+                "true",
+                "--reverse",
+                "true"
+            ]
+        },
+        {
+            "type": "node",
+            "request": "launch",
             "name": "Wildberries Tags",
             "skipFiles": ["<node_internals>/**"],
             "program": "${workspaceFolder}\\index.js",
@@ -522,6 +558,21 @@
             "skipFiles": ["<node_internals>/**"],
             "program": "${workspaceFolder}\\log.js",
             "args": ["--include", "wildberries"]
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Wildberries Stats",
+            "skipFiles": ["<node_internals>/**"],
+            "program": "${workspaceFolder}\\index.js",
+            "args": [
+                "--include",
+                "wildberries",
+                "--throat",
+                "10",
+                "--stats",
+                "true"
+            ]
         },
         {
             "type": "node",

@@ -7,25 +7,26 @@ import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import AdblockerPlugin from "puppeteer-extra-plugin-adblocker";
 
-// import browserClose from "../helpers/browser-close.js";
-import { logQueue } from "../helpers/log-msg.js";
 import {
     addItem,
     addReview,
     getItem,
     getItems,
+    getItemsData,
     getReview,
     getTags,
     updateItem,
     updateTags,
     updateTime,
 } from "../helpers/db.js";
+import { logMsg, logQueue } from "../helpers/log-msg.js";
 import autoScroll from "../helpers/auto-scroll.js";
+import browserClose from "../helpers/browser-close.js";
+import browserConfig from "../helpers/browser-config.js";
 import createPage from "../helpers/create-page.js";
 import downloadItem from "../helpers/image-process.js";
 import getHeaders from "../helpers/get-headers.js";
 import goSettings from "../helpers/go-settings.js";
-import logMsg from "../helpers/log-msg.js";
 import sleep from "../helpers/sleep.js";
 
 import options from "../options.js";
@@ -38,7 +39,7 @@ const prefix = "ozon";
 puppeteer.use(
     AdblockerPlugin({
         blockTrackers: true,
-    })
+    }),
 );
 
 puppeteer.use(StealthPlugin());
@@ -75,7 +76,7 @@ async function download(itemId, queue, url, type = "photo", uuid) {
         options.directory,
         "download",
         "ozon",
-        itemId.toString()
+        itemId.toString(),
     );
 
     if (!fs.existsSync(dirPath)) {
@@ -168,7 +169,7 @@ export async function getOzonItemInfo(link, itemId, queue) {
                 if (Object.keys(cache.info).length) {
                     log(
                         `Found ${Object.keys(cache.info).length} info params`,
-                        itemId
+                        itemId,
                     );
                 } else {
                     log("Info params not found", itemId);
@@ -183,7 +184,7 @@ export async function getOzonItemInfo(link, itemId, queue) {
                 return false;
             }
         },
-        { priority: priorities.item }
+        { priority: priorities.item },
     );
 
     return true;
@@ -225,7 +226,7 @@ export async function getOzonItemByXHR(link, itemId, queue) {
                     method: "GET",
                     headers: getHeaders(),
                     responseType: "document",
-                }
+                },
             );
 
             getInfo = true;
@@ -242,7 +243,7 @@ export async function getOzonItemByXHR(link, itemId, queue) {
 
             log(
                 `Found reviews on page ${page}: ${reviewsLength} items`,
-                itemId
+                itemId,
             );
 
             $("[data-state]").each(async (index, element) => {
@@ -257,7 +258,7 @@ export async function getOzonItemByXHR(link, itemId, queue) {
                         prefix,
                         itemId,
                         reviewItem.uuid,
-                        reviewItem
+                        reviewItem,
                     );
 
                     if (reviewItem.content.photos?.length) {
@@ -267,7 +268,7 @@ export async function getOzonItemByXHR(link, itemId, queue) {
                                 queue,
                                 photoItem.url,
                                 "photo",
-                                photoItem.uuid || photoItem.UUID
+                                photoItem.uuid || photoItem.UUID,
                             );
                         }
                     }
@@ -279,7 +280,7 @@ export async function getOzonItemByXHR(link, itemId, queue) {
                                 queue,
                                 videoItem.url,
                                 "video",
-                                videoItem.uuid || videoItem.UUID
+                                videoItem.uuid || videoItem.UUID,
                             );
                         }
                     }
@@ -532,7 +533,7 @@ export async function getOzonItem(link, itemId, queue, browser) {
                             queue,
                             photoItem.url,
                             "photo",
-                            photoItem.uuid
+                            photoItem.uuid,
                         );
                     }
                 }
@@ -544,7 +545,7 @@ export async function getOzonItem(link, itemId, queue, browser) {
                             queue,
                             videoItem.url,
                             "video",
-                            videoItem.uuid
+                            videoItem.uuid,
                         );
                     }
                 }
@@ -583,6 +584,8 @@ export async function getOzonItem(link, itemId, queue, browser) {
  * @return  {Boolean}           Result
  */
 export async function updateItemById(itemId, queue, browser) {
+    log("Update item by ID: ", itemId);
+
     const item = await getItem(prefix, itemId);
 
     if (!item) {
@@ -593,7 +596,7 @@ export async function updateItemById(itemId, queue, browser) {
         async () => getOzonItem(item.link, itemId, queue, browser),
         {
             priority: priorities.item,
-        }
+        },
     );
 }
 
@@ -630,20 +633,21 @@ export async function updateInfo(queue) {
  * @return  {Boolean}        Result
  */
 export async function updateItems(queue) {
-    const items = await getItems(prefix);
+    const items = await getItemsData(prefix);
 
     log(`Update ${items.length} items`);
 
-    for (const itemId of items) {
-        const item = await getItem(prefix, itemId);
-
-        if (!item) {
-            continue;
-        }
-
-        queue.add(() => getOzonItemByXHR(item.link, itemId, queue), {
+    for (const { id: itemId, value: item } of items) {
+        queue.add(() => getOzonItemByXHR(item?.link, itemId, queue), {
             priority: priorities.item,
         });
+    }
+
+    logQueue(queue);
+
+    while (queue.size || queue.pending) {
+        await sleep(1000);
+        logQueue(queue);
     }
 
     return true;
@@ -678,7 +682,7 @@ export async function updateReviews(queue) {
                         queue,
                         photoItem.url,
                         "photo",
-                        photoItem.uuid || photoItem.UUID
+                        photoItem.uuid || photoItem.UUID,
                     );
                 }
             }
@@ -690,7 +694,7 @@ export async function updateReviews(queue) {
                         queue,
                         videoItem.url,
                         "video",
-                        videoItem.uuid || videoItem.UUID
+                        videoItem.uuid || videoItem.UUID,
                     );
                 }
             }
@@ -710,8 +714,17 @@ export async function updateReviews(queue) {
 export async function updateWithTags(queue) {
     const tags = await getTags(prefix);
 
+    log("Update items with tags: ", tags);
+
     for (const tag of tags) {
         await getItemsByQuery(queue, tag);
+    }
+
+    logQueue(queue);
+
+    while (queue.size || queue.pending) {
+        await sleep(1000);
+        logQueue(queue);
     }
 
     return true;
@@ -726,10 +739,20 @@ export async function updateWithTags(queue) {
  * @return  {Boolean}        Result
  */
 export async function getItemsByQuery(queue, query = options.query) {
+    log(`Get items by query: ${query}`);
+
     const browser = await puppeteer.launch({
+        ...browserConfig,
         headless: options.headless,
         devtools: options.headless ? false : true,
     });
+
+    const page = await createPage(browser);
+    await page.goto("https://ozon.by/");
+
+    await sleep(10_000);
+
+    await page.close();
 
     let ended = false;
 
@@ -745,12 +768,11 @@ export async function getItemsByQuery(queue, query = options.query) {
                 let page;
 
                 try {
-                    page = await createPage(browser, true);
+                    page = await createPage(browser, false);
 
-                    await page.goto(
-                        `https://ozon.by/search/?from_global=true&text=${query}&page=${pageId}`,
-                        goSettings
-                    );
+                    const url = `https://ozon.by/search/?from_global=true&text=${query}&page=${pageId}`;
+
+                    await page.goto(url, goSettings);
 
                     await autoScroll(page);
 
@@ -760,8 +782,8 @@ export async function getItemsByQuery(queue, query = options.query) {
                     let items = await page.evaluate(() => {
                         return Array.from(
                             document.querySelector(
-                                ".widget-search-result-container"
-                            ).firstChild.children
+                                ".widget-search-result-container",
+                            ).firstChild.children,
                         ).map((item) => {
                             return item.firstChild
                                 ? item.firstChild.href
@@ -792,7 +814,7 @@ export async function getItemsByQuery(queue, query = options.query) {
                     items = items.filter(async (item) => {
                         const id = parseInt(
                             item.slice(item.lastIndexOf("-") + 1),
-                            10
+                            10,
                         );
 
                         const time = options.time * 60 * 60 * 1000;
@@ -824,7 +846,7 @@ export async function getItemsByQuery(queue, query = options.query) {
                     for (const result of items) {
                         const id = parseInt(
                             result.slice(result.lastIndexOf("-") + 1),
-                            10
+                            10,
                         );
 
                         await addItem(prefix, id, {
@@ -837,7 +859,7 @@ export async function getItemsByQuery(queue, query = options.query) {
                             () => getOzonItem(result, id, queue, browser),
                             {
                                 priority: priorities.item,
-                            }
+                            },
                         );
                     }
 
@@ -851,7 +873,7 @@ export async function getItemsByQuery(queue, query = options.query) {
                     page = undefined;
                 }
             },
-            { priority: priorities.page }
+            { priority: priorities.page },
         );
     }
 
@@ -861,7 +883,7 @@ export async function getItemsByQuery(queue, query = options.query) {
         logQueue(queue);
     }
 
-    // await browserClose(browser);
+    await browserClose(browser);
 }
 
 export default getItemsByQuery;

@@ -51,7 +51,7 @@ import { processCookiesAndSession } from "./src/adapters/aliexpress.js";
 puppeteer.use(
     AdblockerPlugin({
         blockTrackers: true,
-    })
+    }),
 );
 
 puppeteer.use(StealthPlugin());
@@ -259,10 +259,12 @@ async function whileLog(queue) {
 
     if (options.stats) {
         for (const id of ids) {
-            const { logStats } = await import(`./src/adapters/${id}.js`);
+            const { updateItemsStats } = await import(
+                `./src/adapters/${id}.js`
+            );
 
-            if (logStats) {
-                logStats(queue);
+            if (updateItemsStats) {
+                updateItemsStats(queue);
             } else {
                 logMsg("Log stats not found!", false, id);
             }

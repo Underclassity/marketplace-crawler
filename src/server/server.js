@@ -11,14 +11,7 @@ import cors from "cors";
 import express from "express";
 import morgan from "morgan";
 
-import {
-    getBrands,
-    getItem,
-    getItems,
-    getPredictions,
-    getTags,
-    loadDB,
-} from "../helpers/db.js";
+import { getBrands, getPredictions, getTags, loadDB } from "../helpers/db.js";
 import getAdaptersIds from "../helpers/get-adapters-ids.js";
 import logMsg from "../helpers/log-msg.js";
 
@@ -127,58 +120,6 @@ app.get("/predictions/:adapter", async (req, res) => {
         predictions,
         error: false,
     });
-});
-
-app.get("/categories/:adapter", async (req, res) => {
-    const { adapter } = req.params;
-
-    const items = await getItems(adapter, true);
-
-    if (adapter != "wildberries" || !items.length) {
-        return res.json({ categories: {} });
-    }
-
-    const cache = {};
-
-    for (const itemId of items) {
-        const product = await getItem(adapter, itemId);
-
-        if (!product.info) {
-            continue;
-        }
-
-        const { info } = product;
-
-        if (!cache[info.subj_root_name]) {
-            cache[info.subj_root_name] = {};
-        }
-
-        if (!cache[info.subj_root_name][info.subj_name]) {
-            cache[info.subj_root_name][info.subj_name] = {
-                count: 0,
-                subject_id: info.data.subject_id,
-                subject_root_id: info.data.subject_root_id,
-            };
-        }
-
-        cache[info.subj_root_name][info.subj_name].count++;
-
-        if (
-            info.data.subject_id !=
-            cache[info.subj_root_name][info.subj_name].subject_id
-        ) {
-            console.log(info);
-        }
-
-        if (
-            info.data.subject_root_id !=
-            cache[info.subj_root_name][info.subj_name].subject_root_id
-        ) {
-            console.log(info);
-        }
-    }
-
-    return res.json({ categories: cache });
 });
 
 app.listen(port, () => {

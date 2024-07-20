@@ -9,6 +9,7 @@ import {
     addItem,
     getItem,
     getItems,
+    getItemsData,
     getTags,
     // updateTags,
     // updateTime,
@@ -60,10 +61,10 @@ export async function processItem(itemId, queue) {
             path.resolve(
                 downloadDirPath,
                 itemId.toString(),
-                path.parse(imageItem.path).base
+                path.parse(imageItem.path).base,
             ),
             queue,
-            false
+            false,
         );
     }
 
@@ -119,7 +120,18 @@ export async function updateItems(queue) {
  * @return  {Boolean}        Result
  */
 export async function updateReviews(queue) {
-    await updateItems(queue);
+    // await updateItems(queue);
+
+    const items = await getItemsData(prefix);
+
+    for (const { value: item } of items) {
+        processItem(item.ad_id, queue);
+    }
+
+    while (queue.size || queue.pending) {
+        await sleep(1000);
+        logQueue(queue);
+    }
 
     return true;
 }
@@ -162,7 +174,7 @@ export async function getItemsByQuery(queue, query = options.query) {
 
                             headers: getHeaders(),
                             timeout: options.timeout,
-                        }
+                        },
                     );
 
                     const data = request.data;
@@ -183,7 +195,7 @@ export async function getItemsByQuery(queue, query = options.query) {
 
                         // save cursor for next page
                         const nextPagePagination = data.pagination.pages.find(
-                            (item) => item.label == "next"
+                            (item) => item.label == "next",
                         );
 
                         if (nextPagePagination) {
@@ -200,7 +212,7 @@ export async function getItemsByQuery(queue, query = options.query) {
                     log(`Error page ${pageId} get: ${error.message}`);
                 }
             },
-            { priority: priorities.page }
+            { priority: priorities.page },
         );
     }
 

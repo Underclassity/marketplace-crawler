@@ -7,9 +7,6 @@ import which from "which";
 import axios from "axios";
 import prettyBytes from "pretty-bytes";
 
-// import { LowSync } from "lowdb";
-// import { JSONFileSync } from "lowdb/node";
-
 import { updateFiles } from "./db.js";
 import commandCall from "./command-call.js";
 import generateThumbail from "./generate-thumbnail.js";
@@ -28,16 +25,6 @@ const dbPath = path.resolve(options.directory, "db");
 if (!fs.existsSync(dbPath)) {
     fs.mkdirSync(dbPath);
 }
-
-// const convertAdapter = new JSONFileSync(path.resolve(dbPath, "convert.json"));
-// const convertDb = new LowSync(convertAdapter);
-
-// convertDb.read();
-
-// if (!convertDb.data) {
-//     convertDb.data = [];
-//     convertDb.write();
-// }
 
 const tempDirPath = path.resolve(options.directory, "temp");
 
@@ -84,7 +71,7 @@ export async function extractVideoFrames(
     fps = 5,
     r = 1,
     id,
-    prefix
+    prefix,
 ) {
     if (!which("ffmpeg", { nothrow: true })) {
         logMsg("ffmpeg binary not found!", id, prefix);
@@ -115,20 +102,20 @@ export async function extractVideoFrames(
             videoFrames = fs
                 .readdirSync(tempDirPath)
                 .filter((filename) =>
-                    filename.includes(`${parsedPath.name}-frame`)
+                    filename.includes(`${parsedPath.name}-frame`),
                 )
                 .map((filename) => path.resolve(tempDirPath, filename));
 
             logMsg(
                 `Get ${videoFrames.length} video frames for ${parsedPath.base}`,
                 id,
-                prefix
+                prefix,
             );
         } else {
             logMsg(
                 `Get video frames for ${parsedPath.base} error: ${error}`,
                 id,
-                prefix
+                prefix,
             );
         }
 
@@ -137,7 +124,7 @@ export async function extractVideoFrames(
         logMsg(
             `Get frames error for ${parsedPath.base}: ${error.message}`,
             id,
-            prefix
+            prefix,
         );
         return [];
     }
@@ -166,7 +153,7 @@ export async function convertVideoItem(filepath, itemId, prefix) {
     const exportFilePath = path.resolve(
         options.directory,
         "temp",
-        path.parse(filepath).base
+        path.parse(filepath).base,
     );
 
     if (fs.existsSync(exportFilePath)) {
@@ -189,10 +176,10 @@ export async function convertVideoItem(filepath, itemId, prefix) {
 
         logMsg(
             `Before ${prettyBytes(sizeBefore.size)} - After ${prettyBytes(
-                sizeAfter.size
+                sizeAfter.size,
             )}`,
             itemId,
-            prefix
+            prefix,
         );
 
         if (sizeAfter.size < sizeBefore.size) {
@@ -231,15 +218,6 @@ export async function processFile(filepath, queue, itemId, prefix) {
         return false;
     }
 
-    // if (!filepath.includes(".")) {
-    //     debugger;
-    // }
-
-    // if (convertDb.data.includes(filepath)) {
-    //     logMsg(`File ${filepath} found in convert cache`, itemId, prefix);
-    //     return false;
-    // }
-
     const parsed = path.parse(filepath);
 
     if (!fs.existsSync(tempDirPath)) {
@@ -249,7 +227,7 @@ export async function processFile(filepath, queue, itemId, prefix) {
     const tempWebpFilepath = path.resolve(tempDirPath, `${parsed.name}.webp`);
     const outputFilename = path.resolve(
         path.dirname(filepath),
-        `${parsed.name}.webp`
+        `${parsed.name}.webp`,
     );
 
     const command = `cwebp${
@@ -263,7 +241,7 @@ export async function processFile(filepath, queue, itemId, prefix) {
             async () => {
                 return await commandCall(command);
             },
-            { priority: priorities.download }
+            { priority: priorities.download },
         );
 
         const tempSize = fs.statSync(tempWebpFilepath).size;
@@ -272,10 +250,10 @@ export async function processFile(filepath, queue, itemId, prefix) {
         if (tempSize < originalSize) {
             logMsg(
                 `${filepath}: ${prettyBytes(tempSize)} < ${prettyBytes(
-                    originalSize
+                    originalSize,
                 )}`,
                 itemId,
-                prefix
+                prefix,
             );
 
             deleteHelper(filepath, itemId, prefix);
@@ -284,16 +262,13 @@ export async function processFile(filepath, queue, itemId, prefix) {
         } else {
             logMsg(
                 `${filepath}: ${prettyBytes(tempSize)} > ${prettyBytes(
-                    originalSize
+                    originalSize,
                 )}`,
                 itemId,
-                prefix
+                prefix,
             );
 
             deleteHelper(tempWebpFilepath, itemId, prefix);
-
-            // convertDb.data.push(filepath);
-            // convertDb.write();
         }
 
         return true;
@@ -328,7 +303,7 @@ export async function downloadFile(url, filepath, queue, itemId, prefix) {
             logMsg(
                 `Try to download ${filename} to ${path.dirname(filepath)}`,
                 itemId,
-                prefix
+                prefix,
             );
 
             try {
@@ -344,10 +319,10 @@ export async function downloadFile(url, filepath, queue, itemId, prefix) {
 
                 logMsg(
                     `Downloaded ${filename} to ${path.dirname(
-                        filepath
+                        filepath,
                     )}(size ${prettyBytes(fs.statSync(filepath).size)})`,
                     itemId,
-                    prefix
+                    prefix,
                 );
 
                 return true;
@@ -357,7 +332,7 @@ export async function downloadFile(url, filepath, queue, itemId, prefix) {
                         error.message
                     }`,
                     itemId,
-                    prefix
+                    prefix,
                 );
 
                 result = false;
@@ -365,7 +340,7 @@ export async function downloadFile(url, filepath, queue, itemId, prefix) {
                 return false;
             }
         },
-        { priority: priorities.download }
+        { priority: priorities.download },
     );
 
     // wait for file
@@ -425,7 +400,7 @@ export async function downloadVideo(url, filepath, queue, itemId, prefix) {
         },
         {
             priority: priorities.download,
-        }
+        },
     );
 
     while (!commandResult) {
@@ -436,13 +411,13 @@ export async function downloadVideo(url, filepath, queue, itemId, prefix) {
         logMsg(
             `Downloaded video ${filename}: ${commandResult.result}`,
             itemId,
-            prefix
+            prefix,
         );
     } else {
         logMsg(
             `Download error video ${filename}: ${commandResult.stderr}`,
             itemId,
-            prefix
+            prefix,
         );
     }
 
@@ -489,7 +464,7 @@ export async function isExist(url, queue) {
             }
         },
         queue,
-        priorities.checkSize
+        priorities.checkSize,
     );
 }
 
@@ -511,7 +486,7 @@ export async function checkSize(
     queue,
     itemId,
     prefix,
-    isVideo = false
+    isVideo = false,
 ) {
     const filename = path.basename(filepath);
 
@@ -528,10 +503,10 @@ export async function checkSize(
     if (isVideo) {
         logMsg(
             `File ${filename} is video with size ${prettyBytes(
-                fs.statSync(filepath).size
+                fs.statSync(filepath).size,
             )}`,
             itemId,
-            prefix
+            prefix,
         );
 
         return true;
@@ -558,22 +533,22 @@ export async function checkSize(
 
                 logMsg(
                     `Filesize for ${filename} equal is ${isSizeEqual}(r ${prettyBytes(
-                        contentLength
+                        contentLength,
                     )} f ${prettyBytes(size)})`,
                     itemId,
-                    prefix
+                    prefix,
                 );
             } catch (error) {
                 logMsg(
                     `Filesize ${filename} check error: ${error.message}`,
                     itemId,
-                    prefix
+                    prefix,
                 );
             }
 
             return isSizeEqual;
         },
-        { priority: priorities.checkSize }
+        { priority: priorities.checkSize },
     );
 
     logMsg(`Check size ${filename} result ${result}`, itemId, prefix);
@@ -624,26 +599,17 @@ export async function downloadItem(url, filepath, queue, isVideo = false) {
 
     const webpFilepath = path.resolve(
         path.dirname(filepath),
-        `${parsedPath.name}.webp`
+        `${parsedPath.name}.webp`,
     );
 
     if (url in downloadCache) {
         logMsg(
             `File ${parsedPath.name} already in download process`,
             id,
-            prefix
+            prefix,
         );
         return false;
     }
-
-    // if (!filepath.includes(".")) {
-    //     debugger;
-    // }
-
-    // if (convertDb.data.includes(filepath)) {
-    //     logMsg(`File ${filepath} found in convert cache`, id, prefix);
-    //     return false;
-    // }
 
     if (fs.existsSync(webpFilepath) && webpFilepath != filepath && !isVideo) {
         deleteHelper(filepath, id, prefix);
@@ -679,15 +645,6 @@ export async function downloadItem(url, filepath, queue, isVideo = false) {
                 : false;
     }
 
-    // const isSizeEqual = await checkSize(
-    //     url,
-    //     filepath,
-    //     queue,
-    //     id,
-    //     prefix,
-    //     isVideo
-    // );
-
     if (!fs.existsSync(tempDirPath)) {
         fs.mkdirSync(tempDirPath);
     }
@@ -715,14 +672,14 @@ export async function downloadItem(url, filepath, queue, isVideo = false) {
         logMsg(
             `Downloaded ${parsedPath.base} is ${isDownloaded}, exist ${isTempExist}`,
             id,
-            prefix
+            prefix,
         );
 
         if (isDownloaded && isTempExist) {
             logMsg(
                 `Moved ${parsedPath.base} from temp to ${parsedPath.dir}`,
                 id,
-                prefix
+                prefix,
             );
 
             try {

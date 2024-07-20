@@ -34,7 +34,7 @@ function logProgress(length) {
                 options.directory,
                 "download",
                 prefix,
-                itemId.toString()
+                itemId.toString(),
             );
 
             if (itemInfo.deleted) {
@@ -104,7 +104,9 @@ function logProgress(length) {
                 }
             }
 
-            result.items.push(obj);
+            if (options.force) {
+                result.items.push(obj);
+            }
         }
 
         const infoResults = [];
@@ -130,7 +132,7 @@ function logProgress(length) {
 
         fs.writeFileSync(
             path.resolve(options.directory, "db", `${prefix}-size.json`),
-            JSON.stringify(result, null, 4)
+            JSON.stringify(result, null, 4),
         );
     }
 })();

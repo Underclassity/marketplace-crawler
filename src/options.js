@@ -10,7 +10,7 @@ export const options = yargs(hideBin(process.argv))
         describe: "Base dir",
         default: path.resolve(
             path.dirname(fileURLToPath(import.meta.url)),
-            "../"
+            "../",
         ),
         type: "string",
     })

@@ -1,12 +1,9 @@
 import express from "express";
 
-import { LowSync, MemorySync } from "lowdb";
-
 import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import AdblockerPlugin from "puppeteer-extra-plugin-adblocker";
 
-import { getFilesSize } from "../helpers/db.js";
 import { processCookiesAndSession } from "../adapters/aliexpress.js";
 import browserConfig from "../helpers/browser-config.js";
 import createQueue from "../helpers/create-queue.js";
@@ -14,20 +11,11 @@ import priorities from "../helpers/priorities.js";
 
 import options from "../options.js";
 
-const sizeDb = new LowSync(new MemorySync(), {});
-
-sizeDb.read();
-
-if (!sizeDb.data) {
-    sizeDb.data = {};
-    sizeDb.write();
-}
-
 // Configure puppeteer
 puppeteer.use(
     AdblockerPlugin({
         blockTrackers: true,
-    })
+    }),
 );
 
 puppeteer.use(StealthPlugin());
@@ -90,10 +78,6 @@ queueRouter.post("/:adapter", async (req, res) => {
 
         for (const itemId of items) {
             const updateResult = await updateItemById(itemId, queue, browser);
-
-            // Update size DB
-            sizeDb.data[`${adapter}-${itemId}`] = getFilesSize(adapter, itemId);
-            sizeDb.write();
 
             result[itemId] = updateResult;
         }
